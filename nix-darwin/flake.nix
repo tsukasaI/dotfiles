@@ -27,7 +27,7 @@
         # Development
         neovim
         git
-
+        llvmPackages.openmp
         # Others
         yt-dlp
         graphviz
@@ -45,8 +45,6 @@
         # Nixに移行しないformulae
         brews = [
           "mise"
-          # libompはNixだと設定が面倒なので残す
-          "libomp"
         ];
 
         casks = [
