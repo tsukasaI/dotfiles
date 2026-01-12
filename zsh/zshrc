@@ -1,0 +1,42 @@
+# Nix
+if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
+  . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+fi
+# mise
+eval "$(mise activate zsh)"
+if command -v mise 1>/dev/null 2>&1; then
+  eval "$(mise activate --shims)"
+fi
+
+. "$HOME/.local/bin/env"
+
+# Added by Antigravity
+export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
+
+# ============================================
+# Prompt
+# ============================================
+PROMPT='%F{cyan}%2~%f %(?.%F{green}.%F{red})❯%f '
+
+# ============================================
+# Rust CLI Tools Aliases (対話シェルのみ)
+# ============================================
+if [[ $- == *i* ]]; then
+  alias ls='eza --icons --color=always'
+  alias find='fd'
+  alias ps='procs'
+
+  # cd → zoxide
+  eval "$(zoxide init zsh)"
+  alias cd='z'
+fi
+
+# starship
+eval "$(starship init zsh)"
+
+# Ghostty
+autoload -Uz add-zsh-hook
+_osc7_cwd() {
+  print -Pn "\e]7;file://localhost${PWD}\e\\"
+}
+add-zsh-hook precmd _osc7_cwd

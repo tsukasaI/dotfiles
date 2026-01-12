@@ -1,0 +1,25 @@
+# theme
+theme = GitHub Dark
+background-opacity = 0.8
+window-padding-x = 2
+window-padding-y = 2
+
+# Font
+font-family = BlexMono Nerd Font
+font-family = PlemolJP Console NF
+font-size = 12
+font-thicken = true
+font-feature = -calt
+
+# Cursor
+cursor-style = bar
+cursor-style-blink = false
+shell-integration-features = no-cursor
+
+#mouse
+mouse-hide-while-typing = true
+
+# session
+window-save-state = always
+window-inherit-working-directory = true
+

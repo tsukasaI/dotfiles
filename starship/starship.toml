@@ -1,0 +1,29 @@
+format = "$directory$aws$git_branch$character"
+add_newline = false
+
+[directory]
+# truncation_length = 2
+# truncation_symbol = ""
+# truncate_to_repo = false
+# style = "blue"
+
+truncation_length = 2
+truncation_symbol = "…/"
+truncate_to_repo = false
+style = "blue"
+fish_style_pwd_dir_length = 0
+
+[aws]
+format = '[$symbol($profile )(\($region\))]($style) '
+symbol = "\uf0ef"
+force_display = true
+
+[git_branch]
+format = "[$symbol$branch]($style) "
+symbol = "\ue725"
+style = "cyan"
+
+[character]
+success_symbol = "[❯](green)"
+error_symbol = "[❯](yellow)"
+
