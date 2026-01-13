@@ -9,7 +9,7 @@
 
   outputs = inputs@{ self, nix-darwin, nixpkgs }:
   let
-    configuration = { pkgs, ... }: {
+    configuration = { pkgs, lib, ... }: {
       environment.systemPackages = with pkgs; [
         # CLI tools
         bat
@@ -28,6 +28,20 @@
         neovim
         git
         llvmPackages.openmp
+
+        # DevOps / CLI tools (migrated from mise)
+        awscli2
+        gh
+        biome
+        lefthook
+        terraform
+
+        # Language runtimes (migrated from mise)
+        bun
+        go
+        nodejs
+        pnpm
+        rustup
         # Others
         yt-dlp
         graphviz
@@ -57,6 +71,10 @@
           "font-blex-mono-nerd-font"
         ];
       };
+
+      nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
+        "terraform"
+      ];
 
       nix.settings.experimental-features = "nix-command flakes";
       system.primaryUser = "inouetsukasa";
