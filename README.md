@@ -13,6 +13,7 @@ Personal dotfiles for macOS (Apple Silicon) managed with nix-darwin.
 ├── ghostty/       # Terminal emulator
 ├── vscode/        # Editor settings
 ├── mise/          # Task runner config
+├── git/           # Git configuration
 └── claude-code/   # AI assistant permissions
 ```
 
@@ -27,6 +28,9 @@ Personal dotfiles for macOS (Apple Silicon) managed with nix-darwin.
 ```sh
 # Clone
 git clone https://github.com/inouetsukasa/dotfiles.git ~/dotfiles
+
+# Symlink configs
+sh setup.sh
 
 # Apply nix-darwin configuration
 darwin-rebuild switch --flake ~/dotfiles/nix-darwin

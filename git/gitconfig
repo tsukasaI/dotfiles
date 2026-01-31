@@ -1,0 +1,14 @@
+[user]
+	name = tsukasa inoue
+	email = inoue.tsukasa.4@gmail.com
+	signingkey = 6C34D18450CD695F
+[pull]
+	rebase = false
+[commit]
+	gpgsign = true
+[push]
+	autoSetupRemote = true
+[core]
+	editor = nvim
+[init]
+	defaultBranch = main
