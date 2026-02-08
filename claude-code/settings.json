@@ -73,7 +73,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "/Users/inouetsukasa/dotfiles/claude-code/statusline.sh"
+    "command": "bun /Users/inouetsukasa/dotfiles/claude-code/statusline.ts"
   },
   "enabledPlugins": {
     "code-simplifier@claude-plugins-official": true

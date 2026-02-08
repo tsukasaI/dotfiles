@@ -5,12 +5,17 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     nix-darwin.url = "github:nix-darwin/nix-darwin/master";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
+    ewc.url = "github:tsukasaI/ewc";
+    ewc.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs@{ self, nix-darwin, nixpkgs }:
+  outputs = inputs@{ self, nix-darwin, nixpkgs, ewc }:
   let
+    system = "aarch64-darwin";
     configuration = { pkgs, lib, ... }: {
-      environment.systemPackages = with pkgs; [
+      environment.systemPackages = [
+        ewc.packages.${system}.default
+      ] ++ (with pkgs; [
         # CLI tools
         bat
         eza
@@ -45,7 +50,7 @@
         # Others
         yt-dlp
         graphviz
-      ];
+      ]);
 
       # Homebrew（Nixで管理できないもの用）
       homebrew = {
