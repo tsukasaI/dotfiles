@@ -64,6 +64,7 @@
 
         # Nixに移行しないformulae
         brews = [
+          "deck"
           "mise"
         ];
 
