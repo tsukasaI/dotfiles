@@ -65,15 +65,13 @@ if (ctx != null) {
   row2.push([fgCode, bgCode, `◔ ${ctx.toFixed(1)}%`]);
 }
 
-// 5. Token counts (used / limit)
+// 5. Token counts (cumulative)
 const inTok = input.context_window?.total_input_tokens ?? 0;
 const outTok = input.context_window?.total_output_tokens ?? 0;
-const limit = input.context_window?.context_window_size;
-if (limit != null) {
+if (inTok > 0 || outTok > 0) {
   const fmt = (n: number) =>
     n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
-  const used = inTok + outTok;
-  row2.push([250, 239, `≡ ${fmt(used)}/${fmt(limit)}`]);
+  row2.push([250, 239, `≡ ${fmt(inTok)}↓ ${fmt(outTok)}↑`]);
 }
 
 // 6. Lines changed
