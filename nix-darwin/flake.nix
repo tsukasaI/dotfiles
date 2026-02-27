@@ -48,6 +48,7 @@
         pnpm
         rustup
         # Others
+        silicon
         yt-dlp
         graphviz
       ]);
