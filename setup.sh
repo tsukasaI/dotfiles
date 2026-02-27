@@ -17,4 +17,7 @@ ln -sf "$DOTFILES/git/gitconfig" ~/.gitconfig
 mkdir -p ~/.config/git
 ln -sf "$DOTFILES/git/ignore" ~/.config/git/ignore
 
+# Claude Code hooks
+chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
+
 echo "Done."
