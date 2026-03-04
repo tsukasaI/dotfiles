@@ -3,6 +3,7 @@
   "env": {
     "IS_DEMO": "TRUE",
     "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
+    "ENABLE_TOOL_SEARCH": "1",
     "EDITOR": "nvim"
   },
   "permissions": {
@@ -66,6 +67,17 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "fini $CLAUDE_FILE_PATH"
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
@@ -76,6 +88,5 @@
     "code-simplifier@claude-plugins-official": true
   },
   "plansDirectory": ".claude/plans",
-  "effortLevel": "medium",
-  "model": "sonnet"
+  "effortLevel": "medium"
 }

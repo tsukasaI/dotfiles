@@ -49,7 +49,6 @@
         rustup
         # Others
         silicon
-        yt-dlp
         graphviz
       ]);
 
@@ -67,6 +66,7 @@
         brews = [
           "deck"
           "mise"
+          "yt-dlp"
         ];
 
         casks = [
