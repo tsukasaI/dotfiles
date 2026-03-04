@@ -1,4 +1,5 @@
-return { 'ibhagwan/fzf-lua',
-    -- optional for icon support
-    requires = { 'kyazdani42/nvim-web-devicons' }
+return {
+  'ibhagwan/fzf-lua',
+  dependencies = { 'nvim-tree/nvim-web-devicons' },
+  opts = {},
 }

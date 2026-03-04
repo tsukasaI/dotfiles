@@ -1,7 +1,7 @@
-require("config.lazy")
-
--- リーダーキー
+-- リーダーキー (lazy.nvim より前に設定する必要がある)
 vim.g.mapleader = " "
+
+require("config.lazy")
 
 -- 基本オプション
 vim.opt.number = true           -- 行番号
