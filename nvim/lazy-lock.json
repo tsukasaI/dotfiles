@@ -1,10 +1,10 @@
 {
   "blink.cmp": { "branch": "main", "commit": "4b18c32adef2898f95cdef6192cbd5796c1a332d" },
   "fidget.nvim": { "branch": "main", "commit": "7fa433a83118a70fe24c1ce88d5f0bd3453c0970" },
-  "fzf-lua": { "branch": "main", "commit": "b809639ed4dd63951c107543861ce17ab8bab3f9" },
+  "fzf-lua": { "branch": "main", "commit": "1eba927866251bae1b61dffc5b673b8dbd0f3f48" },
   "lazy.nvim": { "branch": "main", "commit": "306a05526ada86a7b30af95c5cc81ffba93fef97" },
   "lualine.nvim": { "branch": "master", "commit": "47f91c416daef12db467145e16bed5bbfe00add8" },
-  "nvim-treesitter": { "branch": "main", "commit": "972f378653c794b0ff82282a844732695064b70f" },
+  "nvim-treesitter": { "branch": "main", "commit": "544320a9cf5d6bf539ec1cc54d393064015670c4" },
   "nvim-web-devicons": { "branch": "master", "commit": "737cf6c657898d0c697311d79d361288a1343d50" },
-  "rustaceanvim": { "branch": "master", "commit": "d50597d482a6f44ddfc54d1af2f69f052053b4de" }
+  "rustaceanvim": { "branch": "master", "commit": "f2f0c1231a5b019dbc1fd6dafac1751c878925a3" }
 }

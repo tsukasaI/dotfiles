@@ -38,6 +38,7 @@
       "Bash(docker build:*)",
       "Bash(git fetch:*)",
       "Bash(git log:*)",
+      "Bash(git tag:*)",
       "Bash(go vet:*)",
       "Bash(go test:*)",
       "Bash(go doc:*)",
@@ -87,6 +88,5 @@
   "enabledPlugins": {
     "code-simplifier@claude-plugins-official": true
   },
-  "plansDirectory": ".claude/plans",
-  "effortLevel": "medium"
+  "plansDirectory": ".claude/plans"
 }
