@@ -44,6 +44,9 @@
         # Language runtimes (migrated from mise)
         bun
         go
+        gopls
+        gofumpt
+        gotools # goimports etc.
         nodejs
         pnpm
         rustup
