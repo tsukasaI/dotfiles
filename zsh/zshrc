@@ -26,6 +26,18 @@ _cached_eval mise-shims "mise activate --shims"
 export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
 
 # ============================================
+# History
+# ============================================
+HISTFILE=~/.zsh_history
+HISTSIZE=100000
+SAVEHIST=100000
+setopt HIST_IGNORE_DUPS       # skip consecutive duplicates
+setopt HIST_IGNORE_ALL_DUPS   # remove older duplicates, keep latest
+setopt HIST_IGNORE_SPACE      # skip commands starting with space
+setopt SHARE_HISTORY          # share history across terminals
+setopt HIST_REDUCE_BLANKS     # trim extra whitespace
+
+# ============================================
 # Prompt
 # ============================================
 zmodload zsh/datetime
@@ -72,7 +84,7 @@ setopt PROMPT_SUBST
 PROMPT='%F{blue}%2~%f${vcs_info_msg_0_}${_cloud_prompt}${_cmd_duration} %(?.%F{green}.%F{yellow})❯%f '
 
 # ============================================
-# Rust CLI Tools Aliases (対話シェルのみ)
+# Rust CLI Tools Aliases (interactive only)
 # ============================================
 if [[ $- == *i* ]]; then
   alias ls='eza --icons --color=always'
