@@ -16,7 +16,48 @@ export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
 # ============================================
 # Prompt
 # ============================================
-PROMPT='%F{cyan}%2~%f %(?.%F{green}.%F{red})❯%f '
+zmodload zsh/datetime
+autoload -Uz vcs_info
+zstyle ':vcs_info:*' check-for-changes true
+zstyle ':vcs_info:*' unstagedstr '*'
+zstyle ':vcs_info:*' stagedstr '+'
+zstyle ':vcs_info:git:*' formats $' %%F{cyan}\ue725%b%u%c%%f'
+zstyle ':vcs_info:git:*' actionformats $' %%F{cyan}\ue725%b%u%c%%f %%F{red}(%a)%%f'
+
+_cmd_timer_preexec() { _cmd_start=$EPOCHREALTIME }
+_cmd_timer_precmd() {
+  if [[ -n "$_cmd_start" ]]; then
+    local elapsed=$(( EPOCHREALTIME - _cmd_start ))
+    unset _cmd_start
+    if (( elapsed >= 3 && elapsed < 600 )); then
+      local s=$(( ${elapsed%.*} ))
+      if (( s >= 60 )); then
+        _cmd_duration=" %F{yellow}$((s/60))m$((s%60))s%f"
+      else
+        _cmd_duration=" %F{yellow}${s}s%f"
+      fi
+      return
+    fi
+  fi
+  _cmd_duration=""
+}
+
+_cloud_info() {
+  _cloud_prompt=""
+  if [[ -n "$AWS_PROFILE" ]]; then
+    _cloud_prompt+=$' %F{yellow}\uf0ef'"$AWS_PROFILE"
+    [[ -n "$AWS_REGION" ]] && _cloud_prompt+="($AWS_REGION)"
+    _cloud_prompt+="%f"
+  fi
+  if [[ -n "$CLOUDSDK_ACTIVE_CONFIG_NAME" || -n "$GOOGLE_CLOUD_PROJECT" ]]; then
+    local gcp="${GOOGLE_CLOUD_PROJECT:-$CLOUDSDK_ACTIVE_CONFIG_NAME}"
+    _cloud_prompt+=$' %F{blue}\uf7b7'"$gcp%f"
+  fi
+}
+precmd() { vcs_info; _cmd_timer_precmd; _cloud_info }
+preexec() { _cmd_timer_preexec "$@" }
+setopt PROMPT_SUBST
+PROMPT='%F{blue}%2~%f${vcs_info_msg_0_}${_cloud_prompt}${_cmd_duration} %(?.%F{green}.%F{yellow})❯%f '
 
 # ============================================
 # Rust CLI Tools Aliases (対話シェルのみ)
@@ -30,9 +71,6 @@ if [[ $- == *i* ]]; then
   eval "$(zoxide init zsh)"
   alias cd='z'
 fi
-
-# starship
-eval "$(starship init zsh)"
 
 # Ghostty
 autoload -Uz add-zsh-hook
