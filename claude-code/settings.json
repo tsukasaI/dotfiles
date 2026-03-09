@@ -75,7 +75,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "fini $CLAUDE_FILE_PATH"
+            "command": "fini $(jq -r '.tool_input.file_path')"
           }
         ]
       }
