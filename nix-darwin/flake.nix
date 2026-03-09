@@ -7,14 +7,17 @@
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     ewc.url = "github:tsukasaI/ewc";
     ewc.inputs.nixpkgs.follows = "nixpkgs";
+    fini.url = "github:tsukasaI/fini";
+    fini.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs@{ self, nix-darwin, nixpkgs, ewc }:
+  outputs = inputs@{ self, nix-darwin, nixpkgs, ewc, fini }:
   let
     system = "aarch64-darwin";
     configuration = { pkgs, lib, ... }: {
       environment.systemPackages = [
         ewc.packages.${system}.default
+        fini.packages.${system}.default
       ] ++ (with pkgs; [
         # CLI tools
         bat
@@ -24,7 +27,7 @@
         jq
         zoxide
         procs
-        starship
+
         chafa
         gawk
         gnupg
