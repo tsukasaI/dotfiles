@@ -2,11 +2,23 @@
 if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
   . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
 fi
+
+# eval cache helper: caches command output, invalidates when binary changes
+_cached_eval() {
+  local name=$1 cmd=$2
+  local cache_dir="$HOME/.cache/zsh"
+  local cache="$cache_dir/$name.zsh"
+  local bin=$(command -v ${cmd%% *} 2>/dev/null)
+  if [[ -n "$bin" && ( ! -f "$cache" || "$bin" -nt "$cache" ) ]]; then
+    mkdir -p "$cache_dir"
+    eval "$cmd" > "$cache"
+  fi
+  [[ -f "$cache" ]] && source "$cache"
+}
+
 # mise
-eval "$(mise activate zsh)"
-if command -v mise 1>/dev/null 2>&1; then
-  eval "$(mise activate --shims)"
-fi
+_cached_eval mise-activate "mise activate zsh"
+_cached_eval mise-shims "mise activate --shims"
 
 . "$HOME/.local/bin/env"
 
@@ -68,7 +80,7 @@ if [[ $- == *i* ]]; then
   alias ps='procs'
 
   # cd → zoxide
-  eval "$(zoxide init zsh)"
+  _cached_eval zoxide "zoxide init zsh"
   alias cd='z'
 fi
 
