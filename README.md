@@ -42,7 +42,16 @@ Declarative system configuration via Nix Flakes.
 
 **Packages**: neovim, git, bat, eza, fd, ripgrep, zoxide, starship, gh, awscli2, bun, go, nodejs, pnpm, rustup, terraform
 
-**Homebrew Casks**: ghostty, raycast, orbstack, claude-code
+**Homebrew Casks**: ghostty, raycast, orbstack
+
+**Standalone**: Claude Code (native installer, auto-updates)
+
+## Update
+
+```sh
+# Update all dependencies (nix flake + Homebrew + darwin-rebuild)
+nix flake update --flake ~/dotfiles/nix-darwin && sudo darwin-rebuild switch --flake ~/dotfiles/nix-darwin
+```
 
 ## Shell
 

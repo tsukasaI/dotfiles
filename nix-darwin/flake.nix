@@ -79,7 +79,6 @@
           "ghostty"
           "raycast"
           "orbstack"
-          "claude-code"
           "session-manager-plugin"
           "font-plemol-jp-nf"
           "font-blex-mono-nerd-font"
