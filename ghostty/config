@@ -21,5 +21,7 @@ mouse-hide-while-typing = true
 
 # session
 window-save-state = always
-window-inherit-working-directory = true
-
+tab-inherit-working-directory = false
+split-inherit-working-directory = true
+notify-on-command-finish = unfocused
+notify-on-command-finish-after = 1s
