@@ -52,25 +52,34 @@ transcript_raw (
 )
 ```
 
-### Query Examples
+### Quick Commands
 
-```sql
--- Total token usage by project
-SELECT project_dir, COUNT(*) AS sessions, SUM(input_tokens + output_tokens) AS total_tokens
-FROM sessions GROUP BY project_dir ORDER BY total_tokens DESC;
+```bash
+DB=~/.local/share/claude-logs/logs.db
 
--- Sessions in a date range
-SELECT session_id, project_dir, model, started_at, input_tokens + output_tokens AS tokens
-FROM sessions WHERE started_at >= '2026-03-01' ORDER BY started_at;
+# List all sessions
+sqlite3 -header -column "$DB" "SELECT session_id, project_dir, model, started_at, input_tokens + output_tokens AS tokens FROM sessions ORDER BY started_at DESC;"
 
--- Model usage breakdown
-SELECT model, COUNT(*) AS sessions, SUM(output_tokens) AS output
-FROM sessions GROUP BY model;
+# Recent 10 sessions
+sqlite3 -header -column "$DB" "SELECT session_id, project_dir, model, started_at, num_user_messages AS msgs, input_tokens + output_tokens AS tokens FROM sessions ORDER BY started_at DESC LIMIT 10;"
 
--- Search transcript content
-SELECT s.session_id, s.project_dir, s.started_at
-FROM transcript_raw t JOIN sessions s ON t.session_id = s.session_id
-WHERE t.transcript_jsonl LIKE '%keyword%';
+# Total token usage by project
+sqlite3 -header -column "$DB" "SELECT project_dir, COUNT(*) AS sessions, SUM(input_tokens + output_tokens) AS total_tokens FROM sessions GROUP BY project_dir ORDER BY total_tokens DESC;"
+
+# Model usage breakdown
+sqlite3 -header -column "$DB" "SELECT model, COUNT(*) AS sessions, SUM(output_tokens) AS output FROM sessions GROUP BY model;"
+
+# Sessions in a date range
+sqlite3 -header -column "$DB" "SELECT session_id, project_dir, model, started_at, input_tokens + output_tokens AS tokens FROM sessions WHERE started_at >= '2026-03-01' ORDER BY started_at;"
+
+# Search transcript content
+sqlite3 -header -column "$DB" "SELECT s.session_id, s.project_dir, s.started_at FROM transcript_raw t JOIN sessions s ON t.session_id = s.session_id WHERE t.transcript_jsonl LIKE '%keyword%';"
+
+# DB size
+ls -lh "$DB"
+
+# Record count
+sqlite3 "$DB" "SELECT COUNT(*) || ' sessions, ' || (SELECT COUNT(*) FROM transcript_raw) || ' transcripts' FROM sessions;"
 ```
 
 ### Runtime
