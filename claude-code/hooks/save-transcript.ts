@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { Database } from "bun:sqlite";
-import { readFileSync, mkdirSync, existsSync } from "fs";
+import { readFileSync, mkdirSync, realpathSync, chmodSync } from "fs";
 import { join } from "path";
 
 // --- Types ---
@@ -72,8 +72,9 @@ const SCHEMA = `
 `;
 
 function openDb(): Database {
-  mkdirSync(DB_DIR, { recursive: true });
+  mkdirSync(DB_DIR, { recursive: true, mode: 0o700 });
   const db = new Database(DB_PATH, { create: true });
+  chmodSync(DB_PATH, 0o600);
   db.exec("PRAGMA journal_mode=WAL");
   db.exec(SCHEMA);
   return db;
@@ -185,11 +186,16 @@ function saveTranscript(
 
 const input: HookInput = await Bun.stdin.json();
 
-if (!input.transcript_path || !existsSync(input.transcript_path)) {
+const claudeDir = join(Bun.env.HOME!, ".claude");
+let resolved: string;
+try {
+  resolved = realpathSync(input.transcript_path);
+} catch {
   process.exit(0);
 }
+if (!resolved.startsWith(claudeDir)) process.exit(0);
 
-const transcript = readFileSync(input.transcript_path, "utf-8");
+const transcript = readFileSync(resolved, "utf-8");
 const lines = transcript.split("\n").filter((l) => l.trim());
 const meta = parseTranscript(lines);
 
