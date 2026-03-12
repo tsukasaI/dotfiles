@@ -9,6 +9,7 @@ echo "Setting up symlinks..."
 # ~/.config symlinks
 ln -sf "$DOTFILES/nvim" ~/.config/nvim
 ln -sf "$DOTFILES/ghostty" ~/.config/ghostty
+ln -sf "$DOTFILES/wezterm" ~/.config/wezterm
 
 
 # Home directory symlinks

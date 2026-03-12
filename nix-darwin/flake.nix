@@ -77,6 +77,7 @@
 
         casks = [
           "ghostty"
+          "wezterm"
           "raycast"
           "orbstack"
           "session-manager-plugin"
