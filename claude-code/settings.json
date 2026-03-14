@@ -28,15 +28,9 @@
       "Bash(gh pr diff:*)",
       "Bash(gh pr list:*)",
       "Bash(ls:*)",
-      "Bash(rg:*)",
-      "Bash(fd:*)",
-      "Bash(bat:*)",
       "Bash(mkdir:*)",
       "Bash(mv:*)",
-      "Bash(grep:*)",
-      "Bash(find:*)",
       "Bash(jq:*)",
-      "Bash(cat:*)",
       "Bash(docker run:*)",
       "Bash(docker build:*)",
       "Bash(git fetch:*)",
@@ -103,5 +97,6 @@
   "enabledPlugins": {
     "code-simplifier@claude-plugins-official": true
   },
-  "plansDirectory": ".claude/plans"
+  "plansDirectory": ".claude/plans",
+  "autoMemoryDirectory": ".claude/memory"
 }
