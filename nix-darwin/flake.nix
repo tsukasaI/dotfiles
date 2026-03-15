@@ -35,6 +35,7 @@
         # Development
         neovim
         git
+        tree-sitter
         llvmPackages.openmp
 
         # DevOps / CLI tools (migrated from mise)
