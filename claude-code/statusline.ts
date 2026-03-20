@@ -27,13 +27,25 @@ function powerline(segments: [number, number, string][]): string {
   return out;
 }
 
+const fmt = (n: number) =>
+  n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
+
+const rlColor = (pct: number): [number, number] =>
+  pct >= 90 ? [168, 53] : pct >= 70 ? [176, 54] : pct >= 50 ? [153, 61] : [117, 24];
+
 const input = await Bun.stdin.json();
 const row1: [number, number, string][] = [];
 const row2: [number, number, string][] = [];
+const row3: [number, number, string][] = [];
 
-// 1. Git branch
+// --- Row 1: dir | git | model ---
+
 const dir = input.workspace?.current_dir;
 if (dir) {
+  const home = Bun.env.HOME ?? "";
+  const display = dir.startsWith(home) ? `~${dir.slice(home.length)}` : dir;
+  row1.push([153, 24, `» ${display}`]);
+
   process.chdir(dir);
   const proc = Bun.spawnSync(["git", "branch", "--show-current"]);
   const branch = proc.stdout.toString().trim();
@@ -43,59 +55,56 @@ if (dir) {
   }
 }
 
-// 2. Directory (home-relative)
-if (dir) {
-  const home = Bun.env.HOME ?? "";
-  const display = dir.startsWith(home) ? `~${dir.slice(home.length)}` : dir;
-  row1.push([153, 24, `» ${display}`]);
-}
-
-// 3. Model (short name)
 const modelName = input.model?.display_name ?? input.model?.id;
 if (modelName) {
   const short = modelName.replace(/^Claude /, "");
   row1.push([159, 30, `◇ ${short}`]);
 }
 
-// 4. Context usage % with progress bar
+// --- Row 2: context bar | cost | rate limits ---
+
 const ctx = input.context_window?.used_percentage;
 if (ctx != null) {
-  const bgCode = ctx >= 90 ? 53 : ctx >= 70 ? 54 : ctx >= 50 ? 61 : 24;
-  const fgCode = ctx >= 90 ? 168 : ctx >= 70 ? 176 : ctx >= 50 ? 153 : 117;
+  const [fg, bg] = rlColor(ctx);
   const filled = Math.round(ctx / 10);
   const bar = "█".repeat(filled) + "░".repeat(10 - filled);
-  row2.push([fgCode, bgCode, `${bar} ${ctx.toFixed(1)}%`]);
+  row2.push([fg, bg, `${bar} ${ctx.toFixed(1)}%`]);
 }
 
-// 5. Token counts (cumulative)
-const inTok = input.context_window?.total_input_tokens ?? 0;
-const outTok = input.context_window?.total_output_tokens ?? 0;
-if (inTok > 0 || outTok > 0) {
-  const fmt = (n: number) =>
-    n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
-  row2.push([250, 239, `≡ ${fmt(inTok)}↓ ${fmt(outTok)}↑`]);
-}
-
-// 6. Session cost
 const cost = input.cost?.total_cost_usd;
 if (cost != null && cost > 0) {
   row2.push([146, 60, `$ ${cost.toFixed(2)}`]);
 }
 
-// 7. Lines changed
+const rl = input.rate_limits;
+if (rl?.five_hour?.used_percentage != null) {
+  const p = rl.five_hour.used_percentage;
+  const [fg, bg] = rlColor(p);
+  row2.push([fg, bg, `5h ${p.toFixed(0)}%`]);
+}
+if (rl?.seven_day?.used_percentage != null) {
+  const p = rl.seven_day.used_percentage;
+  const [fg, bg] = rlColor(p);
+  row2.push([fg, bg, `7d ${p.toFixed(0)}%`]);
+}
+
+// --- Row 3: tokens | lines changed ---
+
+const inTok = input.context_window?.total_input_tokens ?? 0;
+const outTok = input.context_window?.total_output_tokens ?? 0;
+if (inTok > 0 || outTok > 0) {
+  row3.push([250, 239, `≡ ${fmt(inTok)}↓ ${fmt(outTok)}↑`]);
+}
+
 const added = input.cost?.total_lines_added ?? 0;
 const removed = input.cost?.total_lines_removed ?? 0;
 if (added > 0 || removed > 0) {
-  row2.push([116, 23, `+${added}`]);
-  row2.push([175, 53, `-${removed}`]);
+  row3.push([116, 23, `+${added}`]);
+  row3.push([175, 53, `-${removed}`]);
 }
 
-// 8. Vim mode (context-aware)
-const vimMode = input.vim?.mode;
-if (vimMode) {
-  const isNormal = vimMode === "NORMAL";
-  row2.push([isNormal ? 117 : 176, isNormal ? 24 : 54, `◆ ${vimMode}`]);
-}
+// --- Output ---
 
 if (row1.length > 0) console.log(powerline(row1));
 if (row2.length > 0) console.log(powerline(row2));
+if (row3.length > 0) console.log(powerline(row3));
