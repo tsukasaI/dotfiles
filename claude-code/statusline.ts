@@ -60,8 +60,8 @@ if (modelName) {
 // 4. Context usage % with progress bar
 const ctx = input.context_window?.used_percentage;
 if (ctx != null) {
-  const bgCode = ctx >= 90 ? 52 : ctx >= 70 ? 58 : ctx >= 50 ? 94 : 22;
-  const fgCode = ctx >= 90 ? 210 : ctx >= 70 ? 228 : ctx >= 50 ? 223 : 157;
+  const bgCode = ctx >= 90 ? 53 : ctx >= 70 ? 54 : ctx >= 50 ? 61 : 24;
+  const fgCode = ctx >= 90 ? 168 : ctx >= 70 ? 176 : ctx >= 50 ? 153 : 117;
   const filled = Math.round(ctx / 10);
   const bar = "█".repeat(filled) + "░".repeat(10 - filled);
   row2.push([fgCode, bgCode, `${bar} ${ctx.toFixed(1)}%`]);
@@ -79,22 +79,22 @@ if (inTok > 0 || outTok > 0) {
 // 6. Session cost
 const cost = input.cost?.total_cost_usd;
 if (cost != null && cost > 0) {
-  row2.push([229, 94, `$ ${cost.toFixed(2)}`]);
+  row2.push([146, 60, `$ ${cost.toFixed(2)}`]);
 }
 
 // 7. Lines changed
 const added = input.cost?.total_lines_added ?? 0;
 const removed = input.cost?.total_lines_removed ?? 0;
 if (added > 0 || removed > 0) {
-  row2.push([157, 22, `+${added}`]);
-  row2.push([210, 52, `-${removed}`]);
+  row2.push([116, 23, `+${added}`]);
+  row2.push([175, 53, `-${removed}`]);
 }
 
 // 8. Vim mode (context-aware)
 const vimMode = input.vim?.mode;
 if (vimMode) {
   const isNormal = vimMode === "NORMAL";
-  row2.push([isNormal ? 157 : 228, isNormal ? 22 : 58, `◆ ${vimMode}`]);
+  row2.push([isNormal ? 117 : 176, isNormal ? 24 : 54, `◆ ${vimMode}`]);
 }
 
 if (row1.length > 0) console.log(powerline(row1));
