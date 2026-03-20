@@ -57,12 +57,14 @@ if (modelName) {
   row1.push([159, 30, `◇ ${short}`]);
 }
 
-// 4. Context usage % (context-aware)
+// 4. Context usage % with progress bar
 const ctx = input.context_window?.used_percentage;
 if (ctx != null) {
   const bgCode = ctx >= 90 ? 52 : ctx >= 70 ? 58 : ctx >= 50 ? 94 : 22;
   const fgCode = ctx >= 90 ? 210 : ctx >= 70 ? 228 : ctx >= 50 ? 223 : 157;
-  row2.push([fgCode, bgCode, `◔ ${ctx.toFixed(1)}%`]);
+  const filled = Math.round(ctx / 10);
+  const bar = "█".repeat(filled) + "░".repeat(10 - filled);
+  row2.push([fgCode, bgCode, `${bar} ${ctx.toFixed(1)}%`]);
 }
 
 // 5. Token counts (cumulative)
@@ -74,7 +76,13 @@ if (inTok > 0 || outTok > 0) {
   row2.push([250, 239, `≡ ${fmt(inTok)}↓ ${fmt(outTok)}↑`]);
 }
 
-// 6. Lines changed
+// 6. Session cost
+const cost = input.cost?.total_cost_usd;
+if (cost != null && cost > 0) {
+  row2.push([229, 94, `$ ${cost.toFixed(2)}`]);
+}
+
+// 7. Lines changed
 const added = input.cost?.total_lines_added ?? 0;
 const removed = input.cost?.total_lines_removed ?? 0;
 if (added > 0 || removed > 0) {
