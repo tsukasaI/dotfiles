@@ -7,6 +7,7 @@ require("config.lazy")
 vim.opt.number = true           -- 行番号
 vim.opt.tabstop = 2             -- タブ幅
 vim.opt.shiftwidth = 2          -- インデント幅
+vim.opt.expandtab = true        -- スペースに展開
 vim.opt.smartindent = true      -- スマートインデント
 vim.opt.smartcase = true        -- 大文字含むと区別
 vim.opt.splitright = true       -- 右に分割
@@ -17,6 +18,15 @@ vim.opt.signcolumn = 'yes'
 
 vim.api.nvim_set_hl(0, "Normal", { bg = "none" })
 vim.api.nvim_set_hl(0, "NormalFloat", { bg = "none" })
+
+-- Diagnostics
+vim.diagnostic.config({
+  virtual_text = { current_line = true },
+  signs = true,
+  underline = true,
+  float = { border = 'rounded' },
+})
+vim.keymap.set('n', '<leader>e', vim.diagnostic.open_float, { desc = 'Show diagnostic' })
 
 -- LSP
 vim.lsp.config('gopls', {
