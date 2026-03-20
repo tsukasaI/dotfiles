@@ -2,5 +2,9 @@ return {
   'echasnovski/mini.pairs',
   version = '*',
   event = 'InsertEnter',
-  opts = {},
+  opts = {
+    mappings = {
+      ['`'] = { neigh_pattern = '[^`].[^`]' },
+    },
+  },
 }
