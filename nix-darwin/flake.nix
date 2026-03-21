@@ -81,6 +81,7 @@
           "wezterm"
           "raycast"
           "orbstack"
+          "karabiner-elements"
           "session-manager-plugin"
           "font-plemol-jp-nf"
           "font-blex-mono-nerd-font"
