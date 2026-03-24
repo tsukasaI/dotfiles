@@ -5,3 +5,5 @@ result-*
 # MacOS
 .DS_Store
 
+# Karabiner
+karabiner/automatic_backups/
