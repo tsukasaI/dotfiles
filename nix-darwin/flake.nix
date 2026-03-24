@@ -55,7 +55,7 @@
         pnpm
         rustup
         # Others
-        silicon
+        charm-freeze
         graphviz
       ]);
 
