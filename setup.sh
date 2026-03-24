@@ -10,7 +10,8 @@ echo "Setting up symlinks..."
 ln -sf "$DOTFILES/nvim" ~/.config/nvim
 ln -sf "$DOTFILES/ghostty" ~/.config/ghostty
 ln -sf "$DOTFILES/wezterm" ~/.config/wezterm
-ln -sf "$DOTFILES/karabiner" ~/.config/karabiner
+mkdir -p ~/.config/karabiner
+ln -sf "$DOTFILES/karabiner/karabiner.json" ~/.config/karabiner/karabiner.json
 
 
 # Home directory symlinks
