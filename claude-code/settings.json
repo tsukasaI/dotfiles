@@ -64,6 +64,15 @@
             "command": "/Users/inouetsukasa/dotfiles/claude-code/hooks/block-dangerous.sh"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/inouetsukasa/dotfiles/claude-code/hooks/block-config-edit.sh"
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -85,6 +94,18 @@
           {
             "type": "command",
             "command": "fini $(jq -r '.tool_input.file_path')"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/inouetsukasa/dotfiles/claude-code/hooks/check-debug-statements.sh",
+            "async": true
           }
         ]
       }
