@@ -1,14 +1,26 @@
-[user]
-	name = tsukasa inoue
-	email = inoue.tsukasa.4@gmail.com
-	signingkey = 6C34D18450CD695F
-[pull]
-	rebase = false
-[commit]
-	gpgsign = true
-[push]
-	autoSetupRemote = true
 [core]
 	editor = nvim
 [init]
 	defaultBranch = main
+[user]
+	name = tsukasa inoue
+	email = inoue.tsukasa.4@gmail.com
+	signingkey = 6C34D18450CD695F
+[commit]
+	gpgsign = true
+[push]
+	autoSetupRemote = true
+[pull]
+	rebase = false
+[fetch]
+	prune = true
+[merge]
+	conflictstyle = zdiff3
+[rebase]
+	autosquash = true
+	autostash = true
+[diff]
+	algorithm = histogram
+	colorMoved = plain
+[rerere]
+	enabled = true
