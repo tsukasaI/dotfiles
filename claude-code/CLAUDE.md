@@ -15,6 +15,9 @@
     - `learned(scope)`: discovered quirks / gotchas
 - Editor: nvim
 - When a command is blocked by PreToolUse hook, present the blocked command so I can run it manually.
+- For non-trivial tasks (3+ steps or architectural decisions), enter plan mode first. If the approach breaks down mid-task, stop and re-plan.
+- Use subagents to keep the main context window clean. Offload research, exploration, and parallel analysis to subagents.
+- Never mark a task complete without verifying it works. Run builds, linters, syntax checks, or tests as appropriate.
 
 # Coding Style
 - Keep it simple. Avoid premature abstractions.
