@@ -14,7 +14,22 @@
   outputs = inputs@{ self, nix-darwin, nixpkgs, ewc, fini }:
   let
     system = "aarch64-darwin";
-    configuration = { pkgs, lib, ... }: {
+    configuration = { pkgs, lib, ... }:
+    let
+      treesitterParsers = pkgs.vimPlugins.nvim-treesitter.withPlugins (p: with p; [
+        rust toml go gomod gowork gosum
+      ]);
+      neovimWithParsers = pkgs.symlinkJoin {
+        name = "neovim-with-parsers";
+        paths = [ pkgs.neovim ];
+        nativeBuildInputs = [ pkgs.makeWrapper ];
+        postBuild = ''
+          wrapProgram $out/bin/nvim \
+            --add-flags '--cmd "set rtp^=${treesitterParsers}"'
+        '';
+      };
+    in
+    {
       environment.systemPackages = [
         ewc.packages.${system}.default
         fini.packages.${system}.default
@@ -33,9 +48,8 @@
         gnupg
 
         # Development
-        neovim
+        neovimWithParsers
         git
-        tree-sitter
         llvmPackages.openmp
 
         # DevOps / CLI tools (migrated from mise)

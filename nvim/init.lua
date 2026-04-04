@@ -22,9 +22,26 @@ vim.opt.showmode = false        -- lualineに任せる
 vim.opt.updatetime = 250        -- CursorHold高速化
 vim.opt.inccommand = 'split'    -- 置換リアルタイムプレビュー
 vim.opt.breakindent = true      -- 折り返しインデント維持
+vim.opt.cursorline = true
 
-vim.api.nvim_set_hl(0, "Normal", { bg = "none" })
-vim.api.nvim_set_hl(0, "NormalFloat", { bg = "none" })
+-- Transparent background (let terminal handle opacity)
+local function set_transparent()
+  local groups = {
+    "Normal", "NormalNC", "NormalFloat",
+    "SignColumn", "LineNr", "CursorLineNr",
+    "StatusLine", "StatusLineNC",
+    "EndOfBuffer", "FoldColumn",
+    "WinSeparator",
+  }
+  for _, group in ipairs(groups) do
+    vim.api.nvim_set_hl(0, group, { bg = "none" })
+  end
+  vim.api.nvim_set_hl(0, "CursorLine", { bg = "#3a3a50" })
+end
+set_transparent()
+vim.api.nvim_create_autocmd("ColorScheme", {
+  callback = set_transparent,
+})
 
 -- Diagnostics
 vim.diagnostic.config({
