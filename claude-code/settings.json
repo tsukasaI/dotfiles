@@ -116,6 +116,5 @@
     "command": "bun /Users/inouetsukasa/dotfiles/claude-code/statusline.ts"
   },
   "enabledPlugins": {},
-  "plansDirectory": ".claude/plans",
-  "autoMemoryDirectory": ".claude/memory"
+  "plansDirectory": ".claude/plans"
 }

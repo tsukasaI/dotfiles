@@ -1,5 +1,5 @@
 # Workflow
-- Never commit automatically. When changes are ready to commit, suggest `git add` and `git commit` commands with a contextual commit message.
+- Never commit automatically. When changes are ready to commit, suggest `git add` and `git commit` commands with a contextual commit message. Always write commit messages in English, regardless of conversation language.
 - Commit message format (Contextual Commits = Conventional Commits + structured body):
   ```
   <type>(<scope>): <description>
