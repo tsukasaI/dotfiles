@@ -4,8 +4,10 @@
 	defaultBranch = main
 [user]
 	name = tsukasa inoue
-	email = inoue.tsukasa.4@gmail.com
+	email = 65926267+tsukasaI@users.noreply.github.com
 	signingkey = 6C34D18450CD695F
+[includeIf "gitdir:~/oss/"]
+	path = ~/.config/git/gitconfig-oss
 [commit]
 	gpgsign = true
 [push]

@@ -19,6 +19,7 @@ ln -sf "$DOTFILES/zsh/zshrc" ~/.zshrc
 ln -sf "$DOTFILES/git/gitconfig" ~/.gitconfig
 mkdir -p ~/.config/git
 ln -sf "$DOTFILES/git/ignore" ~/.config/git/ignore
+ln -sf "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
 
 # Claude Code hooks
 chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
