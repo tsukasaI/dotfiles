@@ -8,3 +8,39 @@
 
 # Claude
 .claude/
+CLAUDE.md
+CLAUDE.local.md
+
+# Node
+node_modules/
+
+# Editor / IDE
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+
+# Environment / Secrets
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+*.o
+*.so
+*.dylib
+
+# Misc
+.terraform/
+.cache/
+.parcel-cache/
+__pycache__/
+*.pyc
+.pytest_cache/
+.next/
+dist/
+coverage/
+*.log
+Thumbs.db
