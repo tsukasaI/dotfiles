@@ -52,14 +52,14 @@
         git
         llvmPackages.openmp
 
-        # DevOps / CLI tools (migrated from mise)
+        # DevOps / CLI tools
         awscli2
         gh
         biome
         lefthook
         terraform
 
-        # Language runtimes (migrated from mise)
+        # Language runtimes
         bun
         go
         gopls
@@ -68,6 +68,7 @@
         nodejs
         pnpm
         rustup
+        uv
         # Others
         charm-freeze
         graphviz
