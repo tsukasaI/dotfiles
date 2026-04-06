@@ -38,6 +38,21 @@ if [[ "$CMD" =~ /dev/(tcp|udp)/ ]]; then
   block "NETWORK" "Bash /dev/tcp|udp opens covert network channels."
 fi
 
+# ── Allowlist: security tools that match blocklist patterns ──────────────────
+ALLOWLIST="$SCRIPT_DIR/allowlist.conf"
+if [[ -f "$ALLOWLIST" ]]; then
+  while IFS= read -r tool; do
+    [[ "$tool" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${tool//[[:space:]]/}" ]] && continue
+    tool="${tool#"${tool%%[![:space:]]*}"}"
+    tool="${tool%"${tool##*[![:space:]]}"}"
+    escaped=$(printf '%s' "$tool" | sed 's/[.^$*+?()[\]{}|\\]/\\&/g')
+    if [[ "$CMD" =~ ${CB}${escaped}([[:space:]]|$) ]]; then
+      exit 0
+    fi
+  done < "$ALLOWLIST"
+fi
+
 # ── Blocklist rules ──────────────────────────────────────────────────────────
 while IFS='|' read -r category prefix reason; do
   # Skip comments and blank lines
