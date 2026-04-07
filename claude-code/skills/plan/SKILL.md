@@ -1,3 +1,7 @@
+---
+description: Before writing any code, create an implementation plan
+---
+
 Before writing any code, create an implementation plan:
 
 1. Analyze the current codebase to understand existing patterns and constraints

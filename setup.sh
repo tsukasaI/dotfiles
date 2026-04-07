@@ -21,7 +21,9 @@ mkdir -p ~/.config/git
 ln -sf "$DOTFILES/git/ignore" ~/.config/git/ignore
 ln -sf "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
 
-# Claude Code hooks
+# Claude Code
+mkdir -p ~/.claude
+ln -sf "$DOTFILES/claude-code/skills" ~/.claude/skills
 chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
 
 echo "Done."
