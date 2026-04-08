@@ -3,7 +3,8 @@
   "env": {
     "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
     "ENABLE_TOOL_SEARCH": "1",
-    "EDITOR": "nvim"
+    "EDITOR": "nvim",
+    "CLAUDE_CODE_EFFORT_LEVEL": "max"
   },
   "attribution": {
     "commit": "",
