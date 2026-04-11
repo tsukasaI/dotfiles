@@ -18,9 +18,8 @@ _cached_eval() {
 
 # mise
 _cached_eval mise-activate "mise activate zsh"
-_cached_eval mise-shims "mise activate --shims"
 
-. "$HOME/.local/bin/env"
+[[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
 # Added by Antigravity
 export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
