@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { existsSync, statSync } from "fs";
+import { statSync } from "fs";
 
 // ANSI helpers
 const RST = "\x1b[0m";
@@ -46,11 +46,11 @@ if (dir) {
   const display = dir.startsWith(home) ? `~${dir.slice(home.length)}` : dir;
   row1.push([153, 24, `» ${display}`]);
 
-  process.chdir(dir);
-  const proc = Bun.spawnSync(["git", "branch", "--show-current"]);
+  const proc = Bun.spawnSync(["git", "branch", "--show-current"], { cwd: dir });
   const branch = proc.stdout.toString().trim();
   if (branch) {
-    const isWorktree = existsSync(".git") && statSync(".git").isFile();
+    let isWorktree = false;
+    try { isWorktree = statSync(`${dir}/.git`).isFile(); } catch {}
     row1.push([189, 60, `⎇ ${branch}${isWorktree ? " [wt]" : ""}`]);
   }
 }
