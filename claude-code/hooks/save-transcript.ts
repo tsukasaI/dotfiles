@@ -193,7 +193,7 @@ try {
 } catch {
   process.exit(0);
 }
-if (!resolved.startsWith(claudeDir)) process.exit(0);
+if (!resolved.startsWith(claudeDir + "/")) process.exit(0);
 
 const transcript = readFileSync(resolved, "utf-8");
 const lines = transcript.split("\n").filter((l) => l.trim());

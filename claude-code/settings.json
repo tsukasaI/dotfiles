@@ -94,7 +94,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "fini $(jq -r '.tool_input.file_path')"
+            "command": "fini \"$(jq -r '.tool_input.file_path')\""
           }
         ]
       }
