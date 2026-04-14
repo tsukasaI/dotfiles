@@ -18,6 +18,17 @@ block() {
   exit 2
 }
 
+trim() {
+  local s=$1
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+escape_regex() {
+  printf '%s' "$1" | sed 's/[.^$*+?()[\]{}|\\]/\\&/g'
+}
+
 # Command-boundary prefix: ensures "remove-items" does not match "rm"
 CB='(^|[;&|`$([:space:]])'
 
@@ -44,9 +55,8 @@ if [[ -f "$ALLOWLIST" ]]; then
   while IFS= read -r tool; do
     [[ "$tool" =~ ^[[:space:]]*# ]] && continue
     [[ -z "${tool//[[:space:]]/}" ]] && continue
-    tool="${tool#"${tool%%[![:space:]]*}"}"
-    tool="${tool%"${tool##*[![:space:]]}"}"
-    escaped=$(printf '%s' "$tool" | sed 's/[.^$*+?()[\]{}|\\]/\\&/g')
+    tool=$(trim "$tool")
+    escaped=$(escape_regex "$tool")
     if [[ "$CMD" =~ ${CB}${escaped}([[:space:]]|$) ]]; then
       exit 0
     fi
@@ -60,35 +70,27 @@ while IFS='|' read -r category prefix reason; do
   [[ -z "${category//[[:space:]]/}" ]] && continue
 
   category="${category//[[:space:]]/}"
-  prefix="${prefix#"${prefix%%[![:space:]]*}"}"   # ltrim
-  prefix="${prefix%"${prefix##*[![:space:]]}"}"   # rtrim
-  reason="${reason#"${reason%%[![:space:]]*}"}"   # ltrim
-  reason="${reason%"${reason##*[![:space:]]}"}"   # rtrim
+  prefix=$(trim "$prefix")
+  reason=$(trim "$reason")
 
   [[ -z "$prefix" ]] && continue
 
   # *...*  → "contains anywhere" match (e.g. *secret*)
   if [[ "$prefix" == \** && "$prefix" == *\* ]]; then
-    inner="${prefix:1:${#prefix}-2}"
-    escaped=$(printf '%s' "$inner" | sed 's/[.^$*+?()[\]{}|\\]/\\&/g')
-    if [[ "$CMD" =~ $escaped ]]; then
-      block "$category" "$reason"
-    fi
+    escaped=$(escape_regex "${prefix:1:${#prefix}-2}")
+    pattern="$escaped"
   # prefix*  → "starts with" match, no end-boundary (e.g. mkfs* matches mkfs.ext4)
   elif [[ "$prefix" == *\* ]]; then
-    inner="${prefix:0:${#prefix}-1}"
-    escaped=$(printf '%s' "$inner" | sed 's/[.^$*+?()[\]{}|\\]/\\&/g')
+    escaped=$(escape_regex "${prefix:0:${#prefix}-1}")
     pattern="${CB}${escaped}"
-    if [[ "$CMD" =~ $pattern ]]; then
-      block "$category" "$reason"
-    fi
   else
     # Standard command-boundary prefix match (e.g. rm matches "rm foo" but not "remove-items")
-    escaped=$(printf '%s' "$prefix" | sed 's/[.^$*+?()[\]{}|\\]/\\&/g')
+    escaped=$(escape_regex "$prefix")
     pattern="${CB}${escaped}([[:space:]]|$)"
-    if [[ "$CMD" =~ $pattern ]]; then
-      block "$category" "$reason"
-    fi
+  fi
+
+  if [[ "$CMD" =~ $pattern ]]; then
+    block "$category" "$reason"
   fi
 done < "$BLOCKLIST"
 

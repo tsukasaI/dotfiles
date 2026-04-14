@@ -4,7 +4,7 @@
     "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
     "ENABLE_TOOL_SEARCH": "1",
     "EDITOR": "nvim",
-    "CLAUDE_CODE_EFFORT_LEVEL": "max"
+    "CLAUDE_CODE_EFFORT_LEVEL": "high"
   },
   "attribution": {
     "commit": "",
@@ -12,19 +12,7 @@
   },
   "permissions": {
     "allow": [
-      "Bash(curl http://localhost:*)",
-      "Bash(curl https://localhost:*)",
-      "Bash(curl http://127.0.0.1:*)",
-      "Bash(curl https://127.0.0.1:*)",
-      "Bash(curl http://[::1]:*)",
-      "Bash(curl https://[::1]:*)",
-      "Bash(curl -X * http://localhost:*)",
-      "Bash(curl -X * https://localhost:*)",
-      "Bash(curl -X * http://127.0.0.1:*)",
-      "Bash(curl -X * https://127.0.0.1:*)",
-      "Bash(curl -H * http://localhost:*)",
-      "Bash(curl -d * http://localhost:*)",
-      "Bash(curl --data * http://localhost:*)",
+      "Bash(curl:*)",
       "Bash(gh pr view:*)",
       "Bash(gh pr diff:*)",
       "Bash(gh pr list:*)",
@@ -36,6 +24,7 @@
       "Bash(docker build:*)",
       "Bash(git fetch:*)",
       "Bash(git log:*)",
+      "Bash(git diff:*)",
       "Bash(git tag:*)",
       "Bash(go vet:*)",
       "Bash(go test:*)",
@@ -117,6 +106,15 @@
     "command": "bun /Users/inouetsukasa/dotfiles/claude-code/statusline.ts"
   },
   "enabledPlugins": {},
+  "extraKnownMarketplaces": {
+    "supabase-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "supabase/agent-skills"
+      }
+    }
+  },
+  "advisorModel": "opus",
   "plansDirectory": ".claude/plans",
   "autoMemoryEnabled": false
 }
