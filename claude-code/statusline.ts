@@ -63,7 +63,10 @@ if (modelName) {
 
 // --- Row 2: context bar | cost | rate limits ---
 
-const ctx = input.context_window?.used_percentage;
+const MAX_CTX = /\[1m\]/.test(input.model?.id ?? "") ? 1_000_000 : 200_000;
+const usedTok = (input.context_window?.total_input_tokens ?? 0)
+              + (input.context_window?.total_output_tokens ?? 0);
+const ctx = usedTok > 0 ? Math.min(100, (usedTok / MAX_CTX) * 100) : null;
 if (ctx != null) {
   const [fg, bg] = rlColor(ctx);
   const filled = Math.round(ctx / 10);
