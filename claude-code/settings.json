@@ -32,7 +32,24 @@
       "Bash(go get:*)",
       "Bash(go mod tidy:*)",
       "Bash(golangci-lint run:*)",
-      "Bash(wait)"
+      "Bash(wait)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(gh repo view:*)",
+      "Bash(gh search:*)",
+      "Bash(gh issue:*)",
+      "WebFetch(domain:ghostty.org)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:gist.github.com)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:neovim.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(/Users/inouetsukasa/dotfiles/claude-code/hooks/block-dangerous.sh)",
+      "Bash(echo \"exit=$?\")",
+      "WebFetch(domain:docs.claude.com)",
+      "Bash(find *)",
+      "Bash(grep -E '\\(nvim/nvim|ghostty/ghostty|wezterm/wezterm\\)$')",
+      "WebFetch(domain:www.anthropic.com)"
     ],
     "deny": [
       "Read(**/*secret*)",
@@ -41,7 +58,8 @@
       "Read(id_rsa)",
       "Read(id_ed25519)"
     ],
-    "defaultMode": "default"
+    "defaultMode": "default",
+    "disableAutoMode": "disable"
   },
   "hooks": {
     "PreToolUse": [
@@ -115,5 +133,6 @@
   },
   "advisorModel": "opus",
   "plansDirectory": ".claude/plans",
-  "autoMemoryEnabled": false
+  "autoMemoryEnabled": false,
+  "useAutoModeDuringPlan": false
 }
