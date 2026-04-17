@@ -7,3 +7,8 @@ result-*
 
 # Karabiner
 karabiner/automatic_backups/
+
+# Claude Code local state
+.claude/memory/
+.claude/plans/
+.claude/settings.local.json
