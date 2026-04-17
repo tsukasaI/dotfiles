@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PostToolUse hook (Stop, async): warns about leftover debug statements in changed files.
+# Stop hook (async): warns about leftover debug statements in changed files.
 # Non-blocking — outputs warnings but never fails.
 
 set -euo pipefail

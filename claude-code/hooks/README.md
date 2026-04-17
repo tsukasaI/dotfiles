@@ -9,6 +9,7 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 | Script | Matcher | Description |
 |---|---|---|
 | `block-dangerous.sh` | `Bash` | Block dangerous shell commands defined in `blocklist.conf` |
+| `block-config-edit.sh` | `Edit\|Write` | Block edits to linter/formatter config files |
 
 ### PostToolUse
 
@@ -16,11 +17,17 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 |---|---|---|
 | (inline) `fini` | `Edit\|Write` | Auto-format edited files with fini |
 
+### Stop
+
+| Script | Matcher | Description |
+|---|---|---|
+| `check-debug-statements.sh` | `*` | Warn about leftover debug statements in changed files (async) |
+
 ### SessionEnd
 
 | Script | Matcher | Description |
 |---|---|---|
-| `save-transcript.ts` | `*` | Save session transcript to SQLite |
+| `save-transcript.ts` | `*` | Save session transcript to SQLite (async) |
 
 ## Session Log Storage
 
