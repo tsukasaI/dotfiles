@@ -24,6 +24,8 @@ ln -sf "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
 # Claude Code
 mkdir -p ~/.claude
 ln -sf "$DOTFILES/claude-code/skills" ~/.claude/skills
+ln -sf "$DOTFILES/claude-code/rules" ~/.claude/rules
+ln -sf "$DOTFILES/claude-code/agents" ~/.claude/agents
 ln -sf "$DOTFILES/claude-code/settings.json" ~/.claude/settings.json
 ln -sf "$DOTFILES/claude-code/CLAUDE.md" ~/.claude/CLAUDE.md
 chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
