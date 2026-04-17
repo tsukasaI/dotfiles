@@ -3,8 +3,7 @@
   "env": {
     "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
     "ENABLE_TOOL_SEARCH": "1",
-    "EDITOR": "nvim",
-    "CLAUDE_CODE_EFFORT_LEVEL": "high"
+    "EDITOR": "nvim"
   },
   "attribution": {
     "commit": "",
@@ -51,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/inouetsukasa/dotfiles/claude-code/hooks/block-dangerous.sh"
+            "command": "$HOME/dotfiles/claude-code/hooks/block-dangerous.sh"
           }
         ]
       },
@@ -60,7 +59,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/inouetsukasa/dotfiles/claude-code/hooks/block-config-edit.sh"
+            "command": "$HOME/dotfiles/claude-code/hooks/block-config-edit.sh"
           }
         ]
       }
@@ -71,7 +70,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun /Users/inouetsukasa/dotfiles/claude-code/hooks/save-transcript.ts",
+            "command": "bun $HOME/dotfiles/claude-code/hooks/save-transcript.ts",
             "async": true
           }
         ]
@@ -94,7 +93,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/inouetsukasa/dotfiles/claude-code/hooks/check-debug-statements.sh",
+            "command": "$HOME/dotfiles/claude-code/hooks/check-debug-statements.sh",
             "async": true
           }
         ]
@@ -103,7 +102,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "bun /Users/inouetsukasa/dotfiles/claude-code/statusline.ts"
+    "command": "bun $HOME/dotfiles/claude-code/statusline.ts"
   },
   "enabledPlugins": {},
   "extraKnownMarketplaces": {
