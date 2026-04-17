@@ -56,7 +56,18 @@
       "Read(**/*credential*)",
       "Read(.env*)",
       "Read(id_rsa)",
-      "Read(id_ed25519)"
+      "Read(id_ed25519)",
+      "Read(**/node_modules/**)",
+      "Read(**/.wrangler/**)",
+      "Read(**/dist/**)",
+      "Read(**/build/**)",
+      "Read(**/venv/**)",
+      "Read(**/.venv/**)",
+      "Read(**/target/**)",
+      "Read(**/.next/**)",
+      "Read(**/.turbo/**)",
+      "Read(**/__pycache__/**)",
+      "Read(**/.pytest_cache/**)"
     ],
     "defaultMode": "default",
     "disableAutoMode": "disable"
