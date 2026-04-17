@@ -71,7 +71,7 @@ Zsh with modern CLI aliases:
 
 ## Terminal
 
-Ghostty with GitHub Dark theme, BlexMono Nerd Font, 80% opacity.
+Primary: Ghostty (GitHub Dark theme, BlexMono Nerd Font, 80% opacity). WezTerm is kept as a fallback.
 
 ## Claude Code
 
@@ -129,6 +129,13 @@ GIT | git switch -d | git switch -d detaches HEAD
 "Read(**/*secret*)", "Read(**/*credential*)",
 "Read(.env*)", "Read(id_rsa)", "Read(id_ed25519)"
 ```
+
+## Troubleshooting
+
+- `darwin-rebuild switch` fails with a user mismatch: ensure `system.primaryUser` in `nix-darwin/flake.nix` matches `whoami`.
+- `setup.sh` fails on symlink conflicts: remove the existing target (e.g. `rm ~/.zshrc`) and re-run.
+- Claude Code hooks do nothing: confirm `~/.claude/settings.json` resolves on this host and `$HOME/dotfiles/...` paths exist.
+- Homebrew cask conflict after `cleanup = "zap"`: run `brew uninstall --cask <name>` manually, then rebuild.
 
 ## License
 
