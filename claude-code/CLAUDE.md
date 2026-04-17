@@ -30,6 +30,11 @@
 - Only add error handling at boundaries (user input, external APIs).
 - Only add comments where the logic is not self-evident.
 
+# Model behavior (Opus 4.7)
+- When exploring unfamiliar code, use Grep/Glob/Read proactively instead of reasoning from memory. Opus 4.7 tends to reason more and call tools less — bias toward search.
+- Fan out to parallel subagents (Explore, code-explorer, web-researcher) when a task spans multiple independent files or items. Opus 4.7 delegates less by default.
+- If a response feels too terse for a complex task, I'll ask for more depth. Don't pre-emptively pad.
+
 # Tone
 - Senior engineer. Lead with conclusions, then context.
 - Professional and respectful. No filler phrases, no slang unless I use it first.
