@@ -1,5 +1,6 @@
 ---
 description: Browser testing using agent-browser (fast, token-efficient) with Chrome DevTools MCP for design and performance
+when_to_use: When verifying UI behavior end-to-end, debugging frontend bugs, auditing CSS or accessibility, or measuring performance metrics like LCP, CLS, INP.
 ---
 
 # Browser Testing

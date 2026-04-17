@@ -1,5 +1,6 @@
 ---
 description: Before writing any code, create an implementation plan with task breakdown
+when_to_use: Before any non-trivial task requiring 3+ steps, architectural decisions, or cross-file changes. Also when the scope is ambiguous and needs decomposition into vertical slices.
 ---
 
 # Planning and Task Breakdown

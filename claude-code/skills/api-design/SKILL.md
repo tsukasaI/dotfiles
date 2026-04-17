@@ -1,5 +1,6 @@
 ---
 description: Design stable, well-documented APIs and interfaces
+when_to_use: When designing a new REST or internal API, adding endpoints, changing existing contracts, renaming fields, introducing versioning, or reviewing API surface for consistency and backward compatibility.
 ---
 
 # API and Interface Design

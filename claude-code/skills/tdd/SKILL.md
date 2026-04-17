@@ -1,5 +1,6 @@
 ---
 description: Follow a strict test-driven development cycle
+when_to_use: When implementing a new feature with defined acceptance criteria, or when fixing a bug where a regression test would prevent recurrence. Triggered by red-green-refactor, prove-it patterns, or explicit TDD requests.
 ---
 
 # Test-Driven Development
