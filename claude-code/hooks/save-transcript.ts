@@ -186,20 +186,20 @@ function saveTranscript(
 
 const input: HookInput = await Bun.stdin.json();
 
-const claudeDir = join(Bun.env.HOME!, ".claude");
-let resolved: string;
 try {
-  resolved = realpathSync(input.transcript_path);
-} catch {
+  const claudeDir = join(Bun.env.HOME!, ".claude");
+  const resolved = realpathSync(input.transcript_path);
+  if (!resolved.startsWith(claudeDir + "/")) process.exit(0);
+
+  const transcript = readFileSync(resolved, "utf-8");
+  const lines = transcript.split("\n").filter((l) => l.trim());
+  const meta = parseTranscript(lines);
+
+  const db = openDb();
+  saveSession(db, input.session_id, input.cwd, input.hook_event_name, meta);
+  saveTranscript(db, input.session_id, transcript);
+  db.close();
+} catch (err) {
+  console.error(`[save-transcript] failed: ${err instanceof Error ? err.message : err}`);
   process.exit(0);
 }
-if (!resolved.startsWith(claudeDir + "/")) process.exit(0);
-
-const transcript = readFileSync(resolved, "utf-8");
-const lines = transcript.split("\n").filter((l) => l.trim());
-const meta = parseTranscript(lines);
-
-const db = openDb();
-saveSession(db, input.session_id, input.cwd, input.hook_event_name, meta);
-saveTranscript(db, input.session_id, transcript);
-db.close();
