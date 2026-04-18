@@ -61,22 +61,14 @@ if (modelName) {
   row1.push([159, 30, `◇ ${short}`]);
 }
 
-// --- Row 2: context bar | cost | rate limits ---
+// --- Row 2: context bar | rate limits ---
 
-const MAX_CTX = /\[1m\]/.test(input.model?.id ?? "") ? 1_000_000 : 200_000;
-const usedTok = (input.context_window?.total_input_tokens ?? 0)
-              + (input.context_window?.total_output_tokens ?? 0);
-const ctx = usedTok > 0 ? Math.min(100, (usedTok / MAX_CTX) * 100) : null;
+const ctx = input.context_window?.used_percentage;
 if (ctx != null) {
   const [fg, bg] = rlColor(ctx);
   const filled = Math.round(ctx / 10);
   const bar = "█".repeat(filled) + "░".repeat(10 - filled);
   row2.push([fg, bg, `${bar} ${ctx.toFixed(1)}%`]);
-}
-
-const cost = input.cost?.total_cost_usd;
-if (cost != null && cost > 0) {
-  row2.push([146, 60, `$ ${cost.toFixed(2)}`]);
 }
 
 const rl = input.rate_limits;
