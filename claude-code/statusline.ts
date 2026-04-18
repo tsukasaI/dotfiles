@@ -75,12 +75,12 @@ const rl = input.rate_limits;
 if (rl?.five_hour?.used_percentage != null) {
   const p = rl.five_hour.used_percentage;
   const [fg, bg] = rlColor(p);
-  row2.push([fg, bg, `5h ${p.toFixed(0)}%`]);
+  row2.push([fg, bg, `5H ${p.toFixed(0)}%`]);
 }
 if (rl?.seven_day?.used_percentage != null) {
   const p = rl.seven_day.used_percentage;
   const [fg, bg] = rlColor(p);
-  row2.push([fg, bg, `7d ${p.toFixed(0)}%`]);
+  row2.push([fg, bg, `7D ${p.toFixed(0)}%`]);
 }
 
 // --- Row 3: tokens | lines changed ---
