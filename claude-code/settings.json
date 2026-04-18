@@ -3,6 +3,7 @@
   "env": {
     "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
     "ENABLE_TOOL_SEARCH": "1",
+    "CLAUDE_CODE_EFFORT_LEVEL": "high",
     "EDITOR": "nvim"
   },
   "attribution": {
@@ -49,7 +50,25 @@
       "WebFetch(domain:docs.claude.com)",
       "Bash(find *)",
       "Bash(grep -E '\\(nvim/nvim|ghostty/ghostty|wezterm/wezterm\\)$')",
-      "WebFetch(domain:www.anthropic.com)"
+      "WebFetch(domain:www.anthropic.com)",
+      "WebFetch(domain:cloud.google.com)",
+      "WebFetch(domain:developers.google.com)",
+      "WebFetch(domain:firebase.google.com)",
+      "WebFetch(domain:docs.aws.amazon.com)",
+      "WebFetch(domain:aws.amazon.com)",
+      "WebFetch(domain:developers.cloudflare.com)",
+      "WebFetch(domain:blog.cloudflare.com)",
+      "WebFetch(domain:learn.microsoft.com)",
+      "WebFetch(domain:azure.microsoft.com)",
+      "WebFetch(domain:go.dev)",
+      "WebFetch(domain:pkg.go.dev)",
+      "WebFetch(domain:doc.rust-lang.org)",
+      "WebFetch(domain:docs.rs)",
+      "WebFetch(domain:crates.io)",
+      "WebFetch(domain:www.typescriptlang.org)",
+      "WebFetch(domain:docs.python.org)",
+      "WebFetch(domain:nodejs.org)",
+      "WebFetch(domain:developer.mozilla.org)"
     ],
     "deny": [
       "Read(**/*secret*)",
