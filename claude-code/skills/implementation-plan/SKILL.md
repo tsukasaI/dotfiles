@@ -1,9 +1,9 @@
 ---
-name: plan
-description: Before writing code, produce an implementation plan broken into vertical slices. Use before any non-trivial task requiring 3+ steps, architectural decisions, or cross-file changes; also when scope is ambiguous and needs decomposition. Operate in read-only mode until the plan is confirmed.
+name: implementation-plan
+description: Produce an implementation plan broken into vertical slices before writing code. Use before any non-trivial task requiring 3+ steps, architectural decisions, or cross-file changes; also when scope is ambiguous and needs decomposition. Complements Claude Code's plan mode — plan mode enforces the read-only + approval gate, this skill defines what the plan artifact looks like. Operate in read-only until the plan is confirmed.
 ---
 
-# Planning and Task Breakdown
+# Implementation Plan
 
 Fix the plan before touching code. A plan is wrong fast and cheap; code is wrong slowly and expensively.
 
