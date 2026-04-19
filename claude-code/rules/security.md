@@ -5,3 +5,4 @@
 - Escape or sanitize user input before rendering in HTML to prevent XSS.
 - Validate and sanitize file paths from user input to prevent path traversal.
 - Use allowlists over denylists for input validation when possible.
+- Never log secrets, credentials, full request bodies, or PII. Redact at the logging boundary.
