@@ -1,38 +1,81 @@
 ---
-description: Before writing any code, create an implementation plan with task breakdown
-when_to_use: Before any non-trivial task requiring 3+ steps, architectural decisions, or cross-file changes. Also when the scope is ambiguous and needs decomposition into vertical slices.
+name: plan
+description: Before writing code, produce an implementation plan broken into vertical slices. Use before any non-trivial task requiring 3+ steps, architectural decisions, or cross-file changes; also when scope is ambiguous and needs decomposition. Operate in read-only mode until the plan is confirmed.
 ---
 
 # Planning and Task Breakdown
 
-Before writing any code, operate in read-only mode.
+Fix the plan before touching code. A plan is wrong fast and cheap; code is wrong slowly and expensively.
 
-## Process
+## When to use
 
-1. **Analyze**: Read the spec and relevant codebase to understand existing patterns, conventions, and constraints
-2. **Map dependencies**: Identify what depends on what -- build foundations first
-3. **Slice vertically**: Each task delivers a working, testable feature path (not horizontal layers)
-4. **Write tasks**: For each task, define:
+- Task spans 3+ steps, multiple files, or architectural decisions
+- Scope is ambiguous — requirement needs decomposition before implementation starts
+- Two or more reasonable approaches exist and the trade-off is not obvious
+
+When NOT to use:
+- Single-file, single-function edits with an obvious shape
+- Pure refactors where the target state is already specified in the request
+- Bug fixes where the failing test already pins the behavior
+
+## Workflow
+
+1. **Analyze** — Read the spec and the parts of the codebase the change will touch. Surface existing patterns, conventions, constraints.
+2. **Map dependencies** — What must exist before what. Build foundations first.
+3. **Slice vertically** — Each task delivers a working, testable path (not a horizontal layer). After each task the system still runs.
+4. **Write each task** with:
    - Description (one paragraph)
    - Acceptance criteria (specific, testable)
    - Verification steps (tests, build, manual checks)
-   - Dependencies and files likely touched
-   - Scope: XS (1 file), S (1-2), M (3-5), L (5-8), XL (break it down further)
-5. **Order and checkpoint**: High-risk tasks early. Checkpoints every 2-3 tasks. System stays working after each task.
-6. **Note risks and trade-offs**
+   - Files likely touched and dependencies on other tasks
+5. **Order and checkpoint** — High-risk tasks first. Checkpoints every 2–3 tasks to re-verify assumptions.
+6. **Call out risks and trade-offs** — Explicitly name what could go wrong and what you chose against.
+7. **Present and wait** — Show the plan and wait for confirmation before coding.
 
-## Task sizing
+## Splitting rule
 
-- If a task touches 8+ files or has more than 3 acceptance criteria, split it
-- If the title contains "and", it's probably two tasks
-- Agents perform best on S and M tasks
+If a task touches many files, has more than ~3 acceptance criteria, or its title contains "and" — split it. Split until each task delivers one coherent behavior.
 
 ## Parallelization
 
-- **Safe**: Independent feature slices, tests for implemented features, docs
-- **Sequential**: Migrations, shared state, dependency chains
-- **Coordinate first**: Features sharing an API contract -- define contract, then parallelize
+- **Safe to parallelize**: independent feature slices, tests for already-implemented features, docs
+- **Must be sequential**: migrations, shared-state changes, dependency chains
+- **Coordinate first, then parallelize**: features sharing an API contract — define the contract up front, then fan out
 
-## Output
+## Output format
 
-Present the plan and **WAIT for my confirmation** before proceeding.
+```
+# Plan: <short title>
+
+## Goal
+<one paragraph: what ships and why>
+
+## Assumptions
+- <assumption the plan rests on>
+
+## Tasks
+### 1. <task title>
+- Description: <one paragraph>
+- Acceptance: <bullets, testable>
+- Verification: <tests / build / manual>
+- Files: <paths>
+- Depends on: <task numbers or "none">
+
+### 2. ...
+
+## Risks and trade-offs
+- <risk>: <mitigation or accepted cost>
+- <alternative considered>: <why rejected>
+
+## Checkpoints
+- After task N: <what to re-verify>
+```
+
+## Red flags
+
+| Rationalization | Reality |
+|---|---|
+| "Let me just start — I'll plan as I go." | The cost of a wrong plan found mid-implementation is much higher than up-front planning. |
+| "Horizontal layers are simpler to plan." | They leave the system broken between tasks. Vertical slices keep it working. |
+| "One big task is fine if I know what to do." | If you can describe it in one task, you can describe it in three, and the three are easier to verify. |
+| "I'll add the risks section later." | Risks not written down do not get mitigated. |
