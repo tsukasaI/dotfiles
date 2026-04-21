@@ -1,3 +1,6 @@
+-- 起動高速化 (最上部で有効化)
+vim.loader.enable()
+
 -- リーダーキー (lazy.nvim より前に設定する必要がある)
 vim.g.mapleader = " "
 
@@ -13,7 +16,9 @@ vim.opt.ignorecase = true       -- 検索時大文字小文字無視
 vim.opt.smartcase = true        -- 大文字含むと区別
 vim.opt.splitright = true       -- 右に分割
 vim.opt.splitbelow = true       -- 下に分割
-vim.opt.clipboard = 'unnamedplus'
+vim.schedule(function()
+  vim.opt.clipboard = 'unnamedplus'
+end)
 vim.opt.mouse = ''
 vim.opt.signcolumn = 'yes'
 vim.opt.undofile = true         -- 永続undo
@@ -46,7 +51,15 @@ vim.api.nvim_create_autocmd("ColorScheme", {
 -- Diagnostics
 vim.diagnostic.config({
   virtual_text = { current_line = true },
-  signs = true,
+  signs = {
+    text = {
+      [vim.diagnostic.severity.ERROR] = '',
+      [vim.diagnostic.severity.WARN]  = '',
+      [vim.diagnostic.severity.INFO]  = '',
+      [vim.diagnostic.severity.HINT]  = '',
+    },
+  },
+  severity_sort = true,
   underline = true,
   float = { border = 'rounded' },
 })
@@ -65,37 +78,12 @@ vim.keymap.set('x', '>', '>gv')
 vim.keymap.set('n', '<A-j>', '<cmd>m .+1<cr>==', { desc = 'Move line down' })
 vim.keymap.set('n', '<A-k>', '<cmd>m .-2<cr>==', { desc = 'Move line up' })
 
--- LSP
-vim.lsp.config('gopls', {
-  cmd = { 'gopls' },
-  filetypes = { 'go', 'gomod', 'gowork', 'gotmpl' },
-  root_markers = { 'go.mod', 'go.work', '.git' },
-  settings = {
-    gopls = {
-      analyses = {
-        nilness = true,
-        unusedparams = true,
-        unusedwrite = true,
-        useany = true,
-      },
-      staticcheck = true,
-      gofumpt = true,
-      completeUnimported = true,
-      semanticTokens = true,
-      codelenses = {
-        gc_details = true,
-        generate = true,
-        run_govulncheck = true,
-        test = true,
-        tidy = true,
-      },
-      hints = {
-        assignVariableTypes = true,
-        compositeLiteralFields = true,
-        constantValues = true,
-        parameterNames = true,
-      },
-    },
-  },
+-- LSP (設定本体は nvim/lsp/<name>.lua — 0.12+ で自動ロード)
+vim.lsp.config('*', {
+  capabilities = require('blink.cmp').get_lsp_capabilities(),
 })
 vim.lsp.enable('gopls')
+vim.lsp.inlay_hint.enable(true)
+vim.keymap.set('n', '<leader>th', function()
+  vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
+end, { desc = 'Toggle inlay hints' })
