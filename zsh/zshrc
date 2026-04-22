@@ -93,6 +93,9 @@ if [[ $- == *i* ]]; then
   # cd → zoxide
   _cached_eval zoxide "zoxide init zsh"
   alias cd='z'
+
+  # fzf (Ctrl+R 履歴, Ctrl+T ファイル, Alt+C ディレクトリ)
+  _cached_eval fzf "fzf --zsh"
 fi
 
 # Ghostty

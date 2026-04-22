@@ -41,6 +41,7 @@
         ripgrep
         jq
         zoxide
+        fzf
         procs
 
         chafa
@@ -50,6 +51,7 @@
         # Development
         neovimWithParsers
         git
+        lazygit
         llvmPackages.openmp
 
         # DevOps / CLI tools
