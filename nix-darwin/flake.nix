@@ -105,6 +105,16 @@
         ];
       };
 
+      system.defaults = {
+        NSGlobalDomain = {
+          KeyRepeat = 1;
+          InitialKeyRepeat = 10;
+          ApplePressAndHoldEnabled = false;
+          "com.apple.trackpad.scaling" = 3.0;
+        };
+        ".GlobalPreferences"."com.apple.mouse.scaling" = 3.0;
+      };
+
       nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
         "terraform"
       ];
