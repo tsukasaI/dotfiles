@@ -6,7 +6,7 @@ Personal dotfiles for macOS (Apple Silicon) managed with nix-darwin.
 
 ```
 .
-├── nix-darwin/    # System configuration (packages, Homebrew)
+├── nix-darwin/    # System configuration (packages, Homebrew, macOS defaults)
 ├── nvim/          # Neovim with lazy.nvim
 ├── zsh/           # Shell config and aliases
 ├── starship/      # Cross-shell prompt
@@ -43,6 +43,8 @@ Declarative system configuration via Nix Flakes.
 **Packages**: neovim, git, bat, eza, fd, ripgrep, zoxide, starship, gh, awscli2, bun, go, nodejs, pnpm, rustup, terraform
 
 **Homebrew Casks**: ghostty, raycast, orbstack
+
+**macOS defaults** (`system.defaults`): fastest key repeat (`KeyRepeat=1`, `InitialKeyRepeat=10`), press-and-hold character picker disabled, trackpad/mouse tracking speed maxed (`3.0`). Requires logout after `darwin-rebuild switch` to take effect.
 
 **Standalone**: Claude Code (native installer, auto-updates)
 
