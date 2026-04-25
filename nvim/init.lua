@@ -83,7 +83,3 @@ vim.lsp.config('*', {
   capabilities = require('blink.cmp').get_lsp_capabilities(),
 })
 vim.lsp.enable('gopls')
-vim.lsp.inlay_hint.enable(true)
-vim.keymap.set('n', '<leader>th', function()
-  vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
-end, { desc = 'Toggle inlay hints' })
