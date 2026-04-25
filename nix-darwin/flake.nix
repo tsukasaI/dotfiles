@@ -110,9 +110,78 @@
           KeyRepeat = 1;
           InitialKeyRepeat = 10;
           ApplePressAndHoldEnabled = false;
+
           "com.apple.trackpad.scaling" = 3.0;
+
+          "com.apple.swipescrolldirection" = true;
         };
+
         ".GlobalPreferences"."com.apple.mouse.scaling" = 3.0;
+
+        trackpad = {
+          Clicking = true;
+          Dragging = false;
+          DragLock = false;
+          TrackpadThreeFingerDrag = true;
+          TrackpadRightClick = true;
+          FirstClickThreshold = 2;
+          SecondClickThreshold = 2;
+        };
+
+        CustomUserPreferences = {
+          "com.apple.AppleMultitouchTrackpad" = {
+            ActuateDetents = 1;
+            TrackpadCornerSecondaryClick = 0;
+            TrackpadHandResting = 1;
+            TrackpadHorizScroll = 1;
+            TrackpadMomentumScroll = 1;
+            TrackpadPinch = 1;
+            TrackpadRotate = 1;
+            TrackpadScroll = 1;
+            TrackpadFourFingerHorizSwipeGesture = 2;
+            TrackpadFourFingerVertSwipeGesture = 2;
+            TrackpadFourFingerPinchGesture = 2;
+            TrackpadFiveFingerPinchGesture = 2;
+            TrackpadThreeFingerHorizSwipeGesture = 0;
+            TrackpadThreeFingerVertSwipeGesture = 0;
+            TrackpadThreeFingerTapGesture = 0;
+            TrackpadTwoFingerDoubleTapGesture = 1;
+            TrackpadTwoFingerFromRightEdgeSwipeGesture = 3;
+            USBMouseStopsTrackpad = 0;
+          };
+          "com.apple.driver.AppleBluetoothMultitouch.trackpad" = {
+            TrackpadCornerSecondaryClick = 0;
+            TrackpadHandResting = 1;
+            TrackpadHorizScroll = 1;
+            TrackpadMomentumScroll = 1;
+            TrackpadPinch = 1;
+            TrackpadRotate = 1;
+            TrackpadScroll = 1;
+            TrackpadFourFingerHorizSwipeGesture = 2;
+            TrackpadFourFingerVertSwipeGesture = 2;
+            TrackpadFourFingerPinchGesture = 2;
+            TrackpadFiveFingerPinchGesture = 2;
+            TrackpadThreeFingerHorizSwipeGesture = 0;
+            TrackpadThreeFingerVertSwipeGesture = 0;
+            TrackpadThreeFingerTapGesture = 0;
+            TrackpadTwoFingerDoubleTapGesture = 1;
+            TrackpadTwoFingerFromRightEdgeSwipeGesture = 3;
+            USBMouseStopsTrackpad = 0;
+          };
+          "com.apple.driver.AppleBluetoothMultitouch.mouse" = {
+            MouseHorizontalScroll = 1;
+            MouseVerticalScroll = 1;
+            MouseMomentumScroll = 1;
+            MouseOneFingerDoubleTapGesture = 0;
+            MouseTwoFingerDoubleTapGesture = 3;
+            MouseTwoFingerHorizSwipeGesture = 2;
+          };
+          NSGlobalDomain = {
+            "com.apple.mouse.doubleClickThreshold" = 0.15;
+            "com.apple.scrollwheel.scaling" = 3.0;
+            "com.apple.trackpad.forceClick" = 1;
+          };
+        };
       };
 
       nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
