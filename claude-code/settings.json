@@ -160,8 +160,10 @@
       }
     }
   },
-  "advisorModel": "opus",
   "plansDirectory": ".claude/plans",
   "autoMemoryEnabled": false,
+  "theme": "dark-ansi",
+  "viewMode": "verbose",
+  "preferredNotifChannel": "ghostty",
   "useAutoModeDuringPlan": false
 }
