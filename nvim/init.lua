@@ -11,7 +11,6 @@ vim.opt.number = true           -- 行番号
 vim.opt.tabstop = 2             -- タブ幅
 vim.opt.shiftwidth = 2          -- インデント幅
 vim.opt.expandtab = true        -- スペースに展開
-vim.opt.smartindent = true      -- スマートインデント
 vim.opt.ignorecase = true       -- 検索時大文字小文字無視
 vim.opt.smartcase = true        -- 大文字含むと区別
 vim.opt.splitright = true       -- 右に分割
