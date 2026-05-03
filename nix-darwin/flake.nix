@@ -43,6 +43,7 @@
         zoxide
         fzf
         procs
+        tokei
 
         chafa
         gawk

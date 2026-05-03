@@ -19,6 +19,10 @@
       "Bash(mkdir:*)",
       "Bash(mv:*)",
       "Bash(jq:*)",
+      "Bash(rg:*)",
+      "Bash(fd:*)",
+      "Bash(eza:*)",
+      "Bash(tokei:*)",
       "Bash(docker run:*)",
       "Bash(docker build:*)",
       "Bash(git fetch:*)",
@@ -47,8 +51,6 @@
       "Bash(/Users/inouetsukasa/dotfiles/claude-code/hooks/block-dangerous.sh)",
       "Bash(echo \"exit=$?\")",
       "WebFetch(domain:docs.claude.com)",
-      "Bash(find *)",
-      "Bash(grep -E '\\(nvim/nvim|ghostty/ghostty|wezterm/wezterm\\)$')",
       "WebFetch(domain:www.anthropic.com)",
       "WebFetch(domain:cloud.google.com)",
       "WebFetch(domain:developers.google.com)",
@@ -160,10 +162,11 @@
       }
     }
   },
+  "viewMode": "verbose",
   "plansDirectory": ".claude/plans",
   "autoMemoryEnabled": false,
   "theme": "dark-ansi",
-  "viewMode": "verbose",
   "preferredNotifChannel": "ghostty",
-  "useAutoModeDuringPlan": false
+  "useAutoModeDuringPlan": false,
+  "verbose": true
 }
