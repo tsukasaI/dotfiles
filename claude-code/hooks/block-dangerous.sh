@@ -29,8 +29,79 @@ escape_regex() {
   printf '%s' "$1" | sed 's/[.^$*+?()[\]{}|\\]/\\&/g'
 }
 
-# Command-boundary prefix: ensures "remove-items" does not match "rm"
-CB='(^|[;&|`$([:space:]])'
+# Strip text inside single- and double-quoted regions so blocklist patterns
+# don't false-positive on words like "secret" inside commit messages or echo args.
+# Inside double quotes, $(...) and `...` still execute (bash expansion), so
+# preserve those regions verbatim. Conservative: when in doubt, keep text.
+strip_quotes_preserving_subst() {
+  local s=$1
+  local n=${#s}
+  local out=""
+  local i=0
+  local c start depth cc
+  while (( i < n )); do
+    c=${s:i:1}
+    if [[ $c == "'" ]]; then
+      ((i++))
+      while (( i < n )) && [[ ${s:i:1} != "'" ]]; do ((i++)); done
+      (( i < n )) && ((i++))
+    elif [[ $c == '"' ]]; then
+      ((i++))
+      while (( i < n )); do
+        c=${s:i:1}
+        if [[ $c == '"' ]]; then
+          ((i++)); break
+        elif [[ $c == '\' ]]; then
+          ((i+=2))
+        elif [[ $c == '$' && ${s:i+1:1} == '(' ]]; then
+          start=$i; depth=1
+          ((i+=2))
+          while (( i < n )) && (( depth > 0 )); do
+            cc=${s:i:1}
+            if [[ $cc == '\' ]]; then
+              ((i+=2)); continue
+            elif [[ $cc == '(' ]]; then ((depth++))
+            elif [[ $cc == ')' ]]; then ((depth--))
+            fi
+            ((i++))
+          done
+          out+=${s:start:i-start}
+        elif [[ $c == '`' ]]; then
+          start=$i
+          ((i++))
+          while (( i < n )) && [[ ${s:i:1} != '`' ]]; do
+            if [[ ${s:i:1} == '\' ]]; then ((i+=2)); else ((i++)); fi
+          done
+          (( i < n )) && ((i++))
+          out+=${s:start:i-start}
+        else
+          ((i++))
+        fi
+      done
+    else
+      out+=$c
+      ((i++))
+    fi
+  done
+  printf '%s' "$out"
+}
+
+CMD_NOQUOTES=$(strip_quotes_preserving_subst "$CMD")
+
+# Command-boundary leading char class. Chars that can legitimately precede
+# a command name in bash:
+#   `<` process substitution `<(rm ...)`
+#   `\` alias-bypass `\rm`
+#   `/` full path `/usr/bin/rm`
+#   `{` `,` brace expansion `{rm,echo}`
+#   `;` `&` `|` `` ` `` `$` `(` shell separators / substitution starters
+CB='(^|[<\\/{,;&|`$([:space:]])'
+
+# Command-boundary trailing char class: chars that legitimately follow a
+# command name in bash. Originally only space|EOL, which let bypasses like
+# `rm;ls`, `bash;ls`, `rm>file` slip through. `,` and `}` cover brace
+# expansion forms like `{rm,echo}` and `{cmd,rm}`.
+TB='([[:space:];&|<>()`,{}]|$)'
 
 # ── Special case: curl (localhost allowed, external blocked) ─────────────────
 if [[ "$CMD" =~ ${CB}curl[[:space:]] ]]; then
@@ -39,14 +110,22 @@ if [[ "$CMD" =~ ${CB}curl[[:space:]] ]]; then
   fi
 fi
 
-# ── Pipe-to-shell injection ──────────────────────────────────────────────────
-if [[ "$CMD" =~ \|[[:space:]]*(bash|sh|zsh|dash|fish|ksh)([[:space:]]|$) ]]; then
-  block "CODE_INJECTION" "Piping into a shell interpreter can execute arbitrary remote code."
+# ── Pipe-to-shell / pipe-to-interpreter injection ───────────────────────────
+# Includes script interpreters that read commands from stdin (python, node, etc.)
+if [[ "$CMD" =~ \|[[:space:]]*(bash|sh|zsh|dash|fish|ksh|python|python3|node|perl|ruby|php)([[:space:]]|$) ]]; then
+  block "CODE_INJECTION" "Piping into a shell or script interpreter can execute arbitrary code."
 fi
 
 # ── /dev/tcp and /dev/udp (bash network pseudo-devices) ─────────────────────
 if [[ "$CMD" =~ /dev/(tcp|udp)/ ]]; then
   block "NETWORK" "Bash /dev/tcp|udp opens covert network channels."
+fi
+
+# ── ANSI-C $'...' strings hide command names via \xNN / \NNN escapes ────────
+# Bash decodes $'\x72\x6d' to literal "rm" at runtime, so the scanner can't
+# see the underlying command. Block any use of $'...' to close this hole.
+if [[ "$CMD" =~ \$\' ]]; then
+  block "CODE_INJECTION" "ANSI-C \$'...' strings can hide command names via escape sequences."
 fi
 
 # ── Allowlist: security tools that match blocklist patterns ──────────────────
@@ -57,7 +136,7 @@ if [[ -f "$ALLOWLIST" ]]; then
     [[ -z "${tool//[[:space:]]/}" ]] && continue
     tool=$(trim "$tool")
     escaped=$(escape_regex "$tool")
-    if [[ "$CMD" =~ ${CB}${escaped}([[:space:]]|$) ]]; then
+    if [[ "$CMD_NOQUOTES" =~ ${CB}${escaped}${TB} ]]; then
       exit 0
     fi
   done < "$ALLOWLIST"
@@ -86,10 +165,10 @@ while IFS='|' read -r category prefix reason; do
   else
     # Standard command-boundary prefix match (e.g. rm matches "rm foo" but not "remove-items")
     escaped=$(escape_regex "$prefix")
-    pattern="${CB}${escaped}([[:space:]]|$)"
+    pattern="${CB}${escaped}${TB}"
   fi
 
-  if [[ "$CMD" =~ $pattern ]]; then
+  if [[ "$CMD_NOQUOTES" =~ $pattern ]]; then
     block "$category" "$reason"
   fi
 done < "$BLOCKLIST"
