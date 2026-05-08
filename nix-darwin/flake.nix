@@ -77,6 +77,12 @@
         graphviz
       ]);
 
+      # Touch ID for sudo (works inside tmux/screen via pam_reattach)
+      security.pam.services.sudo_local = {
+        touchIdAuth = true;
+        reattach = true;
+      };
+
       # Homebrew（Nixで管理できないもの用）
       homebrew = {
         enable = true;
@@ -86,12 +92,16 @@
           cleanup = "zap";
         };
 
+        taps = [
+          "bendews/tap"  # apw (Apple Passwords CLI)
+        ];
 
         # Nixに移行しないformulae
         brews = [
           "deck"
           "mise"
           "yt-dlp"
+          "apw"  # Apple Passwords CLI
         ];
 
         casks = [

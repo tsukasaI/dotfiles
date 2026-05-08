@@ -21,6 +21,13 @@ mkdir -p ~/.config/git
 ln -sf "$DOTFILES/git/ignore" ~/.config/git/ignore
 ln -sf "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
 
+# SSH (UseKeychain integration)
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+if [ -e ~/.ssh/config ] && [ ! -L ~/.ssh/config ]; then
+  mv ~/.ssh/config ~/.ssh/config.backup.$(date +%Y%m%d-%H%M%S)
+fi
+ln -sf "$DOTFILES/ssh/config" ~/.ssh/config
+
 # Claude Code
 mkdir -p ~/.claude
 ln -sf "$DOTFILES/claude-code/skills" ~/.claude/skills
