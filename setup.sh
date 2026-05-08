@@ -7,34 +7,34 @@ DOTFILES="$HOME/dotfiles"
 echo "Setting up symlinks..."
 
 # ~/.config symlinks
-ln -sf "$DOTFILES/nvim" ~/.config/nvim
-ln -sf "$DOTFILES/ghostty" ~/.config/ghostty
-ln -sf "$DOTFILES/wezterm" ~/.config/wezterm
+ln -sfn "$DOTFILES/nvim" ~/.config/nvim
+ln -sfn "$DOTFILES/ghostty" ~/.config/ghostty
+ln -sfn "$DOTFILES/wezterm" ~/.config/wezterm
 mkdir -p ~/.config/karabiner
-ln -sf "$DOTFILES/karabiner/karabiner.json" ~/.config/karabiner/karabiner.json
+ln -sfn "$DOTFILES/karabiner/karabiner.json" ~/.config/karabiner/karabiner.json
 
 
 # Home directory symlinks
-ln -sf "$DOTFILES/zsh/zshrc" ~/.zshrc
-ln -sf "$DOTFILES/git/gitconfig" ~/.gitconfig
+ln -sfn "$DOTFILES/zsh/zshrc" ~/.zshrc
+ln -sfn "$DOTFILES/git/gitconfig" ~/.gitconfig
 mkdir -p ~/.config/git
-ln -sf "$DOTFILES/git/ignore" ~/.config/git/ignore
-ln -sf "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
+ln -sfn "$DOTFILES/git/ignore" ~/.config/git/ignore
+ln -sfn "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
 
 # SSH (UseKeychain integration)
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
 if [ -e ~/.ssh/config ] && [ ! -L ~/.ssh/config ]; then
   mv ~/.ssh/config ~/.ssh/config.backup.$(date +%Y%m%d-%H%M%S)
 fi
-ln -sf "$DOTFILES/ssh/config" ~/.ssh/config
+ln -sfn "$DOTFILES/ssh/config" ~/.ssh/config
 
 # Claude Code
 mkdir -p ~/.claude
-ln -sf "$DOTFILES/claude-code/skills" ~/.claude/skills
-ln -sf "$DOTFILES/claude-code/rules" ~/.claude/rules
-ln -sf "$DOTFILES/claude-code/agents" ~/.claude/agents
-ln -sf "$DOTFILES/claude-code/settings.json" ~/.claude/settings.json
-ln -sf "$DOTFILES/claude-code/CLAUDE.md" ~/.claude/CLAUDE.md
+ln -sfn "$DOTFILES/claude-code/skills" ~/.claude/skills
+ln -sfn "$DOTFILES/claude-code/rules" ~/.claude/rules
+ln -sfn "$DOTFILES/claude-code/agents" ~/.claude/agents
+ln -sfn "$DOTFILES/claude-code/settings.json" ~/.claude/settings.json
+ln -sfn "$DOTFILES/claude-code/CLAUDE.md" ~/.claude/CLAUDE.md
 chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
 
 echo "Done."
