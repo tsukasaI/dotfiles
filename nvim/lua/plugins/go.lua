@@ -12,4 +12,14 @@ return {
 			},
 		},
 	},
+	{
+		'leoluz/nvim-dap-go',
+		ft = 'go',
+		dependencies = { 'mfussenegger/nvim-dap' },
+		opts = {},
+		keys = {
+			{ '<leader>dt', function() require('dap-go').debug_test() end, ft = 'go', desc = 'DAP: debug nearest Go test' },
+			{ '<leader>dT', function() require('dap-go').debug_last_test() end, ft = 'go', desc = 'DAP: debug last Go test' },
+		},
+	},
 }

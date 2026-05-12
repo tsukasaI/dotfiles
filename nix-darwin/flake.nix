@@ -68,6 +68,7 @@
         gopls
         gofumpt
         gotools # goimports etc.
+        delve # Go debugger (used by nvim-dap-go)
         nodejs
         pnpm
         rustup
