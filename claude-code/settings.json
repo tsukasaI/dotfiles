@@ -29,7 +29,6 @@
       "Bash(git log:*)",
       "Bash(git diff:*)",
       "Bash(git tag:*)",
-      "Bash(git -c color.ui=never diff:*)",
       "Bash(go vet:*)",
       "Bash(go test:*)",
       "Bash(go doc:*)",
@@ -43,7 +42,6 @@
       "Bash(gh repo view:*)",
       "Bash(gh search:*)",
       "Bash(gh issue:*)",
-      "Bash(gh label list:*)",
       "WebFetch(domain:ghostty.org)",
       "WebFetch(domain:docs.anthropic.com)",
       "WebFetch(domain:gist.github.com)",
@@ -71,7 +69,11 @@
       "WebFetch(domain:www.typescriptlang.org)",
       "WebFetch(domain:docs.python.org)",
       "WebFetch(domain:nodejs.org)",
-      "WebFetch(domain:developer.mozilla.org)"
+      "WebFetch(domain:developer.mozilla.org)",
+      "Bash(find *)",
+      "Bash(grep -E '\\(nvim/nvim|ghostty/ghostty|wezterm/wezterm\\)$')",
+      "WebFetch(domain:support.claude.com)",
+      "Bash(defaults read *)"
     ],
     "deny": [
       "Read(**/*secret*)",
@@ -146,6 +148,11 @@
             "type": "command",
             "command": "$HOME/dotfiles/claude-code/hooks/check-debug-statements.sh",
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "bun $HOME/dotfiles/claude-code/hooks/save-transcript.ts",
+            "async": true
           }
         ]
       }
@@ -168,7 +175,10 @@
   "plansDirectory": ".claude/plans",
   "autoMemoryEnabled": false,
   "theme": "dark-ansi",
+  "verbose": true,
   "preferredNotifChannel": "ghostty",
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true,
   "useAutoModeDuringPlan": false,
-  "verbose": true
+  "remoteControlAtStartup": true
 }

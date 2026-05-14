@@ -11,6 +11,7 @@ interface HookInput {
   transcript_path: string;
   cwd: string;
   hook_event_name: string;
+  reason?: string;
 }
 
 interface Usage {
@@ -41,6 +42,7 @@ interface SessionMeta {
   outputTokens: number;
   numUser: number;
   numAssistant: number;
+  dayCounts: Map<string, number>;
 }
 
 // --- Database ---
@@ -69,6 +71,14 @@ const SCHEMA = `
     size_bytes INTEGER,
     FOREIGN KEY (session_id) REFERENCES sessions(session_id)
   );
+  CREATE TABLE IF NOT EXISTS session_days (
+    session_id TEXT,
+    day TEXT,
+    message_count INTEGER DEFAULT 0,
+    PRIMARY KEY (session_id, day),
+    FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_session_days_day ON session_days(day);
 `;
 
 function openDb(): Database {
@@ -103,6 +113,7 @@ function parseTranscript(lines: string[]): SessionMeta {
     outputTokens: 0,
     numUser: 0,
     numAssistant: 0,
+    dayCounts: new Map(),
   };
 
   for (const line of lines) {
@@ -116,6 +127,12 @@ function parseTranscript(lines: string[]): SessionMeta {
     const ts = entry.timestamp ?? "";
     if (!meta.startedAt && ts) meta.startedAt = ts;
     if (ts) meta.endedAt = ts;
+
+    const isMessage = entry.type === "user" || entry.type === "assistant";
+    if (ts && isMessage) {
+      const day = ts.slice(0, 10);
+      meta.dayCounts.set(day, (meta.dayCounts.get(day) ?? 0) + 1);
+    }
 
     switch (entry.type) {
       case "user":
@@ -182,6 +199,20 @@ function saveTranscript(
   ).run(sessionId, transcript, Buffer.byteLength(transcript, "utf-8"));
 }
 
+function saveSessionDays(
+  db: Database,
+  sessionId: string,
+  dayCounts: Map<string, number>,
+): void {
+  db.prepare(`DELETE FROM session_days WHERE session_id = ?`).run(sessionId);
+  const insert = db.prepare(
+    `INSERT INTO session_days (session_id, day, message_count) VALUES (?, ?, ?)`,
+  );
+  for (const [day, count] of dayCounts) {
+    insert.run(sessionId, day, count);
+  }
+}
+
 // --- Main ---
 
 const input: HookInput = await Bun.stdin.json();
@@ -195,9 +226,13 @@ try {
   const lines = transcript.split("\n").filter((l) => l.trim());
   const meta = parseTranscript(lines);
 
+  const endReason = input.reason ?? input.hook_event_name;
   const db = openDb();
-  saveSession(db, input.session_id, input.cwd, input.hook_event_name, meta);
-  saveTranscript(db, input.session_id, transcript);
+  db.transaction(() => {
+    saveSession(db, input.session_id, input.cwd, endReason, meta);
+    saveTranscript(db, input.session_id, transcript);
+    saveSessionDays(db, input.session_id, meta.dayCounts);
+  })();
   db.close();
 } catch (err) {
   console.error(`[save-transcript] failed: ${err instanceof Error ? err.message : err}`);
