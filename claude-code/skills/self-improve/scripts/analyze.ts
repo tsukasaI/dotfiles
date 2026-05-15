@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { readFileSync, readdirSync, statSync, realpathSync, existsSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 
 const HOME = Bun.env.HOME!;
 const PROJECTS_DIR = join(HOME, ".claude", "projects");
@@ -11,6 +11,33 @@ const CUTOFF_MS = NOW - WINDOW_DAYS * 24 * 3600 * 1000;
 const PROMPT_CLUSTER_MIN = 3;
 const FIRST_WORDS_COUNT = 5;
 const DEAD_SKILL_DAYS = 90;
+const OVERLAP_MIN_MATCHES = 5;
+const META_CLUSTER_MIN_MEMBERS = 3;
+
+const STOPLIST = new Set([
+  "the", "and", "for", "use", "uses", "using", "when", "this", "with", "from",
+  "into", "via", "you", "your", "that", "are", "have", "has", "had", "but",
+  "not", "all", "any", "can", "may", "see", "set", "get", "let", "one", "two",
+  "new", "old", "now", "next", "also", "out", "than", "more", "less", "very",
+  "should", "could", "would", "must", "will", "want", "need", "wants", "needs",
+  "make", "made", "show", "list", "based", "such", "etc",
+  "instead", "before", "after", "while", "what", "which", "where", "how", "why",
+  "skill", "skills", "claude", "code", "file", "files", "type", "name", "names",
+  "above", "below", "each", "both", "only", "either", "between", "across",
+  "true", "false", "null", "undefined",
+]);
+
+function extractKeywords(text: string): Set<string> {
+  const out = new Set<string>();
+  const lower = text.toLowerCase();
+  for (const t of lower.split(/[^a-z0-9-]+/)) {
+    if (t.length < 3) continue;
+    if (STOPLIST.has(t)) continue;
+    if (/^\d+$/.test(t)) continue;
+    out.add(t);
+  }
+  return out;
+}
 
 interface ToolUse {
   type: "tool_use";
@@ -46,31 +73,73 @@ interface SkillRecord {
   mtime: string;
   frontmatter: { name?: string; description?: string };
   body_first_300_chars: string;
+  body_first_500_chars: string;
   raw_body: string;
+  keywords: string[];
 }
 
-function listSkillDirs(): SkillRecord[] {
+function findGitRoot(start: string): string | null {
+  let dir = start;
+  for (let i = 0; i < 32; i++) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
+}
+
+function listSkillDirsForCwd(cwd: string): SkillRecord[] {
   const records: SkillRecord[] = [];
+  const seen = new Set<string>();
+
   const userSkills = join(HOME, ".claude", "skills");
   if (existsSync(userSkills)) {
     for (const entry of readdirSync(userSkills, { withFileTypes: true })) {
       if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
       const skillMd = join(userSkills, entry.name, "SKILL.md");
       if (!existsSync(skillMd)) continue;
-      records.push(loadSkill(entry.name, skillMd, "user"));
+      const rec = loadSkill(entry.name, skillMd, "user");
+      if (seen.has(rec.path)) continue;
+      seen.add(rec.path);
+      records.push(rec);
     }
   }
-  const cwd = process.cwd();
-  const projSkills = join(cwd, ".claude", "skills");
-  if (existsSync(projSkills)) {
-    for (const entry of readdirSync(projSkills, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const skillMd = join(projSkills, entry.name, "SKILL.md");
-      if (!existsSync(skillMd)) continue;
-      records.push(loadSkill(entry.name, skillMd, "project"));
+
+  const gitRoot = findGitRoot(cwd);
+  let dir = cwd;
+  for (let i = 0; i < 32; i++) {
+    const skillsDir = join(dir, ".claude", "skills");
+    if (existsSync(skillsDir)) {
+      try {
+        for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue;
+          const skillMd = join(skillsDir, entry.name, "SKILL.md");
+          if (!existsSync(skillMd)) continue;
+          const rec = loadSkill(entry.name, skillMd, "project");
+          if (seen.has(rec.path)) continue;
+          seen.add(rec.path);
+          records.push(rec);
+        }
+      } catch {}
     }
+    if (gitRoot && dir === gitRoot) break;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
+
   return records;
+}
+
+const skillsForCwdCache = new Map<string, SkillRecord[]>();
+function getSkillsForCwd(cwd: string): SkillRecord[] {
+  if (!cwd) return [];
+  const cached = skillsForCwdCache.get(cwd);
+  if (cached) return cached;
+  const result = listSkillDirsForCwd(cwd);
+  skillsForCwdCache.set(cwd, result);
+  return result;
 }
 
 function loadSkill(name: string, skillMd: string, scope: "user" | "project"): SkillRecord {
@@ -82,6 +151,8 @@ function loadSkill(name: string, skillMd: string, scope: "user" | "project"): Sk
   const fm = parseFrontmatter(raw);
   const body = stripFrontmatter(raw);
   const mtime = new Date(statSync(resolvedPath).mtimeMs).toISOString();
+  const body500 = body.slice(0, 500);
+  const keywords = [...extractKeywords(`${fm.description ?? ""}\n${body500}`)];
   return {
     name,
     path: resolvedPath,
@@ -89,7 +160,9 @@ function loadSkill(name: string, skillMd: string, scope: "user" | "project"): Sk
     mtime,
     frontmatter: fm,
     body_first_300_chars: body.slice(0, 300),
+    body_first_500_chars: body500,
     raw_body: body,
+    keywords,
   };
 }
 
@@ -318,6 +391,87 @@ function buildDeadSkills(skills: SkillRecord[], scan: ScanResult, dataSufficient
   return result;
 }
 
+interface OverlapHint {
+  skill_name: string;
+  skill_path: string;
+  scope: "user" | "project";
+  description: string;
+  match_count: number;
+}
+
+function computeOverlapHints(clusterSamples: string[], skills: SkillRecord[]): OverlapHint[] {
+  const clusterKw = extractKeywords(clusterSamples.join("\n"));
+  const hits: OverlapHint[] = [];
+  for (const s of skills) {
+    let matches = 0;
+    for (const w of s.keywords) {
+      if (clusterKw.has(w)) matches++;
+    }
+    if (matches < OVERLAP_MIN_MATCHES) continue;
+    hits.push({
+      skill_name: s.frontmatter.name ?? s.name,
+      skill_path: s.path,
+      scope: s.scope,
+      description: s.frontmatter.description ?? "",
+      match_count: matches,
+    });
+  }
+  hits.sort((a, b) => b.match_count - a.match_count);
+  return hits.slice(0, 3);
+}
+
+const CODE_REVIEW_TOPIC_WORDS = new Set([
+  "review", "code-review", "lc", "leetcode", "algorithm", "algo", "lint",
+  "refactor", "debug", "coding", "interview", "tdd", "test", "tests",
+]);
+
+function computeCodeReviewOverlap(skills: SkillRecord[]): OverlapHint[] {
+  const hits: OverlapHint[] = [];
+  for (const s of skills) {
+    const matched: string[] = [];
+    for (const w of s.keywords) {
+      if (CODE_REVIEW_TOPIC_WORDS.has(w)) matched.push(w);
+    }
+    if (matched.length < 2) continue;
+    hits.push({
+      skill_name: s.frontmatter.name ?? s.name,
+      skill_path: s.path,
+      scope: s.scope,
+      description: s.frontmatter.description ?? "",
+      match_count: matched.length,
+    });
+  }
+  hits.sort((a, b) => b.match_count - a.match_count);
+  return hits.slice(0, 3);
+}
+
+function detectLanguage(firstSample: string): string {
+  const firstLine = firstSample.split(/\r?\n/)[0].trim();
+  if (
+    /^func\s+/.test(firstLine) ||
+    /^package\s+\w/.test(firstLine) ||
+    /^import\s+"/.test(firstLine) ||
+    /^type\s+\w+\s+(struct|interface|\[\]|\*)/.test(firstLine)
+  ) return "go";
+  if (
+    /^def\s+/.test(firstLine) ||
+    /^class\s+\w+/.test(firstLine) ||
+    /^from\s+[\w.]+\s+import/.test(firstLine)
+  ) return "python";
+  if (
+    /^function\s+/.test(firstLine) ||
+    /^(const|let|var)\s+\w/.test(firstLine) ||
+    /^export\s+(default\s+)?/.test(firstLine) ||
+    /^import\s+\{/.test(firstLine)
+  ) return "js/ts";
+  if (
+    /^fn\s+/.test(firstLine) ||
+    /^pub\s+fn\s+/.test(firstLine) ||
+    /^impl\s+/.test(firstLine)
+  ) return "rust";
+  return "unknown";
+}
+
 function buildPromptClusters(prompts: PromptEntry[]) {
   const nonSlash = prompts.filter((p) => !p.is_slash);
   type Key = string;
@@ -346,6 +500,9 @@ function buildPromptClusters(prompts: PromptEntry[]) {
   const projectFwSeen = new Set<string>();
   for (const v of perCwd.values()) {
     if (v.count < PROMPT_CLUSTER_MIN) continue;
+    const skills = getSkillsForCwd(v.cwd);
+    const overlap_hints = computeOverlapHints(v.samples, skills);
+    const language = detectLanguage(v.samples[0] ?? "");
     clusters.push({
       first_words: v.first_words,
       count: v.count,
@@ -353,6 +510,9 @@ function buildPromptClusters(prompts: PromptEntry[]) {
       scope: "project",
       scope_target: join(v.cwd, ".claude", "skills"),
       samples: v.samples,
+      language,
+      overlap_hints,
+      in_meta_cluster: false,
     });
     projectFwSeen.add(v.first_words);
   }
@@ -360,6 +520,10 @@ function buildPromptClusters(prompts: PromptEntry[]) {
     if (v.count < PROMPT_CLUSTER_MIN) continue;
     if (v.cwds.size < 2) continue;
     if (projectFwSeen.has(v.first_words)) continue;
+    const firstCwd = [...v.cwds][0];
+    const skills = getSkillsForCwd(firstCwd);
+    const overlap_hints = computeOverlapHints(v.samples, skills);
+    const language = detectLanguage(v.samples[0] ?? "");
     clusters.push({
       first_words: v.first_words,
       count: v.count,
@@ -367,10 +531,61 @@ function buildPromptClusters(prompts: PromptEntry[]) {
       scope: "user",
       scope_target: join(HOME, ".claude", "skills"),
       samples: v.samples,
+      language,
+      overlap_hints,
+      in_meta_cluster: false,
     });
   }
   clusters.sort((a, b) => b.count - a.count);
   return clusters;
+}
+
+function buildMetaClusters(clusters: any[]) {
+  const groups = new Map<string, { scope_target: string; language: string; scope: string; member_indices: number[]; cwds: Set<string>; total_count: number; sample_first_words: string[]; sample_codes: string[] }>();
+  clusters.forEach((c, idx) => {
+    if (!c.language || c.language === "unknown") return;
+    const key = `${c.scope_target}\x00${c.language}`;
+    const g = groups.get(key) ?? {
+      scope_target: c.scope_target,
+      language: c.language,
+      scope: c.scope,
+      member_indices: [],
+      cwds: new Set<string>(),
+      total_count: 0,
+      sample_first_words: [],
+      sample_codes: [],
+    };
+    g.member_indices.push(idx);
+    for (const cw of c.cwds) g.cwds.add(cw);
+    g.total_count += c.count;
+    if (g.sample_first_words.length < 5) g.sample_first_words.push(c.first_words);
+    if (g.sample_codes.length < 3 && c.samples[0]) g.sample_codes.push(c.samples[0]);
+    groups.set(key, g);
+  });
+
+  const metas: any[] = [];
+  for (const g of groups.values()) {
+    if (g.member_indices.length < META_CLUSTER_MIN_MEMBERS) continue;
+    for (const idx of g.member_indices) clusters[idx].in_meta_cluster = true;
+    const firstCwd = [...g.cwds][0];
+    const skillsForMeta = firstCwd ? getSkillsForCwd(firstCwd) : [];
+    const code_overlap_hints = computeCodeReviewOverlap(skillsForMeta);
+    metas.push({
+      meta_kind: "code_paste",
+      language: g.language,
+      scope: g.scope,
+      scope_target: g.scope_target,
+      cwds: [...g.cwds],
+      total_count: g.total_count,
+      cluster_count: g.member_indices.length,
+      sample_first_words: g.sample_first_words,
+      sample_codes: g.sample_codes,
+      member_indices: g.member_indices,
+      code_overlap_hints,
+    });
+  }
+  metas.sort((a, b) => b.total_count - a.total_count);
+  return metas;
 }
 
 function buildSlashFrequency(prompts: PromptEntry[]) {
@@ -427,12 +642,15 @@ function listAvailableAgents(): Set<string> {
   return out;
 }
 
-const skills = listSkillDirs();
+const skills = getSkillsForCwd(process.cwd());
 const scanResult = scan();
 const oldestIso = scanResult.oldest_session_ms ? new Date(scanResult.oldest_session_ms).toISOString() : null;
 const dataSufficient =
   scanResult.oldest_session_ms !== null &&
   NOW - scanResult.oldest_session_ms >= DEAD_SKILL_DAYS * 24 * 3600 * 1000;
+
+const promptClusters = buildPromptClusters(scanResult.prompts);
+const metaClusters = buildMetaClusters(promptClusters);
 
 const out = {
   generated_at: new Date(NOW).toISOString(),
@@ -444,8 +662,16 @@ const out = {
     skills_found: skills.length,
     total_skill_invocations_in_window: scanResult.invocations.length,
   },
+  available_skills: skills.map((s) => ({
+    name: s.frontmatter.name ?? s.name,
+    path: s.path,
+    scope: s.scope,
+    description: s.frontmatter.description ?? "",
+    body_first_500_chars: s.body_first_500_chars,
+  })),
   dead_skills: buildDeadSkills(skills, scanResult, dataSufficient),
-  prompt_clusters: buildPromptClusters(scanResult.prompts),
+  meta_clusters: metaClusters,
+  prompt_clusters: promptClusters,
   slash_command_frequency: buildSlashFrequency(scanResult.prompts),
   skill_review_hints: buildSkillReviewHints(skills, listAvailableAgents()),
 };

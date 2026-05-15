@@ -47,9 +47,19 @@ const PROMPT_MAX_CHARS_FOR_CORRECTION = 400;
 
 interface ToolUse {
   type: "tool_use";
+  id?: string;
   name: string;
   input?: Record<string, unknown>;
 }
+
+interface ToolResult {
+  type: "tool_result";
+  tool_use_id?: string;
+  is_error?: boolean;
+  content?: unknown;
+}
+
+const FAILURE_CHAIN_MIN = 3;
 interface TextBlock {
   type: "text";
   text: string;
@@ -78,7 +88,7 @@ interface AssistantAction {
 }
 
 interface Pair {
-  kind: "interrupt" | "correction";
+  kind: "interrupt" | "correction" | "failure_loop";
   ts: string;
   cwd: string;
   tool_name: string;
@@ -86,6 +96,21 @@ interface Pair {
   file_path: string | null;
   user_response: string;
   assistant_action: string;
+  chain_length?: number;
+}
+
+interface ToolUseEvent {
+  id: string;
+  ts: string;
+  tool_name: string;
+  excerpt: string;
+  file_path: string | null;
+  cwd: string;
+}
+
+interface ToolResultEvent {
+  is_error: boolean;
+  content: string;
 }
 
 function excerptForTool(name: string, input: Record<string, unknown> | undefined, cwd: string): { excerpt: string; file_path: string | null } {
@@ -218,6 +243,38 @@ function processSession(file: string, result: ScanResult): void {
     }
   }
 
+  // Build tool_use timeline and tool_result map for failure_loop detection.
+  const toolUseTimeline: ToolUseEvent[] = [];
+  const toolResults = new Map<string, ToolResultEvent>();
+  for (const e of entries) {
+    if (e.isSidechain === true) continue;
+    const content = e.message?.content;
+    if (!content || typeof content === "string") continue;
+    const cwd = e.cwd ?? sessionCwd;
+    const ts = e.timestamp ?? "";
+    if (e.type === "assistant") {
+      for (const b of content) {
+        if (b.type !== "tool_use") continue;
+        const tu = b as ToolUse;
+        if (!tu.id) continue;
+        const { excerpt, file_path } = excerptForTool(tu.name, tu.input, cwd);
+        toolUseTimeline.push({ id: tu.id, ts, tool_name: tu.name, excerpt, file_path, cwd });
+      }
+    } else if (e.type === "user") {
+      for (const b of content) {
+        if (b.type !== "tool_result") continue;
+        const tr = b as ToolResult;
+        if (!tr.tool_use_id) continue;
+        const contentStr = typeof tr.content === "string" ? tr.content : JSON.stringify(tr.content ?? "");
+        toolResults.set(tr.tool_use_id, {
+          is_error: tr.is_error === true,
+          content: contentStr,
+        });
+      }
+    }
+  }
+  detectFailureLoops(toolUseTimeline, toolResults, result.pairs);
+
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i];
     if (e.isSidechain === true) continue;
@@ -270,6 +327,47 @@ function processSession(file: string, result: ScanResult): void {
   }
 }
 
+function detectFailureLoops(
+  timeline: ToolUseEvent[],
+  results: Map<string, ToolResultEvent>,
+  pairs: Pair[],
+): void {
+  let i = 0;
+  while (i < timeline.length) {
+    const head = timeline[i];
+    const headRes = results.get(head.id);
+    if (!headRes || !headRes.is_error) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j + 1 < timeline.length) {
+      const next = timeline[j + 1];
+      if (next.tool_name !== head.tool_name || next.excerpt !== head.excerpt) break;
+      const nextRes = results.get(next.id);
+      if (!nextRes || !nextRes.is_error) break;
+      j++;
+    }
+    const chainLen = j - i + 1;
+    if (chainLen >= FAILURE_CHAIN_MIN) {
+      const last = timeline[j];
+      const lastRes = results.get(last.id);
+      pairs.push({
+        kind: "failure_loop",
+        ts: last.ts,
+        cwd: head.cwd,
+        tool_name: head.tool_name,
+        excerpt: head.excerpt,
+        file_path: head.file_path,
+        chain_length: chainLen,
+        user_response: (lastRes?.content ?? "").trim().slice(0, 200),
+        assistant_action: `${head.tool_name}: ${head.excerpt}`,
+      });
+    }
+    i = j + 1;
+  }
+}
+
 function resolveAssistantAction(
   userEntry: TranscriptEntry,
   byUuid: Map<string, TranscriptEntry>,
@@ -310,13 +408,15 @@ function resolveAssistantAction(
 }
 
 interface ClusterAgg {
-  kind: "interrupt" | "correction";
+  kind: "interrupt" | "correction" | "failure_loop";
   tool_name: string;
   excerpt: string;
   cwds: Set<string>;
   exts: Set<string>;
   count: number;
-  samples: { ts: string; assistant_action: string; user_response: string }[];
+  total_chain_length: number;
+  max_chain_length: number;
+  samples: { ts: string; assistant_action: string; user_response: string; chain_length?: number }[];
 }
 
 function buildClusters(pairs: Pair[]) {
@@ -330,9 +430,15 @@ function buildClusters(pairs: Pair[]) {
       cwds: new Set<string>(),
       exts: new Set<string>(),
       count: 0,
+      total_chain_length: 0,
+      max_chain_length: 0,
       samples: [],
     };
     agg.count++;
+    if (p.chain_length) {
+      agg.total_chain_length += p.chain_length;
+      if (p.chain_length > agg.max_chain_length) agg.max_chain_length = p.chain_length;
+    }
     if (p.cwd) agg.cwds.add(p.cwd);
     if (p.file_path) {
       const ext = extname(p.file_path);
@@ -343,6 +449,7 @@ function buildClusters(pairs: Pair[]) {
         ts: p.ts,
         assistant_action: p.assistant_action,
         user_response: p.user_response,
+        chain_length: p.chain_length,
       });
     }
     map.set(key, agg);
@@ -357,7 +464,7 @@ function buildClusters(pairs: Pair[]) {
         ? join(cwds[0], ".claude", "CLAUDE.md")
         : join(HOME, ".claude", "CLAUDE.md");
     const path_hint = v.exts.size === 1 ? [...v.exts][0] : null;
-    out.push({
+    const entry: any = {
       kind: v.kind,
       tool_name: v.tool_name,
       excerpt: v.excerpt,
@@ -367,14 +474,29 @@ function buildClusters(pairs: Pair[]) {
       scope_target,
       path_hint,
       samples: v.samples,
-    });
+    };
+    if (v.kind === "failure_loop") {
+      entry.total_chain_length = v.total_chain_length;
+      entry.max_chain_length = v.max_chain_length;
+    }
+    out.push(entry);
   }
-  out.sort((a, b) => b.count - a.count);
+  // sort: failure_loop > interrupt > correction, then by count desc within kind
+  const kindRank = (k: string) => (k === "failure_loop" ? 0 : k === "interrupt" ? 1 : 2);
+  out.sort((a, b) => {
+    const k = kindRank(a.kind) - kindRank(b.kind);
+    if (k !== 0) return k;
+    return b.count - a.count;
+  });
   return out;
 }
 
 const scanResult = scan();
 const oldestIso = scanResult.oldest_session_ms ? new Date(scanResult.oldest_session_ms).toISOString() : null;
+const pairsByKind = scanResult.pairs.reduce((acc, p) => {
+  acc[p.kind] = (acc[p.kind] ?? 0) + 1;
+  return acc;
+}, {} as Record<string, number>);
 
 const out = {
   generated_at: new Date(NOW).toISOString(),
@@ -383,6 +505,7 @@ const out = {
     sessions_scanned: scanResult.sessions_scanned,
     oldest_session: oldestIso,
     total_pairs_collected: scanResult.pairs.length,
+    pairs_by_kind: pairsByKind,
   },
   correction_pairs: buildClusters(scanResult.pairs),
 };

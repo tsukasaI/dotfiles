@@ -1,5 +1,5 @@
 # Workflow
-- Never commit automatically. When changes are ready to commit, suggest `git add` and `git commit` commands with a contextual commit message. Always write commit messages in English, regardless of conversation language.
+- Never commit automatically. When changes are ready to commit, **output** `git add` and `git commit` commands for me to run with a contextual commit message — never execute them yourself. Always write commit messages in English, regardless of conversation language.
 - Don't pass `-C <path>` to git when operating inside the current project — the cwd is already the repo. Use plain `git add` / `git commit` / `git status`. Only use `-C` when genuinely targeting a different repository.
 - Commit message format (Contextual Commits = Conventional Commits + structured body):
   ```
