@@ -16,6 +16,7 @@
     system = "aarch64-darwin";
     configuration = { pkgs, lib, ... }:
     let
+      # Pre-compile tree-sitter parsers via Nix so nvim doesn't need a C toolchain at runtime.
       treesitterParsers = pkgs.vimPlugins.nvim-treesitter.withPlugins (p: with p; [
         rust toml go gomod gowork gosum
       ]);
@@ -34,48 +35,44 @@
         ewc.packages.${system}.default
         fini.packages.${system}.default
       ] ++ (with pkgs; [
-        # CLI tools
+        # Modern CLI replacements
         bat
         eza
         fd
         ripgrep
-        jq
+        procs
         zoxide
         fzf
-        procs
+        jq
         tokei
 
-        chafa
-        gawk
+        # Required for git commit signing (gpgsign = true)
         gnupg
 
-        # Development
+        # Editor / Git
         neovimWithParsers
         git
         lazygit
-        llvmPackages.openmp
 
-        # DevOps / CLI tools
+        # Cloud / DevOps
         awscli2
         gh
-        biome
-        lefthook
         terraform
 
-        # Language runtimes
+        # Node / TypeScript
         bun
+        nodejs
+        pnpm
+
+        # Go (LSP, formatters, debugger for nvim-dap-go)
         go
         gopls
         gofumpt
-        gotools # goimports etc.
-        delve # Go debugger (used by nvim-dap-go)
-        nodejs
-        pnpm
-        rustup
+        gotools # goimports
+        delve
+
+        # Python
         uv
-        # Others
-        charm-freeze
-        graphviz
       ]);
 
       # Touch ID for sudo (works inside tmux/screen via pam_reattach)
@@ -89,7 +86,7 @@
         enable = true;
         onActivation = {
           autoUpdate = true;
-					upgrade = true;
+          upgrade = true;
           cleanup = "zap";
         };
 
