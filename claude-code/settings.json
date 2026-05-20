@@ -148,11 +148,6 @@
             "type": "command",
             "command": "$HOME/dotfiles/claude-code/hooks/check-debug-statements.sh",
             "async": true
-          },
-          {
-            "type": "command",
-            "command": "bun $HOME/dotfiles/claude-code/hooks/save-transcript.ts",
-            "async": true
           }
         ]
       }

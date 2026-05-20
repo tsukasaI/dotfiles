@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
-import { statSync } from "fs";
+import { statSync, readFileSync } from "fs";
+import { dirname } from "path";
 
 // ANSI helpers
 const RST = "\x1b[0m";
@@ -33,6 +34,34 @@ const fmt = (n: number) =>
 const rlColor = (pct: number): [number, number] =>
   pct >= 90 ? [168, 53] : pct >= 70 ? [176, 54] : pct >= 50 ? [153, 61] : [117, 24];
 
+// Read git HEAD without forking. Walks up from `start` to find `.git`
+// (directory or worktree file), then parses HEAD. Returns null if not in a repo
+// or HEAD points to a detached commit.
+function readGitBranch(start: string): { branch: string; isWorktree: boolean } | null {
+  let dir = start;
+  while (true) {
+    const gitPath = `${dir}/.git`;
+    let st;
+    try { st = statSync(gitPath); } catch {}
+    if (st) {
+      let gitDir = gitPath;
+      const isWorktree = st.isFile();
+      if (isWorktree) {
+        const m = readFileSync(gitPath, "utf-8").trim().match(/^gitdir:\s*(.+)$/);
+        if (!m) return null;
+        gitDir = m[1];
+      }
+      let head: string;
+      try { head = readFileSync(`${gitDir}/HEAD`, "utf-8").trim(); } catch { return null; }
+      const m = head.match(/^ref:\s*refs\/heads\/(.+)$/);
+      return m ? { branch: m[1], isWorktree } : null;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
 const input = await Bun.stdin.json();
 const row1: [number, number, string][] = [];
 const row2: [number, number, string][] = [];
@@ -46,12 +75,9 @@ if (dir) {
   const display = dir.startsWith(home) ? `~${dir.slice(home.length)}` : dir;
   row1.push([153, 24, `» ${display}`]);
 
-  const proc = Bun.spawnSync(["git", "branch", "--show-current"], { cwd: dir });
-  const branch = proc.stdout.toString().trim();
-  if (branch) {
-    let isWorktree = false;
-    try { isWorktree = statSync(`${dir}/.git`).isFile(); } catch {}
-    row1.push([189, 60, `⎇ ${branch}${isWorktree ? " [wt]" : ""}`]);
+  const git = readGitBranch(dir);
+  if (git) {
+    row1.push([189, 60, `⎇ ${git.branch}${git.isWorktree ? " [wt]" : ""}`]);
   }
 }
 
@@ -72,15 +98,11 @@ if (ctx != null) {
 }
 
 const rl = input.rate_limits;
-if (rl?.five_hour?.used_percentage != null) {
-  const p = rl.five_hour.used_percentage;
+for (const [key, label] of [["five_hour", "5H"], ["seven_day", "7D"]] as const) {
+  const p = rl?.[key]?.used_percentage;
+  if (p == null) continue;
   const [fg, bg] = rlColor(p);
-  row2.push([fg, bg, `5H ${p.toFixed(0)}%`]);
-}
-if (rl?.seven_day?.used_percentage != null) {
-  const p = rl.seven_day.used_percentage;
-  const [fg, bg] = rlColor(p);
-  row2.push([fg, bg, `7D ${p.toFixed(0)}%`]);
+  row2.push([fg, bg, `${label} ${p.toFixed(0)}%`]);
 }
 
 // --- Row 3: tokens | lines changed ---

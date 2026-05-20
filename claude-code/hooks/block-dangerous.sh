@@ -26,7 +26,15 @@ trim() {
 }
 
 escape_regex() {
-  printf '%s' "$1" | sed 's/[.^$*+?()[\]{}|\\]/\\&/g'
+  local s=$1 out="" i c
+  for (( i=0; i<${#s}; i++ )); do
+    c=${s:i:1}
+    case $c in
+      "."|"^"|"\$"|"*"|"+"|"?"|"("|")"|"["|"]"|"{"|"}"|"|"|"\\") out+="\\"$c ;;
+      *) out+=$c ;;
+    esac
+  done
+  printf '%s' "$out"
 }
 
 # Strip text inside single- and double-quoted regions so blocklist patterns

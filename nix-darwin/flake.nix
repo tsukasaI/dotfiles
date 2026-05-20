@@ -29,6 +29,26 @@
             --add-flags '--cmd "set rtp^=${treesitterParsers}"'
         '';
       };
+
+      trackpadGestures = {
+        TrackpadCornerSecondaryClick = 0;
+        TrackpadHandResting = 1;
+        TrackpadHorizScroll = 1;
+        TrackpadMomentumScroll = 1;
+        TrackpadPinch = 1;
+        TrackpadRotate = 1;
+        TrackpadScroll = 1;
+        TrackpadFourFingerHorizSwipeGesture = 2;
+        TrackpadFourFingerVertSwipeGesture = 2;
+        TrackpadFourFingerPinchGesture = 2;
+        TrackpadFiveFingerPinchGesture = 2;
+        TrackpadThreeFingerHorizSwipeGesture = 0;
+        TrackpadThreeFingerVertSwipeGesture = 0;
+        TrackpadThreeFingerTapGesture = 0;
+        TrackpadTwoFingerDoubleTapGesture = 1;
+        TrackpadTwoFingerFromRightEdgeSwipeGesture = 3;
+        USBMouseStopsTrackpad = 0;
+      };
     in
     {
       environment.systemPackages = [
@@ -138,45 +158,10 @@
         };
 
         CustomUserPreferences = {
-          "com.apple.AppleMultitouchTrackpad" = {
+          "com.apple.AppleMultitouchTrackpad" = trackpadGestures // {
             ActuateDetents = 1;
-            TrackpadCornerSecondaryClick = 0;
-            TrackpadHandResting = 1;
-            TrackpadHorizScroll = 1;
-            TrackpadMomentumScroll = 1;
-            TrackpadPinch = 1;
-            TrackpadRotate = 1;
-            TrackpadScroll = 1;
-            TrackpadFourFingerHorizSwipeGesture = 2;
-            TrackpadFourFingerVertSwipeGesture = 2;
-            TrackpadFourFingerPinchGesture = 2;
-            TrackpadFiveFingerPinchGesture = 2;
-            TrackpadThreeFingerHorizSwipeGesture = 0;
-            TrackpadThreeFingerVertSwipeGesture = 0;
-            TrackpadThreeFingerTapGesture = 0;
-            TrackpadTwoFingerDoubleTapGesture = 1;
-            TrackpadTwoFingerFromRightEdgeSwipeGesture = 3;
-            USBMouseStopsTrackpad = 0;
           };
-          "com.apple.driver.AppleBluetoothMultitouch.trackpad" = {
-            TrackpadCornerSecondaryClick = 0;
-            TrackpadHandResting = 1;
-            TrackpadHorizScroll = 1;
-            TrackpadMomentumScroll = 1;
-            TrackpadPinch = 1;
-            TrackpadRotate = 1;
-            TrackpadScroll = 1;
-            TrackpadFourFingerHorizSwipeGesture = 2;
-            TrackpadFourFingerVertSwipeGesture = 2;
-            TrackpadFourFingerPinchGesture = 2;
-            TrackpadFiveFingerPinchGesture = 2;
-            TrackpadThreeFingerHorizSwipeGesture = 0;
-            TrackpadThreeFingerVertSwipeGesture = 0;
-            TrackpadThreeFingerTapGesture = 0;
-            TrackpadTwoFingerDoubleTapGesture = 1;
-            TrackpadTwoFingerFromRightEdgeSwipeGesture = 3;
-            USBMouseStopsTrackpad = 0;
-          };
+          "com.apple.driver.AppleBluetoothMultitouch.trackpad" = trackpadGestures;
           "com.apple.driver.AppleBluetoothMultitouch.mouse" = {
             MouseHorizontalScroll = 1;
             MouseVerticalScroll = 1;

@@ -30,7 +30,7 @@ check_file() {
   esac
 
   local hits
-  hits=$(grep -nE "$pattern" "$file" 2>/dev/null || true)
+  hits=$(git grep -nE "$pattern" -- "$file" 2>/dev/null || true)
   if [[ -n "$hits" ]]; then
     printf '  %s:\n' "$file"
     printf '%s\n' "$hits" | while IFS= read -r line; do
