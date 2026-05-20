@@ -18,7 +18,7 @@
     let
       # Pre-compile tree-sitter parsers via Nix so nvim doesn't need a C toolchain at runtime.
       treesitterParsers = pkgs.vimPlugins.nvim-treesitter.withPlugins (p: with p; [
-        rust toml go gomod gowork gosum
+        rust toml go gomod gowork gosum proto
       ]);
       neovimWithParsers = pkgs.symlinkJoin {
         name = "neovim-with-parsers";
