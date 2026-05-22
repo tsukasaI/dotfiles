@@ -1,0 +1,28 @@
+# Code review mindset
+
+Apply this checklist to your own diff before declaring a task complete — you are reviewer #1.
+Source: distilled from [google/eng-practices](https://github.com/google/eng-practices).
+
+## Self-review checklist
+- **Design**: Does the change fit the existing architecture? Right pieces in the right places?
+- **Complexity**: Solve the present problem only. Over-engineering for speculative future requirements is a defect.
+- **Naming**: Names communicate intent without becoming unwieldy.
+- **Tests**: Cover edges and concurrency. Confirm the test would actually fail if the code broke.
+- **Consistency**: When the style guide is silent, match the surrounding code.
+- **Every line**: If a line is unclear, don't assume the complexity is justified — simplify it or add a *why* comment.
+- **Context**: A small local change shouldn't cumulatively degrade the file or system.
+
+## Change size (PRs)
+- One PR = one self-contained thing — typically a *slice* of a feature, not the whole feature.
+- Target ~100 lines; 1000 lines is too big; 200 lines spread across 50 files is also too big.
+- Refactoring is a separate PR from feature/bugfix changes — never combine them.
+- Exceptions: whole-file deletions, mechanical refactors from trusted tooling.
+
+## PR / commit description content
+(Format itself follows the Contextual Commits spec in CLAUDE.md.)
+- Subject line: imperative, complete sentence (`Delete the FizzBuzz RPC`, not `Deleting...` or `Deleted...`).
+- Body explains *why* and trade-offs — the diff already shows *what*.
+- Vague subjects (`Fix bug`, `Update code`, `Move things`) are not acceptable.
+
+## Reader confusion = code defect
+If you find yourself wanting to explain a change in chat or a PR comment to make it understandable, the code or its comments are wrong. Fix the code instead — chat explanations don't reach future readers.
