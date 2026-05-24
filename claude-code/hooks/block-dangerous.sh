@@ -118,6 +118,13 @@ if [[ "$CMD" =~ ${CB}curl[[:space:]] ]]; then
   fi
 fi
 
+# ── Special case: git push --force / -f blocked, --force-with-lease allowed ──
+if [[ "$CMD_NOQUOTES" =~ ${CB}git[[:space:]]+push([[:space:]]|$) ]]; then
+  if [[ "$CMD_NOQUOTES" =~ (^|[[:space:]])(--force([[:space:]]|$)|-f([[:space:]]|$)) ]]; then
+    block "GIT" "git push --force / -f rewrites remote history. Use --force-with-lease if force is genuinely needed."
+  fi
+fi
+
 # ── Pipe-to-shell / pipe-to-interpreter injection ───────────────────────────
 # Includes script interpreters that read commands from stdin (python, node, etc.)
 if [[ "$CMD" =~ \|[[:space:]]*(bash|sh|zsh|dash|fish|ksh|python|python3|node|perl|ruby|php)([[:space:]]|$) ]]; then
