@@ -94,7 +94,35 @@ strip_quotes_preserving_subst() {
   printf '%s' "$out"
 }
 
-CMD_NOQUOTES=$(strip_quotes_preserving_subst "$CMD")
+# Strip the body of quoted heredocs (<<'TAG' / <<"TAG" / <<-'TAG' / <<-"TAG").
+# Per POSIX, a quoted heredoc delimiter disables parameter expansion and command
+# substitution → body is pure literal data. Keeping the start/terminator lines
+# preserves the wrapper (so `python <<'EOF'` etc. still match the blocklist),
+# but the body is removed before scanning so commit messages containing words
+# like 'bash' / 'secret' / 'credential' don't false-positive.
+strip_quoted_heredoc_bodies() {
+  local s=$1 out="" line tag="" tabstrip="" cmp
+  while IFS= read -r line; do
+    if [[ -n "$tag" ]]; then
+      cmp=$line
+      [[ -n "$tabstrip" ]] && cmp="${line#"${line%%[!$'\t']*}"}"
+      if [[ "$cmp" == "$tag" ]]; then
+        out+="$line"$'\n'
+        tag=""; tabstrip=""
+      fi
+    else
+      if [[ "$line" =~ \<\<(-)?\'([A-Za-z_][A-Za-z0-9_]*)\' ]] \
+        || [[ "$line" =~ \<\<(-)?\"([A-Za-z_][A-Za-z0-9_]*)\" ]]; then
+        tabstrip="${BASH_REMATCH[1]}"
+        tag="${BASH_REMATCH[2]}"
+      fi
+      out+="$line"$'\n'
+    fi
+  done <<< "$s"
+  printf '%s' "${out%$'\n'}"
+}
+
+CMD_NOQUOTES=$(strip_quotes_preserving_subst "$(strip_quoted_heredoc_bodies "$CMD")")
 
 # Command-boundary leading char class. Chars that can legitimately precede
 # a command name in bash:
