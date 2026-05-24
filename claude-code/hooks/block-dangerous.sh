@@ -125,6 +125,15 @@ if [[ "$CMD_NOQUOTES" =~ ${CB}git[[:space:]]+push([[:space:]]|$) ]]; then
   fi
 fi
 
+# ── Special case: reader commands accessing secret files ────────────────────
+# Single-statement bounded via [^;&|<>]* to avoid false-positives like
+# `cat README.md && echo done > .env`. Regex stored in a variable because
+# bash's [[ ]] tokenizer treats `;&` (case fall-through) as a syntax token.
+SECRET_READ_RE='(cat|head|tail|less|more|bat|nano|vim|nvim)[[:space:]]+[^;&|<>]*(\.env([.][a-zA-Z0-9_-]+)?|\.pem|\.key|\.p12|id_rsa|id_ed25519|id_ecdsa|id_dsa)([[:space:]]|$|[;&|<>])'
+if [[ "$CMD_NOQUOTES" =~ ${CB}${SECRET_READ_RE} ]]; then
+  block "CREDENTIAL" "Reader command targets a secret file (.env* / .pem / .key / .p12 / SSH private key)."
+fi
+
 # ── Pipe-to-shell / pipe-to-interpreter injection ───────────────────────────
 # Includes script interpreters that read commands from stdin (python, node, etc.)
 if [[ "$CMD" =~ \|[[:space:]]*(bash|sh|zsh|dash|fish|ksh|python|python3|node|perl|ruby|php)([[:space:]]|$) ]]; then
