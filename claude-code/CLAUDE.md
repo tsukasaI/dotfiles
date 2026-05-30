@@ -34,9 +34,9 @@
 - When unclear or incomplete, ask — don't fill gaps with plausible-looking guesses. Mark anything still uncertain as "推測" / "unverified" so I can confirm before it lands in a file.
 - Before appending or editing existing notes, Read the existing entries and check for consistency. Don't introduce contradictions silently.
 
-# Model behavior (Opus 4.7)
-- When exploring unfamiliar code or content, use Grep/Glob/Read proactively instead of reasoning from memory. Opus 4.7 tends to reason more and call tools less — bias toward search.
-- Fan out to parallel subagents (Explore, code-explorer, web-researcher) when a task spans multiple independent files or items. Opus 4.7 delegates less by default.
+# Model behavior
+- When exploring unfamiliar code or content, use Grep/Glob/Read proactively instead of reasoning from memory — bias toward search over recall.
+- Fan out to parallel subagents (Explore, code-explorer, web-researcher) when a task spans multiple independent files or items — don't serialize independent work.
 - If a response feels too terse for a complex task, I'll ask for more depth. Don't pre-emptively pad.
 
 # Tone
