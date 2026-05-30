@@ -1,3 +1,27 @@
+---
+# Loaded only when code files are in context — a self-review checklist is
+# meaningless without code. Extend this list when adopting a new language.
+paths:
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.mjs"
+  - "**/*.cjs"
+  - "**/*.go"
+  - "**/*.rs"
+  - "**/*.py"
+  - "**/*.rb"
+  - "**/*.lua"
+  - "**/*.nix"
+  - "**/*.sh"
+  - "**/*.bash"
+  - "**/*.zsh"
+  - "**/*.sql"
+  - "**/*.vue"
+  - "**/*.svelte"
+---
+
 # Code review mindset
 
 Apply this checklist to your own diff before declaring a task complete — you are reviewer #1.
