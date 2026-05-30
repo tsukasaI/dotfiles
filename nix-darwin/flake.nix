@@ -93,6 +93,13 @@
 
         # Python
         uv
+
+        # Rust (LSP, formatter, linter for nvim)
+        cargo
+        rustc
+        clippy
+        rustfmt
+        rust-analyzer
       ]);
 
       # Touch ID for sudo (works inside tmux/screen via pam_reattach)
