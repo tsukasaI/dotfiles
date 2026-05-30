@@ -87,6 +87,21 @@ if (modelName) {
   row1.push([159, 30, `◇ ${short}`]);
 }
 
+// model-mode badges: reasoning effort, extended thinking, output style.
+// Each field is only present when the corresponding mode is active, so a
+// missing field simply omits its badge.
+const effort = input.effort?.level;
+if (effort) {
+  row1.push([223, 94, `↯ ${effort}`]);
+}
+if (input.thinking?.enabled) {
+  row1.push([189, 55, "✻ think"]);
+}
+const style = input.output_style?.name;
+if (style && style !== "default") {
+  row1.push([159, 22, `✎ ${style}`]);
+}
+
 // --- Row 2: context bar | rate limits ---
 
 const ctx = input.context_window?.used_percentage;
