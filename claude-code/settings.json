@@ -11,7 +11,6 @@
   },
   "permissions": {
     "allow": [
-      "Bash(curl:*)",
       "Bash(gh pr view:*)",
       "Bash(gh pr diff:*)",
       "Bash(gh pr list:*)",
@@ -51,8 +50,6 @@
       "Bash(gh api:*)",
       "WebFetch(domain:neovim.io)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(/Users/inouetsukasa/dotfiles/claude-code/hooks/block-dangerous.sh)",
-      "Bash(echo \"exit=$?\")",
       "WebFetch(domain:docs.claude.com)",
       "WebFetch(domain:www.anthropic.com)",
       "WebFetch(domain:cloud.google.com)",
@@ -73,8 +70,6 @@
       "WebFetch(domain:docs.python.org)",
       "WebFetch(domain:nodejs.org)",
       "WebFetch(domain:developer.mozilla.org)",
-      "Bash(find *)",
-      "Bash(grep -E '\\(nvim/nvim|ghostty/ghostty|wezterm/wezterm\\)$')",
       "WebFetch(domain:support.claude.com)",
       "Bash(defaults read *)"
     ],
@@ -167,10 +162,10 @@
   "plansDirectory": ".claude/plans",
   "autoMemoryEnabled": false,
   "theme": "dark-ansi",
-  "verbose": true,
   "preferredNotifChannel": "ghostty",
+  "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
   "useAutoModeDuringPlan": false,
-  "remoteControlAtStartup": true
+  "skipDangerousModePermissionPrompt": true
 }
