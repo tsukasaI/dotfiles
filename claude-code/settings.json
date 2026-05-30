@@ -148,18 +148,6 @@
           }
         ]
       }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/dotfiles/claude-code/hooks/check-debug-statements.sh",
-            "async": true
-          }
-        ]
-      }
     ]
   },
   "statusLine": {

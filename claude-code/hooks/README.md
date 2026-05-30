@@ -17,12 +17,6 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 |---|---|---|
 | (inline) `fini` | `Edit\|Write` | Auto-format edited files with fini |
 
-### Stop
-
-| Script | Matcher | Description |
-|---|---|---|
-| `check-debug-statements.sh` | `*` | Warn about leftover debug statements in changed files (async) |
-
 ### SessionEnd
 
 | Script | Matcher | Description |
