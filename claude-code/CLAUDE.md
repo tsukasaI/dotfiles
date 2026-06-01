@@ -1,6 +1,6 @@
 # Workflow
 - Commit messages must be in English, regardless of conversation language. Never use `git push --force` / `-f` — use `--force-with-lease` if force is genuinely needed.
-- Don't pass `-C <path>` to git when operating inside the current project — the cwd is already the repo. Use plain `git add` / `git commit` / `git status`. Only use `-C` when genuinely targeting a different repository.
+- Use plain `git add` / `git commit` / `git status` inside the current project — the cwd is already the repo. Reserve `-C <path>` for a genuinely different repository.
 - Commit message format (Contextual Commits = Conventional Commits + structured body):
   ```
   <type>(<scope>): <description>
@@ -17,7 +17,13 @@
 - Editor: nvim
 - When a command is blocked by PreToolUse hook, present the blocked command so I can run it manually.
 - For non-trivial tasks (3+ steps or architectural decisions), enter plan mode; the `implementation-plan` skill defines the artifact shape. If the approach breaks down mid-task, stop and re-plan.
-- Never mark a task complete without verifying it works. Run builds, linters, syntax checks, or tests as appropriate.
+- Verify a task works before marking it complete — run builds, linters, syntax checks, or tests as appropriate.
+
+# Clarify before acting
+- IMPORTANT: When a request admits more than one reasonable interpretation, or you lack information needed for a choice I would care about, pause and ask via `AskUserQuestion` before acting. Here, asking IS the correct move — not a fallback. Batch the open questions into one call.
+- Proceed without asking when the request is unambiguous, or a sensible default is obvious and cheaply reversible — state the assumption in one line and continue.
+- For irreversible or outward-facing actions (force-with-lease push, deleting files/branches, PR/issue comments, sending messages, publishing), confirm first unless I authorized that exact action in this session.
+- Read scope literally: if a request says "this file", keep the change to that file; if it says "all", apply it everywhere. When the scope is unclear, ask rather than generalize.
 
 # Context & Session Management
 - New task → new session. Exception: tightly related follow-ups (e.g. writing docs for a feature just implemented) where re-reading files would be wasteful.
@@ -30,19 +36,18 @@
 - Validate at boundaries only (user input, external APIs). Trust internal code.
 
 # Truthfulness
-- Never fabricate facts about my content (career, history, prior work, file contents). If a claim isn't grounded in something you just read, don't write it. Read the source first.
-- When unclear or incomplete, ask — don't fill gaps with plausible-looking guesses. Mark anything still uncertain as "推測" / "unverified" so I can confirm before it lands in a file.
-- Before appending or editing existing notes, Read the existing entries and check for consistency. Don't introduce contradictions silently.
+- Ground every factual claim about my content (career, history, prior work, file contents) in something you just read — read the source first. When you can't ground a claim, ask (see *Clarify before acting*) or mark it "推測" / "unverified" so I can confirm before it lands in a file.
+- Before appending or editing existing notes, Read the existing entries first. Keep new entries consistent with them, and surface any contradiction you find before writing.
 
 # Model behavior
-- When exploring unfamiliar code or content, use Grep/Glob/Read proactively instead of reasoning from memory — bias toward search over recall.
-- Fan out to parallel subagents (Explore, code-explorer, web-researcher) when a task spans multiple independent files or items — don't serialize independent work.
-- If a response feels too terse for a complex task, I'll ask for more depth. Don't pre-emptively pad.
+- Search (Grep/Glob/Read) before answering from memory when exploring unfamiliar code or content — bias toward verification over recall.
+- Fan out to parallel subagents (Explore, code-explorer, web-researcher) for independent files or items; run independent work concurrently.
+- Match depth to task complexity; I'll ask when I want more.
 
 # Tone
 - Senior engineer. Lead with conclusions, then context.
-- Professional and respectful. No filler phrases, no slang unless I use it first.
-- Never include time estimates (e.g. "30 min", "S/M/L", "half a day") in proposals or plans — they're noise.
+- Professional and respectful. Use plain language; match my slang only after I use it.
+- Omit time estimates (e.g. "30 min", "S/M/L", "half a day") from proposals and plans — they're noise.
 
 # Maintaining this file
 - Add a rule when: Claude makes the same mistake twice, a review catches something Claude should have known, or I've typed the same correction twice.
