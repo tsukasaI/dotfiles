@@ -115,10 +115,14 @@
           autoUpdate = true;
           upgrade = true;
           cleanup = "zap";
+          # Homebrew 5.1+ requires --force-cleanup for `brew bundle ... --cleanup`.
+          # nix-darwin fix (PR #1789) is unmerged; drop this once it lands.
+          extraFlags = [ "--force-cleanup" ];
         };
 
         taps = [
-          "bendews/tap"  # apw (Apple Passwords CLI)
+          # trusted: Homebrew 5.1+ blocks formulae from untrusted third-party taps.
+          { name = "bendews/tap"; trusted = true; }  # apw (Apple Passwords CLI)
         ];
 
         # Nixに移行しないformulae
