@@ -1,0 +1,7 @@
+{
+  "name": "Dark ANSI (readable selection)",
+  "base": "dark-ansi",
+  "overrides": {
+    "selectionBg": "#3b5070"
+  }
+}

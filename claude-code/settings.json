@@ -172,7 +172,7 @@
   "autoMemoryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
-  "theme": "dark-ansi",
+  "theme": "custom:dark-ansi-readable",
   "preferredNotifChannel": "ghostty",
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,

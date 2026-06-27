@@ -33,6 +33,7 @@ mkdir -p ~/.claude
 ln -sfn "$DOTFILES/claude-code/skills" ~/.claude/skills
 ln -sfn "$DOTFILES/claude-code/rules" ~/.claude/rules
 ln -sfn "$DOTFILES/claude-code/agents" ~/.claude/agents
+ln -sfn "$DOTFILES/claude-code/themes" ~/.claude/themes
 ln -sfn "$DOTFILES/claude-code/settings.json" ~/.claude/settings.json
 ln -sfn "$DOTFILES/claude-code/CLAUDE.md" ~/.claude/CLAUDE.md
 chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
