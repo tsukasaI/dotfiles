@@ -149,23 +149,34 @@
     "type": "command",
     "command": "bun $HOME/dotfiles/claude-code/statusline.ts"
   },
-  "enabledPlugins": {},
+  "enabledPlugins": {
+    "goal-setter@goal-setter": true
+  },
   "extraKnownMarketplaces": {
     "supabase-agent-skills": {
       "source": {
         "source": "github",
         "repo": "supabase/agent-skills"
       }
+    },
+    "goal-setter": {
+      "source": {
+        "source": "github",
+        "repo": "gotalab/goal-setter-skill"
+      }
     }
   },
   "viewMode": "verbose",
   "plansDirectory": ".claude/plans",
+  "tui": "fullscreen",
   "autoMemoryEnabled": false,
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
   "theme": "dark-ansi",
   "preferredNotifChannel": "ghostty",
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
   "useAutoModeDuringPlan": false,
-  "skipDangerousModePermissionPrompt": true
+  "copyOnSelect": false
 }
