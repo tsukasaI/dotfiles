@@ -73,6 +73,7 @@
         neovimWithParsers
         git
         lazygit
+        gitleaks
 
         # Cloud / DevOps
         awscli2
@@ -123,6 +124,8 @@
         taps = [
           # trusted: Homebrew 5.1+ blocks formulae from untrusted third-party taps.
           { name = "bendews/tap"; trusted = true; }  # apw (Apple Passwords CLI)
+          { name = "tursodatabase/tap"; trusted = true; }  # turso (libSQL cloud CLI)
+          { name = "libsql/sqld"; trusted = true; }  # sqld (turso CLI dependency)
         ];
 
         # Nixに移行しないformulae
@@ -131,6 +134,7 @@
           "mise"
           "yt-dlp"
           "apw"  # Apple Passwords CLI
+          "tursodatabase/tap/turso"  # libSQL/Turso cloud CLI (core "turso" is a different DB engine)
         ];
 
         casks = [

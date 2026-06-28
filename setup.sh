@@ -20,6 +20,8 @@ ln -sfn "$DOTFILES/git/gitconfig" ~/.gitconfig
 mkdir -p ~/.config/git
 ln -sfn "$DOTFILES/git/ignore" ~/.config/git/ignore
 ln -sfn "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
+ln -sfn "$DOTFILES/git/hooks" ~/.config/git/hooks
+chmod +x "$DOTFILES/git/hooks/"* 2>/dev/null || true
 
 # SSH (UseKeychain integration)
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
