@@ -33,6 +33,7 @@ Source: distilled from [google/eng-practices](https://github.com/google/eng-prac
 - **Naming**: Names communicate intent without becoming unwieldy.
 - **Tests**: Cover edges and concurrency. Confirm the test would actually fail if the code broke.
 - **Consistency**: When the style guide is silent, match the surrounding code.
+- **Runs**: Did the build, linter, and tests pass? If you haven't run them, do so now — self-review on a diff that doesn't compile is theater.
 - **Every line**: If a line is unclear, don't assume the complexity is justified — simplify it or add a *why* comment.
 - **Context**: A small local change shouldn't cumulatively degrade the file or system.
 

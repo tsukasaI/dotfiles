@@ -100,6 +100,9 @@
     "defaultMode": "default",
     "disableAutoMode": "disable"
   },
+  "model": "claude-opus-4-6[1M]",
+  "advisorModel": "opus",
+  "effort": "high",
   "hooks": {
     "PreToolUse": [
       {

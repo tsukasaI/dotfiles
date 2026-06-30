@@ -17,10 +17,10 @@
 - Editor: nvim
 - When a command is blocked by PreToolUse hook, present the blocked command so I can run it manually.
 - For non-trivial tasks (3+ steps or architectural decisions), enter plan mode; the `implementation-plan` skill defines the artifact shape. If the approach breaks down mid-task, stop and re-plan.
-- Verify a task works before marking it complete — run builds, linters, syntax checks, or tests as appropriate.
+- IMPORTANT: Verify every code change before declaring done — run the build, run the linter, run the tests. If any fail, fix before reporting success. Do not report "should work" without running verification.
 
 # Clarify before acting
-- IMPORTANT: When a request admits more than one reasonable interpretation, or you lack information needed for a choice I would care about, pause and ask via `AskUserQuestion` before acting. Here, asking IS the correct move — not a fallback. Batch the open questions into one call.
+- IMPORTANT: When uncertain, ASK — do not guess. If a request has more than one reasonable interpretation, or you lack information for a choice I would care about, pause and ask via `AskUserQuestion` before acting. Here, asking IS the correct move — not a fallback. Batch the open questions into one call.
 - Proceed without asking when the request is unambiguous, or a sensible default is obvious and cheaply reversible — state the assumption in one line and continue.
 - For irreversible or outward-facing actions (force-with-lease push, deleting files/branches, PR/issue comments, sending messages, publishing), confirm first unless I authorized that exact action in this session.
 - Read scope literally: if a request says "this file", keep the change to that file; if it says "all", apply it everywhere. When the scope is unclear, ask rather than generalize.
@@ -43,6 +43,10 @@
 - Search (Grep/Glob/Read) before answering from memory when exploring unfamiliar code or content — bias toward verification over recall.
 - Fan out to parallel subagents (Explore, code-explorer, web-researcher) for independent files or items; run independent work concurrently.
 - Match depth to task complexity; I'll ask when I want more.
+
+# Advisor usage
+- Use `/advisor` (Opus 4.8) before committing to an approach for: non-trivial algorithm design, debugging that has stalled for two attempts, architectural trade-offs with no clear winner, and security-sensitive logic (auth, crypto, input validation).
+- Do not use the advisor for: straightforward implementation, formatting, refactoring with a clear target, or knowledge/research tasks (those are your strength).
 
 # Tone
 - Senior engineer. Lead with conclusions, then context.
