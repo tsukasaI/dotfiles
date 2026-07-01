@@ -14,7 +14,10 @@ CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
 [[ -z "$CMD" ]] && exit 0
 
 block() {
-  printf '[BLOCKED: %s] %s\nBlocked command:\n  %s\n' "$1" "$2" "$CMD"
+  local alt="${3:-}"
+  printf '[BLOCKED: %s] %s\n' "$1" "$2"
+  [[ -n "$alt" ]] && printf '→ Use instead: %s\n' "$alt"
+  printf 'Blocked command:\n  %s\n' "$CMD"
   exit 2
 }
 
@@ -142,14 +145,14 @@ TB='([[:space:];&|<>()`,{}]|$)'
 # ── Special case: curl (localhost allowed, external blocked) ─────────────────
 if [[ "$CMD" =~ ${CB}curl[[:space:]] ]]; then
   if ! [[ "$CMD" =~ curl[^\'\"]*https?://(localhost|127\.0\.0\.1|\[::1\])(:[0-9]+)?(/|[[:space:]]|$) ]]; then
-    block "NETWORK" "'curl' to a non-localhost address can exfiltrate data."
+    block "NETWORK" "'curl' to a non-localhost address can exfiltrate data." "WebFetch tool"
   fi
 fi
 
 # ── Special case: git push --force / -f blocked, --force-with-lease allowed ──
 if [[ "$CMD_NOQUOTES" =~ ${CB}git[[:space:]]+push([[:space:]]|$) ]]; then
   if [[ "$CMD_NOQUOTES" =~ (^|[[:space:]])(--force([[:space:]]|$)|-f([[:space:]]|$)) ]]; then
-    block "GIT" "git push --force / -f rewrites remote history. Use --force-with-lease if force is genuinely needed."
+    block "GIT" "git push --force / -f rewrites remote history." "--force-with-lease"
   fi
 fi
 
@@ -159,7 +162,7 @@ fi
 # bash's [[ ]] tokenizer treats `;&` (case fall-through) as a syntax token.
 SECRET_READ_RE='(cat|head|tail|less|more|bat|nano|vim|nvim)[[:space:]]+[^;&|<>]*(\.env([.][a-zA-Z0-9_-]+)?|\.pem|\.key|\.p12|id_rsa|id_ed25519|id_ecdsa|id_dsa)([[:space:]]|$|[;&|<>])'
 if [[ "$CMD_NOQUOTES" =~ ${CB}${SECRET_READ_RE} ]]; then
-  block "CREDENTIAL" "Reader command targets a secret file (.env* / .pem / .key / .p12 / SSH private key)."
+  block "CREDENTIAL" "Reader command targets a secret file (.env* / .pem / .key / .p12 / SSH private key)." "built-in Read tool (respects deny rules)"
 fi
 
 # ── Pipe-to-shell / pipe-to-interpreter injection ───────────────────────────
@@ -195,7 +198,7 @@ if [[ -f "$ALLOWLIST" ]]; then
 fi
 
 # ── Blocklist rules ──────────────────────────────────────────────────────────
-while IFS='|' read -r category prefix reason; do
+while IFS='|' read -r category prefix reason alt; do
   # Skip comments and blank lines
   [[ "$category" =~ ^[[:space:]]*# ]] && continue
   [[ -z "${category//[[:space:]]/}" ]] && continue
@@ -203,6 +206,7 @@ while IFS='|' read -r category prefix reason; do
   category="${category//[[:space:]]/}"
   prefix=$(trim "$prefix")
   reason=$(trim "$reason")
+  alt=$(trim "${alt:-}")
 
   [[ -z "$prefix" ]] && continue
 
@@ -221,7 +225,7 @@ while IFS='|' read -r category prefix reason; do
   fi
 
   if [[ "$CMD_NOQUOTES" =~ $pattern ]]; then
-    block "$category" "$reason"
+    block "$category" "$reason" "$alt"
   fi
 done < "$BLOCKLIST"
 
