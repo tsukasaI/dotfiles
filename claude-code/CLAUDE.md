@@ -16,7 +16,7 @@
     - `learned(scope)`: discovered quirks / gotchas
 - Editor: nvim
 - When a command is blocked by PreToolUse hook, present the blocked command so I can run it manually.
-- For non-trivial tasks (3+ steps or architectural decisions), enter plan mode; the `implementation-plan` skill defines the artifact shape. If the approach breaks down mid-task, stop and re-plan.
+- For non-trivial tasks (3+ steps or architectural decisions), enter plan mode. If the approach breaks down mid-task, stop and re-plan.
 - IMPORTANT: Verify every code change before declaring done — run the build, run the linter, run the tests. If any fail, fix before reporting success. Do not report "should work" without running verification.
 
 # Clarify before acting
