@@ -126,6 +126,7 @@
           { name = "bendews/tap"; trusted = true; }  # apw (Apple Passwords CLI)
           { name = "tursodatabase/tap"; trusted = true; }  # turso (libSQL cloud CLI)
           { name = "libsql/sqld"; trusted = true; }  # sqld (turso CLI dependency)
+          { name = "ariga/tap"; trusted = true; }  # atlas (DB schema migration tool)
         ];
 
         # Nixに移行しないformulae
@@ -135,6 +136,7 @@
           "yt-dlp"
           "apw"  # Apple Passwords CLI
           "tursodatabase/tap/turso"  # libSQL/Turso cloud CLI (core "turso" is a different DB engine)
+          "ariga/tap/atlas"  # Atlas DB schema migration tool
         ];
 
         casks = [
