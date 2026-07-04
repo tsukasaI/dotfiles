@@ -1,14 +1,95 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "env": {
-    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
-    "ENABLE_TOOL_SEARCH": "1",
-    "EDITOR": "nvim"
-  },
+  "advisorModel": "opus",
+  "agentPushNotifEnabled": true,
   "attribution": {
     "commit": "",
     "pr": ""
   },
+  "autoMemoryEnabled": false,
+  "copyOnSelect": false,
+  "effort": "high",
+  "enabledPlugins": {
+    "goal-setter@goal-setter": true
+  },
+  "env": {
+    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
+    "EDITOR": "nvim",
+    "ENABLE_TOOL_SEARCH": "1"
+  },
+  "extraKnownMarketplaces": {
+    "goal-setter": {
+      "source": {
+        "repo": "gotalab/goal-setter-skill",
+        "source": "github"
+      }
+    },
+    "supabase-agent-skills": {
+      "source": {
+        "repo": "supabase/agent-skills",
+        "source": "github"
+      }
+    }
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "fini \"$(jq -r '.tool_input.file_path')\"",
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "$HOME/dotfiles/claude-code/hooks/block-dangerous.sh",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "command": "$HOME/dotfiles/claude-code/hooks/block-config-edit.sh",
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "async": true,
+            "command": "bun $HOME/dotfiles/claude-code/hooks/save-transcript.ts",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "bash '/Users/inouetsukasa/.claude/hooks/herdr-agent-state.sh' session",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ]
+  },
+  "inputNeededNotifEnabled": true,
+  "model": "claude-opus-4-6[1M]",
   "permissions": {
     "allow": [
       "Bash(gh pr view:*)",
@@ -73,6 +154,7 @@
       "WebFetch(domain:support.claude.com)",
       "Bash(defaults read *)"
     ],
+    "defaultMode": "default",
     "deny": [
       "Read(**/*secret*)",
       "Read(**/*credential*)",
@@ -97,89 +179,19 @@
       "Read(**/__pycache__/**)",
       "Read(**/.pytest_cache/**)"
     ],
-    "defaultMode": "default",
     "disableAutoMode": "disable"
   },
-  "model": "claude-opus-4-6[1M]",
-  "advisorModel": "opus",
-  "effort": "high",
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/dotfiles/claude-code/hooks/block-dangerous.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/dotfiles/claude-code/hooks/block-config-edit.sh"
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun $HOME/dotfiles/claude-code/hooks/save-transcript.ts",
-            "async": true
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "fini \"$(jq -r '.tool_input.file_path')\""
-          }
-        ]
-      }
-    ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "bun $HOME/dotfiles/claude-code/statusline.ts"
-  },
-  "enabledPlugins": {
-    "goal-setter@goal-setter": true
-  },
-  "extraKnownMarketplaces": {
-    "supabase-agent-skills": {
-      "source": {
-        "source": "github",
-        "repo": "supabase/agent-skills"
-      }
-    },
-    "goal-setter": {
-      "source": {
-        "source": "github",
-        "repo": "gotalab/goal-setter-skill"
-      }
-    }
-  },
-  "viewMode": "verbose",
   "plansDirectory": ".claude/plans",
-  "tui": "fullscreen",
-  "autoMemoryEnabled": false,
-  "skipDangerousModePermissionPrompt": true,
-  "skipWorkflowUsageWarning": true,
-  "theme": "custom:dark-ansi-readable",
   "preferredNotifChannel": "ghostty",
   "remoteControlAtStartup": true,
-  "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true,
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
+  "statusLine": {
+    "command": "bun $HOME/dotfiles/claude-code/statusline.ts",
+    "type": "command"
+  },
+  "theme": "custom:dark-ansi-readable",
+  "tui": "fullscreen",
   "useAutoModeDuringPlan": false,
-  "copyOnSelect": false
+  "viewMode": "verbose"
 }
