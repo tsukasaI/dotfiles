@@ -165,6 +165,20 @@ if [[ "$CMD_NOQUOTES" =~ ${CB}${SECRET_READ_RE} ]]; then
   block "CREDENTIAL" "Reader command targets a secret file (.env* / .pem / .key / .p12 / SSH private key)." "built-in Read tool (respects deny rules)"
 fi
 
+# ── Special case: bare sh/bash/zsh invocation (heredoc / script-file execution) ──
+# Uses a stricter boundary than $CB: only start-of-string or immediately after a
+# real shell separator — not "any space". $CB's space-boundary also matches
+# ordinary flag *values* (e.g. `fd -e sh`, `rg -t sh`), which isn't a command
+# start. `bash -c`/`sh -c`/etc. (actual code injection) stay in blocklist.conf
+# under the normal $CB, since that vector must still be caught even through a
+# wrapper like `env bash -c '...'`, where this stricter boundary would miss it.
+STRICT_CB='(^|[<\\/{,;&|`$(])[[:space:]]*'
+for interp in sh bash zsh; do
+  if [[ "$CMD_NOQUOTES" =~ ${STRICT_CB}${interp}${TB} ]]; then
+    block "CODE_INJECTION" "$interp invocation (heredoc / script file can run arbitrary code)."
+  fi
+done
+
 # ── Pipe-to-shell / pipe-to-interpreter injection ───────────────────────────
 # Includes script interpreters that read commands from stdin (python, node, etc.)
 if [[ "$CMD" =~ \|[[:space:]]*(bash|sh|zsh|dash|fish|ksh|python|python3|node|perl|ruby|php)([[:space:]]|$) ]]; then

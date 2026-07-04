@@ -40,6 +40,8 @@
 - Before appending or editing existing notes, Read the existing entries first. Keep new entries consistent with them, and surface any contradiction you find before writing.
 
 # Model behavior
+- Model tiers: Opus 4.6 runs the main loop (default in settings.json). Sonnet 5 handles subagents and parallel work — Explore/code-explorer/web-researcher plus Agent/Workflow `agent()` calls. Opus 4.8 is the advisor, reserved for escalation (see below).
+- When delegating to Agent or Workflow `agent()`, pass `model: sonnet` unless the task specifically needs Opus-level reasoning — delegated work inherits the main loop's model by default, and cost/speed favor Sonnet 5 for scoped subtasks.
 - Search (Grep/Glob/Read) before answering from memory when exploring unfamiliar code or content — bias toward verification over recall.
 - Fan out to parallel subagents (Explore, code-explorer, web-researcher) for independent files or items; run independent work concurrently.
 - Match depth to task complexity; I'll ask when I want more.
