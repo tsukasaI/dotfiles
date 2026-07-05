@@ -1,0 +1,17 @@
+{
+  "_setup": "Copy this file to kb.json (same directory) and replace the placeholder values. kb.json is gitignored because it contains personal environment info.",
+  "vault_root": "~/path/to/vault",
+  "notes_dir": "~/path/to/vault/notes",
+  "ideas_file": "~/path/to/vault/articles/ideas.md",
+  "legacy_notes": "~/path/to/legacy/notes",
+  "drafts_repo": "~/path/to/drafts",
+  "engineer_root": "~/path/to/projects",
+  "extra_repos": ["~/dotfiles"],
+  "logs_db": "~/.local/share/claude-logs/logs.db",
+  "ops_repo": "owner/private-ops-repo",
+  "author_emails": [
+    "you@users.noreply.github.com"
+  ],
+  "max_commits_per_repo": 200,
+  "scan_depth": 3
+}

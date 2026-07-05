@@ -8,6 +8,10 @@ result-*
 # Karabiner
 karabiner/automatic_backups/
 
+# Skill config with personal environment info (vault paths, private repo slug).
+# Copy kb.json.example to kb.json and fill in your own values.
+claude-code/skills/_shared/kb.json
+
 # Claude Code: override user-global .claude/ ignore so project-scoped config (skills, etc.) is trackable,
 # while keeping session-local state ignored.
 !.claude/
