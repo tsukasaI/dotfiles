@@ -2,7 +2,7 @@
 # PreToolUse hook: blocks dangerous Bash commands.
 # stdin  -> JSON: {"tool_input":{"command":"..."}}
 # exit 0 -> allow  (proceeds to normal permission check)
-# exit 2 -> block  (stdout shown as reason to the user)
+# exit 2 -> block  (stderr is fed back to the model as the reason)
 
 set -euo pipefail
 
@@ -15,9 +15,9 @@ CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
 
 block() {
   local alt="${3:-}"
-  printf '[BLOCKED: %s] %s\n' "$1" "$2"
-  [[ -n "$alt" ]] && printf '→ Use instead: %s\n' "$alt"
-  printf 'Blocked command:\n  %s\n' "$CMD"
+  printf '[BLOCKED: %s] %s\n' "$1" "$2" >&2
+  [[ -n "$alt" ]] && printf '→ Use instead: %s\n' "$alt" >&2
+  printf 'Blocked command:\n  %s\n' "$CMD" >&2
   exit 2
 }
 
