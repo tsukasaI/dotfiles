@@ -20,6 +20,9 @@ ln -sfn "$DOTFILES/git/gitconfig" ~/.gitconfig
 mkdir -p ~/.config/git
 ln -sfn "$DOTFILES/git/ignore" ~/.config/git/ignore
 ln -sfn "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
+if [ -e ~/.config/git/hooks ] && [ ! -L ~/.config/git/hooks ]; then
+  mv ~/.config/git/hooks ~/.config/git/hooks.backup.$(date +%Y%m%d-%H%M%S)
+fi
 ln -sfn "$DOTFILES/git/hooks" ~/.config/git/hooks
 chmod +x "$DOTFILES/git/hooks/"* 2>/dev/null || true
 
