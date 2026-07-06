@@ -8,8 +8,13 @@
 set -euo pipefail
 
 if ! command -v gitleaks >/dev/null 2>&1; then
-  printf '\033[33mgitleaks not found on PATH — skipping secret scan.\033[0m\n' >&2
-  exit 0
+  if [ "${SKIP_GITLEAKS:-}" = "1" ]; then
+    printf '\033[33mgitleaks not found — SKIP_GITLEAKS=1 set, allowing commit.\033[0m\n' >&2
+    exit 0
+  fi
+  printf '\033[31mgitleaks not found on PATH — commit blocked (fail-closed).\033[0m\n' >&2
+  printf 'Install gitleaks, or set SKIP_GITLEAKS=1 to bypass.\n' >&2
+  exit 1
 fi
 
 if ! gitleaks git --staged --no-banner --redact --verbose; then
