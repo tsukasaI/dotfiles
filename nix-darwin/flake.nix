@@ -9,9 +9,11 @@
     ewc.inputs.nixpkgs.follows = "nixpkgs";
     fini.url = "github:tsukasaI/fini";
     fini.inputs.nixpkgs.follows = "nixpkgs";
+    herdr.url = "github:ogulcancelik/herdr";
+    herdr.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs@{ self, nix-darwin, nixpkgs, ewc, fini }:
+  outputs = inputs@{ self, nix-darwin, nixpkgs, ewc, fini, herdr }:
   let
     system = "aarch64-darwin";
     configuration = { pkgs, lib, ... }:
@@ -54,6 +56,7 @@
       environment.systemPackages = [
         ewc.packages.${system}.default
         fini.packages.${system}.default
+        herdr.packages.${system}.default
       ] ++ (with pkgs; [
         # Modern CLI replacements
         bat
