@@ -40,14 +40,23 @@
 - Before appending or editing existing notes, Read the existing entries first. Keep new entries consistent with them, and surface any contradiction you find before writing.
 
 # Model behavior
-- Model tiers: Opus 4.6 runs the main loop (default in settings.json). Sonnet 5 handles subagents and parallel work — Explore/code-explorer/web-researcher plus Agent/Workflow `agent()` calls. Opus 4.8 is the advisor, reserved for escalation (see below).
-- When delegating to Agent or Workflow `agent()`, pass `model: sonnet` unless the task specifically needs Opus-level reasoning — delegated work inherits the main loop's model by default, and cost/speed favor Sonnet 5 for scoped subtasks.
+- Model tiers are defined by role, not by point-release name (names rot; roles don't):
+
+  | Role | Model | Set in |
+  |---|---|---|
+  | Main loop | Whatever `settings.json` pins | `settings.json` — not this file |
+  | Subagents (Explore, code-explorer, web-researcher, Agent/Workflow `agent()`) | Cheapest model that can do the subtask; default `sonnet` | `model:` argument at call time |
+  | Advisor | Whatever `/advisor` is configured to use | Advisor config — not this file |
+
+- When delegating to Agent or Workflow `agent()`, pass `model:` explicitly (default `sonnet`) — don't rely on inheritance from the main loop. Escalate above the default only when the subtask meets ≥2 of: (a) no existing pattern in this codebase to imitate, (b) a security/auth/crypto boundary, (c) multiple valid approaches with a real trade-off, (d) it already failed once at the default tier.
+  - Example (escalate): "design a cache-invalidation strategy for this service" — no precedent, real trade-offs.
+  - NG (stay at default): "write a table-driven test for this function" — a pattern to imitate exists.
 - Search (Grep/Glob/Read) before answering from memory when exploring unfamiliar code or content — bias toward verification over recall.
 - Fan out to parallel subagents (Explore, code-explorer, web-researcher) for independent files or items; run independent work concurrently.
-- Match depth to task complexity; I'll ask when I want more.
+- Match depth to task complexity: single-file fix → no plan needed; multi-file change or anything crossing subsystems → plan first. I'll ask when I want more than this default.
 
 # Advisor usage
-- Use `/advisor` (Opus 4.8) before committing to an approach for: non-trivial algorithm design, debugging that has stalled for two attempts, architectural trade-offs with no clear winner, and security-sensitive logic (auth, crypto, input validation).
+- Use `/advisor` before committing to an approach for: non-trivial algorithm design, debugging that has stalled for two attempts, architectural trade-offs with no clear winner, and security-sensitive logic (auth, crypto, input validation).
 - Do not use the advisor for: straightforward implementation, formatting, refactoring with a clear target, or knowledge/research tasks (those are your strength).
 
 # Tone
