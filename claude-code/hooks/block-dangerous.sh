@@ -15,11 +15,11 @@ CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
 
 block() {
   local alt="${3:-}"
-  printf '[BLOCKED: %s] %s\n' "$1" "$2" >&2
-  [[ -n "$alt" ]] && printf '→ Use instead: %s\n' "$alt" >&2
-  printf 'Blocked command:\n  %s\n' "$CMD" >&2
+  printf '[BLOCKED: %s] %s\n' "$1" "$2"
+  [[ -n "$alt" ]] && printf '→ Use instead: %s\n' "$alt"
+  printf 'Blocked command:\n  %s\n' "$CMD"
   exit 2
-}
+} >&2
 
 trim() {
   local s=$1
