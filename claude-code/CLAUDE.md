@@ -21,12 +21,14 @@
 
 # Clarify before acting
 - IMPORTANT: When uncertain, ASK — do not guess. If a request has more than one reasonable interpretation, or you lack information for a choice I would care about, pause and ask via `AskUserQuestion` before acting. Here, asking IS the correct move — not a fallback. Batch the open questions into one call.
-- Proceed without asking when the request is unambiguous, or a sensible default is obvious and cheaply reversible — state the assumption in one line and continue.
+- Proceed without asking when the request is unambiguous, or a sensible default is obvious and cheaply reversible — both must hold: (a) undoing costs one command or edit, and (b) getting it wrong wastes minutes, not data or trust. State the assumption in one line and continue.
+  - Example: "add a test for this function", no path given → default to the existing `_test.go`/`*.test.ts` alongside it; state it, proceed.
+  - NG (ask instead): "clean up this file", no scope given — spans formatting, dead code, and structure; guessing wrong means redoing the diff.
 - For irreversible or outward-facing actions (force-with-lease push, deleting files/branches, PR/issue comments, sending messages, publishing), confirm first unless I authorized that exact action in this session.
 - Read scope literally: if a request says "this file", keep the change to that file; if it says "all", apply it everywhere. When the scope is unclear, ask rather than generalize.
 
 # Context & Session Management
-- New task → new session. Exception: tightly related follow-ups (e.g. writing docs for a feature just implemented) where re-reading files would be wasteful.
+- New task → new session. Exception: tightly related follow-ups (e.g. writing docs for a feature just implemented) where re-reading files would be wasteful. NG (new session anyway): an unrelated bug fix in the same repo, or a feature discussed more than a day ago — re-reading cheaply beats carrying stale context.
 - Prefer `/rewind` (Esc Esc) over correction. When an approach fails, rewind to before the failed attempt and re-prompt with what was learned, rather than saying "that didn't work, try X".
 - `/clear` > `/compact` when you know what matters. Writing the brief yourself ("refactoring X, constraint is Y, relevant files are A/B, ruled out Z") produces cleaner context than trusting the model to summarize.
 - Compact proactively, not reactively. Run `/compact` early with a directive (e.g. `/compact focus on the auth refactor, drop the test debugging`) — auto-compact fires when context rot has already degraded the model.
