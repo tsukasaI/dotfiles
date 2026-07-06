@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PreToolUse hook: blocks Edit/Write to linter/formatter config files.
 # Prevents Claude from weakening tool configs instead of fixing code.
-# exit 0 -> allow, exit 2 -> block
+# exit 0 -> allow, exit 2 -> block (stderr is fed back to the model as the reason)
 
 set -euo pipefail
 
@@ -37,7 +37,7 @@ for pattern in "${PROTECTED[@]}"; do
   # shellcheck disable=SC2254
   case "$BASENAME" in
     $pattern)
-      printf '[BLOCKED: CONFIG_PROTECTION] Editing linter/formatter config "%s" is not allowed.\nFix the code to satisfy the tool, not the other way around.\n' "$BASENAME"
+      printf '[BLOCKED: CONFIG_PROTECTION] Editing linter/formatter config "%s" is not allowed.\nFix the code to satisfy the tool, not the other way around.\n' "$BASENAME" >&2
       exit 2
       ;;
   esac
