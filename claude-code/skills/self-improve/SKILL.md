@@ -80,7 +80,9 @@ The analyzer is read-only. It walks `~/.claude/projects/<encoded-cwd>/*.jsonl`, 
 3. **Overlap check is mandatory before proposing a new skill**:
    - For `meta_clusters`: surface `code_overlap_hints` verbatim. If any hint scores ≥ 2, **Read** that skill's SKILL.md (from `available_skills[].path`) and ask the user: "this existing skill seems to cover the same intent — extend it, or still want a new one?" before drafting a new SKILL.md.
    - For `prompt_clusters`: surface `overlap_hints` similarly.
-   - Even when both lists are empty, scan `available_skills` once and look for any skill whose `description` or `body_first_500_chars` semantically covers the candidate. Lexical keyword match misses cross-domain cases (e.g. an English skill description vs. user-pasted code).
+   - Even when both lists are empty, scan `available_skills` once and apply one test: **would invoking that existing skill on this candidate's sample input produce the output the user is asking for?** If yes for any skill → overlap exists, treat it like an `overlap_hints` hit. Lexical keyword match misses cross-domain cases (e.g. an English skill description vs. user-pasted code).
+     - Example: candidate is "search my notes for X" recurring across sessions — `kb`'s description says exactly this; invoking `kb` produces the requested output → overlap; propose extending `kb`, not a new skill.
+     - NG: candidate is "summarize this PR's diff and post it to the retro issue" — `weekly-digest` posts to the retro issue but doesn't summarize a single PR's diff; invoking it would not satisfy the request → no overlap, proceed.
 
 4. **Read before suggesting** for `skill_review_hints` and any case where overlap is possible:
    - Open the existing `SKILL.md` with `Read` before proposing edits.
@@ -187,7 +189,7 @@ Use `scope_hint` from the analyzer as the default. Adjust only when reading the 
 - **Missing toolchain** (errors like `command not found`, `No such file or directory`, lint binary missing): add the prerequisite to the language `rules/<lang>.md` (e.g. `rules/go.md`: `- golangci-lint must be installed; check with \`which golangci-lint\` first.`).
 - **Repeated edit / write failure** on the same file: the file likely has a constraint Claude didn't know (codegen target, generated file, format-on-write hook). Add a project rule under `<cwd>/.claude/rules/` naming the file and the constraint.
 
-When in doubt, ask the user which file to target before drafting the text.
+"In doubt" means: the sample doesn't clearly match any of the three patterns above, or plausibly matches two (e.g. it contains both a hook-block phrase and a "command not found" phrase). In either case, ask the user which file to target before drafting the text — do not default to CLAUDE.md as a catch-all.
 
 ### Behavior rules (corrections mode)
 
