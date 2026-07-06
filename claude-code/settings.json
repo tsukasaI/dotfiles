@@ -178,8 +178,7 @@
       "Read(**/.turbo/**)",
       "Read(**/__pycache__/**)",
       "Read(**/.pytest_cache/**)"
-    ],
-    "disableAutoMode": "disable"
+    ]
   },
   "plansDirectory": ".claude/plans",
   "preferredNotifChannel": "ghostty",
