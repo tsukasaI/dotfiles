@@ -18,3 +18,8 @@ karabiner/automatic_backups/
 # Claude Code skills: personal vault config stays local — email, vault layout, private repo slug (issue #24).
 # kb.json.example is the committed template.
 claude-code/skills/_shared/kb.json
+
+# Lefthook: auto-generated hook shims (lefthook install overwrites these)
+git/hooks/pre-commit.old
+git/hooks/pre-push
+git/hooks/prepare-commit-msg
