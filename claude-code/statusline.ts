@@ -115,12 +115,12 @@ if (ctx != null) {
 }
 
 // resets_at is Unix epoch seconds. 5H resets within the day (HH:mm); 7D spans
-// days, so prefix a one-char weekday.
-const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+// days, so prefix a weekday.
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 function resetLabel(epochSec: number, withWeekday: boolean): string {
   const d = new Date(epochSec * 1000);
   const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  return `↻${withWeekday ? WEEKDAYS[d.getDay()] : ""}${hm}`;
+  return `↻ ${withWeekday ? `${WEEKDAYS[d.getDay()]} ` : ""}${hm}`;
 }
 
 const rl = input.rate_limits;
