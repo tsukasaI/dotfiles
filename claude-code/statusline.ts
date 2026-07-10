@@ -109,7 +109,18 @@ if (ctx != null) {
   const [fg, bg] = rlColor(ctx);
   const filled = Math.round(ctx / 10);
   const bar = "█".repeat(filled) + "░".repeat(10 - filled);
-  row2.push([fg, bg, `${bar} ${ctx.toFixed(1)}%`]);
+  const size = input.context_window?.context_window_size;
+  const sizeLabel = size ? ` /${size >= 1_000_000 ? `${size / 1_000_000}M` : `${size / 1000}k`}` : "";
+  row2.push([fg, bg, `${bar} ${ctx.toFixed(1)}%${sizeLabel}`]);
+}
+
+// resets_at is Unix epoch seconds. 5H resets within the day (HH:mm); 7D spans
+// days, so prefix a one-char weekday.
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+function resetLabel(epochSec: number, withWeekday: boolean): string {
+  const d = new Date(epochSec * 1000);
+  const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `↻${withWeekday ? WEEKDAYS[d.getDay()] : ""}${hm}`;
 }
 
 const rl = input.rate_limits;
@@ -117,7 +128,9 @@ for (const [key, label] of [["five_hour", "5H"], ["seven_day", "7D"]] as const) 
   const p = rl?.[key]?.used_percentage;
   if (p == null) continue;
   const [fg, bg] = rlColor(p);
-  row2.push([fg, bg, `${label} ${p.toFixed(0)}%`]);
+  const resetsAt = rl?.[key]?.resets_at;
+  const reset = resetsAt ? ` ${resetLabel(resetsAt, key === "seven_day")}` : "";
+  row2.push([fg, bg, `${label} ${p.toFixed(0)}%${reset}`]);
 }
 
 // --- Row 3: tokens | lines changed ---
@@ -126,6 +139,11 @@ const inTok = input.context_window?.total_input_tokens ?? 0;
 const outTok = input.context_window?.total_output_tokens ?? 0;
 if (inTok > 0 || outTok > 0) {
   row3.push([250, 239, `≡ ${fmt(inTok)}↓ ${fmt(outTok)}↑`]);
+}
+
+const costUsd = input.cost?.total_cost_usd;
+if (costUsd > 0) {
+  row3.push([250, 238, `$${costUsd.toFixed(2)}`]);
 }
 
 const added = input.cost?.total_lines_added ?? 0;
