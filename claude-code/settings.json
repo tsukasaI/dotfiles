@@ -1,5 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "cleanupPeriodDays": 14,
   "env": {
     "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
     "EDITOR": "nvim",
@@ -84,7 +85,17 @@
       "WebFetch(domain:code.claude.com)",
       "WebFetch(domain:registry.terraform.io)",
       "WebFetch(domain:www.npmjs.com)",
-      "WebFetch(domain:arxiv.org)"
+      "WebFetch(domain:arxiv.org)",
+      "mcp__cc-memory__get_last_retro",
+      "mcp__cc-memory__list_facts",
+      "mcp__cc-memory__process_inbox",
+      "mcp__cc-memory__edit_fact",
+      "mcp__cc-memory__delete_fact",
+      "mcp__cc-memory__upsert_learnings",
+      "mcp__cc-memory__upsert_summary",
+      "mcp__cc-memory__update_hot_facts",
+      "mcp__cc-memory__record_retro_run",
+      "mcp__claude_ai_staygreen__*"
     ],
     "deny": [
       "Read(**/*secret*)",
@@ -193,18 +204,18 @@
   },
   "viewMode": "verbose",
   "advisorModel": "fable",
+  "askUserQuestionTimeout": "never",
   "plansDirectory": ".claude/plans",
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
-  "askUserQuestionTimeout": "never",
-  "cleanupPeriodDays": 14,
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "custom:dark-ansi-readable",
   "preferredNotifChannel": "ghostty",
-  "remoteControlAtStartup": true,
+  "switchModelsOnFlag": false,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
   "useAutoModeDuringPlan": true,
-  "copyOnSelect": false
+  "copyOnSelect": false,
+  "remoteControlAtStartup": true
 }
