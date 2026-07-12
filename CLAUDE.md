@@ -24,6 +24,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`; `hooks/pre-commit` runs gitleaks (currently shadowed on this machine by lefthook — issue #22). |
 | `scripts/` | `safe-flake-update.sh`, `safe-lazy-update.sh`, `safe-update-all.sh` — cooling-period dependency updates. |
 | `setup.sh` | First-time symlink installer. Known-fragile on fresh machines (issue #5). |
+| `docs/` | Investigation memos specific to this repo's own subject matter (e.g. `turso-investigation.md`); not a knowledge-management store — see the Vault bullet in Concepts for the cc-memory/vault/docs boundary. |
 | `ghostty/`, `wezterm/` | Terminals: ghostty primary, wezterm fallback, deliberately identical theme/font. |
 | `karabiner/`, `ssh/`, `mise/`, `vscode/` | Small configs. `vscode/` is not deployed and has drifted from the live file (issue #28). `mise/config.toml` is near-empty on purpose — toolchains come from Nix. |
 
@@ -62,7 +63,13 @@ There is no staging or deploy step (hooks apply on the next tool call,
   deliberately kept out of Claude's process tree.
 - **Vault**: Obsidian vault at `~/engineer/vault`; the `kb`/`note`/`article`/
   `weekly-digest` skills read or write it. `skills/_shared/kb.json` is
-  gitignored personal config — never commit it (issue #24).
+  gitignored personal config — never commit it (issue #24). **Store
+  boundary**: cc-memory (MCP) holds personal-life facts and Claude-Code
+  session learnings; the vault holds open-ended technical research/TIL meant
+  to be found later by full-text search across topics; a repo's own `docs/`
+  holds investigations specific to that repo's own subject matter (e.g.
+  `docs/turso-investigation.md` here). One store per finding — don't
+  duplicate across them.
 
 ## Pitfalls
 
