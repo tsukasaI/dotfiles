@@ -2,9 +2,8 @@
 name: kb
 description: >
   Search the knowledge vault (~/engineer/vault) and answer from it with file references.
-  Use for /kb <query>; when the user asks 前に調べたことあったっけ / ノートにあったはず /
-  ノート見て / vaultに何かあったっけ; or in English "did I look into this before" /
-  "check my notes for X" / "is this in the vault". Read-only: never writes files.
+  Use when the user asks about something they may have noted before (ノート見て / "check
+  my notes"), or invokes /kb <query>. Read-only: never writes (to save → /note).
 allowed-tools: Bash, Read, Glob, Grep
 ---
 
@@ -22,6 +21,8 @@ Read `${CLAUDE_SKILL_DIR}/../_shared/kb.json`. Search targets, in priority order
 
 If the vault is missing or empty, say exactly that and suggest `/note` to start it.
 Do not silently answer from general knowledge as if it came from the notes.
+
+*Done:* targets resolved and confirmed to exist (or "vault missing" stated).
 
 ## Step 1: search
 
@@ -44,6 +45,8 @@ rg -in -C2 '<variant1>|<variant2>' <hit files>  # where inside them
 
 If the query looks like a tag, also try `rg -il '^tags:.*<tag>' <notes_dir>`.
 
+*Done:* all variants searched across all targets; hit files identified (or zero confirmed).
+
 ## Step 2: answer
 
 - Read the top hits fully (cap ~5 files) and synthesize an answer.
@@ -52,10 +55,14 @@ If the query looks like a tag, also try `rg -il '^tags:.*<tag>' <notes_dir>`.
   the latter explicitly if you include it at all.
 - If notes contradict each other, present both entries with dates; do not pick silently.
 
+*Done:* answer delivered with per-claim source citations.
+
 ## Step 3: on a miss
 
 No hits → state "KBには該当なし", list the query variants tried, and offer to research
 the topic now and save it via `/note` (that turns the miss into a future hit).
+
+*Done:* miss stated with variants listed; /note offered.
 
 ## Hard limits
 

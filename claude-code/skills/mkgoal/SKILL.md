@@ -12,6 +12,9 @@ Produce ONE copy-pasteable `/goal` statement, then stop. This skill never runs
 `/goal`, never executes the verification command, and never invokes other
 skills or subagents. Match the user's conversation language in all dialogue.
 
+Root quality: **checkable** — the evaluator model (Haiku) can answer yes/no from
+transcript text alone, with zero judgment.
+
 Launch argument: $ARGUMENTS
 
 ## Why the bars below exist (how /goal judges completion)
@@ -26,7 +29,7 @@ Launch argument: $ARGUMENTS
 ## Slots (all three required)
 
 Fill silently from the launch argument; ask only about slots that are missing
-or below the bar.
+or not yet checkable.
 
 1. **Completion condition** — objective: a reader of the transcript can answer
    yes/no without exercising judgment. Must name a concrete command outcome,
@@ -35,6 +38,8 @@ or below the bar.
    condition (e.g. `go test ./...`, `npm run lighthouse`).
 3. **Turn cap** — a positive integer. If the user gave none, propose `5` and
    get confirmation.
+
+*Done:* all 3 slots filled and checkable.
 
 ### Objectivity gate for slot 1 (the most important check)
 
@@ -81,6 +86,8 @@ Rules:
 - Every condition must be judgeable from command output visible in the
   transcript. Multiple conditions: join with "and", each tied to a command.
 
+*Done:* single-line checkable `/goal` statement drafted from template.
+
 ## Approval gate
 
 1. Present the drafted statement in a fenced code block, preceded by a
@@ -93,6 +100,17 @@ Rules:
    entire content is the one `/goal` line — no prose, comments, or blank lines
    inside the block. Any remark ("paste this to start the loop") goes outside
    the block. Then stop.
+
+*Done:* user approved and final code block emitted, or skill exited after 3 rejected revisions.
+
+## Red flags
+
+| Rationalization | Reality |
+|---|---|
+| "ユーザーの言い方で十分客観的だ" | 「きれいに」「いい感じ」「改善」は unfilled。人間が yes/no で判定できるか自問する。 |
+| "検証コマンドを実行して動作確認しておこう" | 実行しない。ドラフトするだけ。実行は /goal の仕事。 |
+| "3スロット全部聞くと煩わしいから推測で埋める" | 埋めない。欠けたスロットは必ず聞く。沈黙は同意ではない。 |
+| "条件が複合的だから複数行の /goal にしよう" | しない。1行に収める。複数条件は "and" で繋ぎ、各々に検証コマンドを紐づける。 |
 
 ## Hard limits
 

@@ -1,12 +1,10 @@
 ---
 name: note
 description: >
-  Save knowledge into the Obsidian vault (~/engineer/vault/notes). Use when the user says
-  メモして / ノートに保存 / vaultに入れて / ノートに書いて / TIL / 調査結果を保存して, or in
-  English "save this to my notes" / "write this down" / "remember this"; when they want a
-  finding from the current conversation recorded for later reuse, or /note <topic> to
-  research a topic and save the result. Appends to an existing topic note when one matches
-  instead of creating duplicates.
+  Save knowledge into the Obsidian vault (~/engineer/vault/notes). Use when the user wants
+  to persist a finding or TIL (メモして / "save to notes"), or /note <topic> to research
+  and save. Appends to existing topic notes rather than creating duplicates. Write-side of
+  the vault (to search existing → /kb).
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, WebSearch, WebFetch
 ---
 
@@ -22,6 +20,8 @@ Read `${CLAUDE_SKILL_DIR}/../_shared/kb.json`. `notes_dir` is where notes live
 (`~` = home). If `notes_dir` does not exist, ask the user before creating anything —
 never silently create the vault.
 
+*Done:* kb.json read; notes_dir confirmed to exist (or user asked).
+
 ## Step 1: classify the input
 
 - **(a) Conversation capture** — the user points at something already discussed
@@ -30,6 +30,8 @@ never silently create the vault.
 - **(b) TIL** — a short standalone fact or gotcha the user states.
 - **(c) Topic research** — `/note <topic>` with no prior discussion: research first
   (WebSearch/WebFetch/code reading), then save. Every claim needs a source.
+
+*Done:* input classified as (a), (b), or (c).
 
 ## Step 2: search before writing (mandatory)
 
@@ -47,6 +49,8 @@ go there).
 - **No match** → new file.
 - **Partial overlap** (could fit 2+ notes, or unclear whether to split a topic) →
   AskUserQuestion with the concrete choices.
+
+*Done:* decision made — append to existing, create new, or user chose from options.
 
 ## Step 3: write
 
@@ -69,10 +73,23 @@ When appending to an existing note:
 
 If the file already exists but is not a match for appending (name collision), ask.
 
+*Done:* file written with correct frontmatter and formatted entry.
+
 ## Step 4: report
 
 Reply with the file path, a one-line summary of what was saved, and — when relevant —
 which existing note it was merged into.
+
+*Done:* path + summary reported to user.
+
+## Red flags
+
+| Rationalization | Reality |
+|---|---|
+| "検索したが似たものが無さそうなので新規作成" | 1パスで miss を断定しない。日英・略称バリアントを全部試したか確認。 |
+| "追記より書き直した方が分かりやすい" | 書き直さない。既存エントリは歴史。新しい `##` セクションを追加する。 |
+| "このくらいの内容なら frontmatter は省略してよい" | 省略不可。tags/created/updated/sources は全ファイル必須。 |
+| "矛盾しているが最新の方が正しいはずなので上書き" | 上書きしない。矛盾をユーザーに提示し、解決を記録してから書く。 |
 
 ## Hard limits
 

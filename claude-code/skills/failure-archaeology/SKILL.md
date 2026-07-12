@@ -38,6 +38,8 @@ one investigation, not a recurring report.
 Ask (or infer from the request): which repo, which path/area (e.g. a directory or
 file), and how far back. Default to the whole repo history if no area is given.
 
+*Done:* repo, path (or "all"), and time range confirmed.
+
 ### Step 1: extract contextual lines for the area
 
 ```
@@ -61,6 +63,8 @@ built for the cross-repo weekly/candidates use case, not single-area archaeology
 If the investigation later needs a cross-repo pass, hand off to `weekly-digest`
 instead of reimplementing that here.
 
+*Done:* contextual lines collected with SHA+date (or confirmed empty — itself a finding).
+
 ### Step 2: detect true reverts (not just grep hits)
 
 ```
@@ -80,6 +84,8 @@ or a `This reverts commit <sha>` trailer. Verified in this repo's own history: o
 4 grep hits, only 1 (`revert(claude-code): drop CLAUDE_CODE_DISABLE_MOUSE_CLICKS`)
 was a true revert — the other 3 just used the word "revert" in a decision/intent
 line.
+
+*Done:* all grep hits classified as true revert or false positive.
 
 ### Step 3: cluster repeated fixes on the same area
 
@@ -101,11 +107,15 @@ see whether each fix recorded a `learned()`/`decision()`, or whether it's a case
 like `tsukasaI/dotfiles#16` (a regression with no `decision()`/`learned()` at
 all — nothing to mine, which is itself a finding worth flagging).
 
+*Done:* clusters with ≥3 fix() commits identified; their contextual lines pulled.
+
 ### Step 4: assemble the ledger
 
 Group Steps 1–3's output by area, in the output format below. Cite every claim
 with a commit SHA — no paraphrasing an intent/decision/learned line without its
 hash attached.
+
+*Done:* ledger rendered in output format with SHA citations for every claim.
 
 ## Output format template
 
@@ -137,6 +147,15 @@ commits / 355 contextual lines); staygreen `docs/adr/` (23 ADRs rebuilt from
 commit lines with SHA evidence and supersession chains).
 
 Refs: tsukasaI/dotfiles#16
+
+## Red flags
+
+| Rationalization | Reality |
+|---|---|
+| "harvest.ts を流用すればスコープ指定も効くはず" | 効かない。harvest.ts は --mode=weekly\|candidates のみ、全リポ走査、パス指定不可。git log を直接叩く。 |
+| "revert という語を含むコミット = true revert" | ではない。subject prefix か trailer で確認。grep hit の 75% は false positive（このリポの実績）。 |
+| "contextual lines が無いエリアはスキップ" | スキップしない。lines が無いこと自体が finding（記録なし = 意図不明の変更群）。 |
+| "コミットメッセージを要約して読みやすくする" | しない。intent/decision/learned 行は verbatim + SHA で引用。パラフレーズは証拠能力を消す。 |
 
 ## 再検証 / Re-verify
 

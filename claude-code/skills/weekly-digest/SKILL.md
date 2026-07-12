@@ -27,6 +27,8 @@ Default window = last Monday. `/weekly-digest YYYY-MM-DD` backfills a past week 
 `--since=`. If the script fails, show its stderr and stop — do not reconstruct
 numbers by hand.
 
+*Done:* harvest.ts exited 0; JSON captured (or stderr shown and skill stopped).
+
 ## Step 2: synthesize the digest (English — ops issue convention)
 
 Sections, in order; omit a section only by stating it is empty:
@@ -47,6 +49,8 @@ Sections, in order; omit a section only by stating it is empty:
    then abandoned, notes created but marked 推測/unverified. Phrase as questions
    ("Is X still worth pursuing?") — prompts for the retro, not assignments.
 
+*Done:* all 4 sections drafted (each populated or explicitly marked empty).
+
 ## Step 3: deliver
 
 1. Find this week's retro issue:
@@ -63,6 +67,17 @@ Sections, in order; omit a section only by stating it is empty:
 3. On yes: `gh issue comment <number> -R <ops_repo> --body-file <tempfile>` (write the
    body to the session scratchpad first; heredocs mangle backticks). On no: leave the
    digest in the conversation.
+
+*Done:* comment posted to retro issue, or digest left in conversation on decline/no match.
+
+## Red flags
+
+| Rationalization | Reality |
+|---|---|
+| "harvester が失敗したので手で数字を集める" | 集めない。stderr を見せて止まる。手集計はミスの温床。 |
+| "learned/decision 行が多すぎるので要約する" | verbatim が原則。30行超のときだけ decision の count 要約を許可（Step 2 に明記）。 |
+| "retro issue が見つからないので新規作成する" | 作らない。会話に digest を残して終了。issue 管理は人間の仕事。 |
+| "先週と同じ形式だから確認なしで投稿してよい" | よくない。毎回ユーザー確認が必須（Step 3 のゲート）。 |
 
 ## Hard limits
 

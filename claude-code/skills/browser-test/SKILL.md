@@ -1,6 +1,6 @@
 ---
 name: browser-test
-description: Verify UI behavior, debug frontend bugs, audit CSS/accessibility, and measure performance using agent-browser (fast, token-efficient) with Chrome DevTools MCP for design and performance work. Use for requests like "test this in the browser" / "does the login flow work" / "check accessibility on this page" / "why is this page slow" / 画面で確認して / UI周りのバグ調査 — i.e. end-to-end UI verification, visual regressions, a11y audits, or LCP/CLS/INP measurement. Not for backend-only changes or logic a unit test already covers.
+description: Verify UI behavior, debug frontend bugs, audit CSS/accessibility, and measure performance in a real browser. Use for end-to-end UI verification (画面で確認して / "test this in the browser"), visual regressions, a11y audits, or LCP/CLS/INP measurement. Not for backend-only changes or logic a unit test already covers.
 ---
 
 # Browser Testing
