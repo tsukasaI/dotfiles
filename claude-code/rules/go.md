@@ -7,6 +7,6 @@ paths:
 
 # Go
 
-- Run `go vet ./...` and `golangci-lint run` before considering changes complete.
+- Run `go vet ./...`, `golangci-lint run`, and `go test ./...` before considering changes complete.
 - Wrap errors with `fmt.Errorf("context: %w", err)`.
 - Use table-driven tests.

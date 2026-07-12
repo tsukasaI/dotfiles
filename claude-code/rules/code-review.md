@@ -33,7 +33,7 @@ Source: distilled from [google/eng-practices](https://github.com/google/eng-prac
 - **Naming**: Names communicate intent without becoming unwieldy.
 - **Tests**: Cover edges and concurrency. Confirm the test would actually fail if the code broke.
 - **Consistency**: When the style guide is silent, match the surrounding code.
-- **Runs**: Did the build, linter, and tests pass? If you haven't run them, do so now — self-review on a diff that doesn't compile is theater.
+- **Runs**: Self-review on a diff that doesn't compile is theater — verification (per CLAUDE.md) must already have run.
 - **Every line**: If a line is unclear, don't assume the complexity is justified — simplify it or add a *why* comment.
 - **Context**: A small local change shouldn't cumulatively degrade the file or system.
 
@@ -45,9 +45,9 @@ Source: distilled from [google/eng-practices](https://github.com/google/eng-prac
 
 ## PR / commit description content
 (Format itself follows the Contextual Commits spec in CLAUDE.md.)
-- Subject line: imperative, complete sentence (`Delete the FizzBuzz RPC`, not `Deleting...` or `Deleted...`).
+- Subject line: imperative, complete sentence (`feat(rpc): delete the FizzBuzz RPC`, not `Deleting...` or `Deleted...`).
 - Body explains *why* and trade-offs — the diff already shows *what*.
 - Vague subjects (`Fix bug`, `Update code`, `Move things`) are not acceptable.
 
 ## Reader confusion = code defect
-If you find yourself wanting to explain a change in chat or a PR comment to make it understandable, the code or its comments are wrong. Fix the code instead — chat explanations don't reach future readers.
+If you find yourself wanting to explain a change in chat or a PR comment to make it understandable, the diff or its comments are wrong. Fix the diff instead — chat explanations don't reach future readers.

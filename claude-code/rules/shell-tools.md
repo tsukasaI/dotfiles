@@ -14,7 +14,7 @@ Built-in tools already skip `node_modules`, `dist`, `target`, etc., and avoid sh
 |---|---|---|
 | Search file contents | `Grep` | `rg` |
 | Find files by name | `Glob` | `fd` |
-| List a directory (one level) | `LS` | `eza` |
+| List a directory (one level) | — (no built-in) | `ls` / `eza` |
 | Read a file | `Read` | — |
 
 ## When Bash is unavoidable
