@@ -245,13 +245,27 @@ if [[ "$CMD_NOQUOTES" =~ ${CB}git[[:space:]]+push([[:space:]]|$) ]]; then
   fi
 fi
 
+# ── Special case: gh api with a DELETE method (#2) ──────────────────────────
+# `gh api` reaches the full authenticated GitHub REST surface, so `-X DELETE`
+# can destroy the same resources the GITHUB blocklist rules (gh repo delete
+# etc.) guard against. Read-only gh api calls stay unblocked; other write
+# verbs go through the normal permission prompt (gh api was removed from
+# settings.json unprompted-allow). Method scanned on CMD_RESOLVED so a
+# quoted '-X DELETE' can't hide; command detection on CMD_NOQUOTES keeps
+# quoted prose about gh api from triggering it.
+if [[ "$CMD_NOQUOTES" =~ ${CB}gh[[:space:]]+api([[:space:]]|$) ]]; then
+  if [[ "$CMD_RESOLVED" =~ (^|[[:space:]])(-X|--method)[[:space:]=]*[Dd][Ee][Ll][Ee][Tt][Ee]([[:space:]]|$) ]]; then
+    block "GITHUB" "gh api with a DELETE method can permanently destroy remote resources." "the specific gh subcommand, or ask the user to run it"
+  fi
+fi
+
 # ── Special case: reader commands accessing secret files ────────────────────
 # Single-statement bounded via [^;&|<>]* to avoid false-positives like
 # `cat README.md && echo done > .env`. Regex stored in a variable because
 # bash's [[ ]] tokenizer treats `;&` (case fall-through) as a syntax token.
-SECRET_READ_RE='(cat|head|tail|less|more|bat|nano|vim|nvim)[[:space:]]+[^;&|<>]*(\.env([.][a-zA-Z0-9_-]+)?|\.pem|\.key|\.p12|id_rsa|id_ed25519|id_ecdsa|id_dsa)([[:space:]]|$|[;&|<>])'
+SECRET_READ_RE='(cat|head|tail|less|more|bat|nano|vim|nvim)[[:space:]]+[^;&|<>]*(\.env([.][a-zA-Z0-9_-]+)?|\.pem|\.key|\.p12|id_rsa|id_ed25519|id_ecdsa|id_dsa|credentials?|kubeconfig|\.kube/config|\.npmrc|\.netrc|\.pgpass|\.aws/[^;&|<>[:space:]]*|\.docker/config\.json|\.config/gcloud/[^;&|<>[:space:]]*)([[:space:]]|$|[;&|<>])'
 if [[ "$CMD_NOQUOTES" =~ ${CB}${SECRET_READ_RE} ]]; then
-  block "CREDENTIAL" "Reader command targets a secret file (.env* / .pem / .key / .p12 / SSH private key)." "built-in Read tool (respects deny rules)"
+  block "CREDENTIAL" "Reader command targets a secret file (.env* / key material / cloud & registry credentials)." "built-in Read tool (respects deny rules)"
 fi
 
 # ── Special case: bare sh/bash/zsh invocation (heredoc / script-file execution) ──
