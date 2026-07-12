@@ -90,6 +90,40 @@ function openDb(): Database {
   return db;
 }
 
+// --- Redaction (#4) ---
+// The transcript is stored locally and may later be pushed verbatim to
+// Turso (push-to-turso.sh), so mask well-known credential formats before
+// they ever reach the DB. Regex-based on purpose: running gitleaks at
+// SessionEnd would add process-spawn latency to every session close.
+// Patterns are prefix-identifiable formats only — generic entropy
+// heuristics would mangle ordinary code discussion in the transcript.
+// Replacements contain no quotes/backslashes, so JSONL stays parseable.
+
+const REDACTIONS: Array<[RegExp, string]> = [
+  [
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+    "[REDACTED:private-key]",
+  ],
+  [/\bsk-ant-[A-Za-z0-9_-]{20,}/g, "[REDACTED:anthropic-key]"],
+  [/\bsk-[A-Za-z0-9_-]{20,}/g, "[REDACTED:api-key]"],
+  [/\bgh[pousr]_[A-Za-z0-9]{20,}/g, "[REDACTED:github-token]"],
+  [/\bgithub_pat_[A-Za-z0-9_]{20,}/g, "[REDACTED:github-token]"],
+  [/\bxox[baprs]-[A-Za-z0-9-]{10,}/g, "[REDACTED:slack-token]"],
+  [/\b(?:AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16}\b/g, "[REDACTED:aws-key-id]"],
+  [/\bAIza[0-9A-Za-z_-]{35}/g, "[REDACTED:google-key]"],
+  [
+    /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
+    "[REDACTED:jwt]",
+  ],
+  [/\bBearer\s+[A-Za-z0-9._~+/=-]{20,}/g, "Bearer [REDACTED:token]"],
+];
+
+function redactSecrets(text: string): string {
+  let out = text;
+  for (const [re, label] of REDACTIONS) out = out.replace(re, label);
+  return out;
+}
+
 // --- Transcript parsing ---
 
 function sumTokens(usage: Usage): { input: number; output: number } {
@@ -230,7 +264,7 @@ try {
   const db = openDb();
   db.transaction(() => {
     saveSession(db, input.session_id, input.cwd, endReason, meta);
-    saveTranscript(db, input.session_id, transcript);
+    saveTranscript(db, input.session_id, redactSecrets(transcript));
     saveSessionDays(db, input.session_id, meta.dayCounts);
   })();
   db.close();

@@ -19,6 +19,11 @@
 # On any doubt the script keeps the local data and exits non-zero (fail-safe).
 # INSERT OR IGNORE makes re-runs idempotent (existing rows are skipped).
 #
+# REDACTION (#4): save-transcript.ts masks well-known credential formats at
+# write time since 2026-07-13, but transcript_raw rows written BEFORE that
+# date were stored raw and may contain unredacted secrets. Review old rows
+# before the first push.
+#
 # Flags:
 #   --keep-local   push + verify, but do NOT delete (recommended for the first run)
 
