@@ -50,6 +50,40 @@ for input in $inputs; do
 
   age_days=$(( (now - last_modified) / 86400 ))
 
+  # Cross-check the self-reported lastModified against the commit date on
+  # GitHub (#36). lastModified is not covered by any hash in flake.lock, so
+  # a tampered lock or fetch layer can fake it to sail past the cooling
+  # window; a mismatch with what GitHub reports means the lock is lying →
+  # revert (fail closed). Limitation: an upstream author who backdates the
+  # commit itself stays undetectable — the date is sealed inside the commit
+  # hash and GitHub exposes no per-commit push time.
+  verified=""
+  locked_type=$(jq -r ".nodes.\"$node\".locked.type // empty" flake.lock)
+  if [[ "$locked_type" == "github" ]]; then
+    owner=$(jq -r ".nodes.\"$node\".locked.owner" flake.lock)
+    repo=$(jq -r ".nodes.\"$node\".locked.repo" flake.lock)
+    rev=$(jq -r ".nodes.\"$node\".locked.rev" flake.lock)
+    gh_ts=""
+    gh_date=""
+    if command -v gh >/dev/null 2>&1; then
+      gh_date=$(gh api "repos/$owner/$repo/commits/$rev" --jq '.commit.committer.date' 2>/dev/null || true)
+    fi
+    if [[ -n "$gh_date" ]]; then
+      gh_ts=$(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$gh_date" +%s 2>/dev/null || true)
+    fi
+    if [[ -z "$gh_ts" ]]; then
+      printf '[warn] %-12s server-side timestamp unavailable, using self-reported age only\n' "$input"
+    elif (( gh_ts - last_modified > 60 || last_modified - gh_ts > 60 )); then
+      printf '[spoof?] %-10s lock says lastModified=%s but GitHub says %s — reverting\n' \
+        "$input" "$last_modified" "$gh_ts"
+      mv "$before" flake.lock
+      skipped+=1
+      continue
+    else
+      verified=" (server-verified)"
+    fi
+  fi
+
   if [[ "$input" == "nixpkgs" ]]; then
     threshold=$NIXPKGS_COOLING_DAYS
   else
@@ -61,7 +95,7 @@ for input in $inputs; do
     mv "$before" flake.lock
     skipped+=1
   else
-    printf '[ok]   %-12s age %dd\n' "$input" "$age_days"
+    printf '[ok]   %-12s age %dd%s\n' "$input" "$age_days" "$verified"
     rm "$before"
     accepted+=1
   fi

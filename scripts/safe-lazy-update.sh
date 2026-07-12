@@ -37,18 +37,25 @@ for plugin in $(jq -r 'keys[]' "$LOCK"); do
     continue
   fi
 
+  # Unknown age must fail closed (#36): if the commit's timestamp cannot be
+  # resolved, revert instead of accepting — matching safe-flake-update.sh,
+  # which reverts on a missing lastModified. Note there is no server-side
+  # signal to cross-check here: the committer date is sealed inside the
+  # commit hash, so the local clone's %ct already equals what any API would
+  # return; only an upstream author can backdate, and that stays undetectable.
   plugin_dir="$NVIM_DATA/$plugin"
-  if [[ ! -d "$plugin_dir/.git" ]]; then
-    printf '[warn] %-32s no local clone, keeping update\n' "$plugin"
-    accepted+=1
-    continue
+  committer_ts=""
+  if [[ -d "$plugin_dir/.git" ]]; then
+    committer_ts=$(git -C "$plugin_dir" show -s --format=%ct "$new_commit" 2>/dev/null || true)
   fi
 
-  committer_ts=$(git -C "$plugin_dir" show -s --format=%ct "$new_commit" 2>/dev/null || true)
-
   if [[ -z "$committer_ts" ]]; then
-    printf '[warn] %-32s cannot resolve commit timestamp, keeping update\n' "$plugin"
-    accepted+=1
+    printf '[skip] %-32s cannot resolve commit age (no clone or unknown commit), reverting\n' "$plugin"
+    tmp=$(mktemp)
+    jq --arg p "$plugin" --arg c "$old_commit" '.[$p].commit = $c' "$LOCK" > "$tmp"
+    mv "$tmp" "$LOCK"
+    reverted+=("$plugin")
+    skipped+=1
     continue
   fi
 
