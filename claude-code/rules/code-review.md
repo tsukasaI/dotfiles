@@ -32,7 +32,8 @@ Source: distilled from [google/eng-practices](https://github.com/google/eng-prac
 - **Complexity**: Solve the present problem only. Over-engineering for speculative future requirements is a defect.
 - **Naming**: Names communicate intent without becoming unwieldy.
 - **Tests**: Cover edges and concurrency. Confirm the test would actually fail if the code broke.
-- **Consistency**: When the style guide is silent, match the surrounding code.
+- **Consistency**: When the style guide is silent, match the surrounding code — including *mechanisms*, not just style. If a sibling function already solves this problem class correctly (conditional-UPDATE claim, idempotency key, display limit), match it; the most common defect is the correct pattern existing one function away.
+- **Duplicated truth**: A value maintained in two unlinked places (full schema vs migrations, infra IDs copied between configs, version pins, hand-computed checksums) needs a single source or a mechanical sync check. Any "manually copy X into Y" step in docs or comments is a defect.
 - **Runs**: Self-review on a diff that doesn't compile is theater — verification (per CLAUDE.md) must already have run.
 - **Every line**: If a line is unclear, don't assume the complexity is justified — simplify it or add a *why* comment.
 - **Context**: A small local change shouldn't cumulatively degrade the file or system.
