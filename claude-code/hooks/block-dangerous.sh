@@ -62,58 +62,111 @@ escape_regex() {
   printf '%s' "$out"
 }
 
-# Strip text inside single- and double-quoted regions so blocklist patterns
-# don't false-positive on words like "secret" inside commit messages or echo args.
-# Inside double quotes, $(...) and `...` still execute (bash expansion), so
-# preserve those regions verbatim. Conservative: when in doubt, keep text.
-strip_quotes_preserving_subst() {
-  local s=$1
-  local n=${#s}
-  local out=""
-  local i=0
-  local c start depth cc
+# Normalize a command string for scanning (bash-word semantics, not a full
+# tokenizer). Two modes (#1):
+#   scan    -> used against the block/allow lists. Backslashes outside quotes
+#              are resolved (r\m → rm — bash drops the backslash and runs rm).
+#              A quoted region is restored without its quote chars when it is
+#              glued to an unquoted word fragment (cur'l' → curl) or sits at
+#              command position (start of string / after ; & | ` ( — catches
+#              'rm' -rf). A standalone quoted argument (git commit -m
+#              'rm -rf /') is dropped, so blocklist words inside plain string
+#              arguments don't false-positive. $(...) and `...` inside double
+#              quotes still execute despite the quotes → always kept.
+#   resolve -> all quoted content restored. Used by the curl localhost check,
+#              which must see quoted URLs.
+# Arithmetic uses assignment form (i=$((i+1))), never bare ((i++)) — the
+# latter returns non-zero status when the value is 0, which is a set -e trap.
+normalize_cmd() {
+  local mode=$1 s=$2
+  local n=${#s} out="" i=0
+  local c qc region subst start depth cc keep t
   while (( i < n )); do
     c=${s:i:1}
-    if [[ $c == "'" ]]; then
-      ((i++))
-      while (( i < n )) && [[ ${s:i:1} != "'" ]]; do ((i++)); done
-      (( i < n )) && ((i++))
-    elif [[ $c == '"' ]]; then
-      ((i++))
-      while (( i < n )); do
-        c=${s:i:1}
-        if [[ $c == '"' ]]; then
-          ((i++)); break
-        elif [[ $c == '\' ]]; then
-          ((i+=2))
-        elif [[ $c == '$' && ${s:i+1:1} == '(' ]]; then
-          start=$i; depth=1
-          ((i+=2))
-          while (( i < n )) && (( depth > 0 )); do
-            cc=${s:i:1}
-            if [[ $cc == '\' ]]; then
-              ((i+=2)); continue
-            elif [[ $cc == '(' ]]; then ((depth++))
-            elif [[ $cc == ')' ]]; then ((depth--))
-            fi
-            ((i++))
-          done
-          out+=${s:start:i-start}
-        elif [[ $c == '`' ]]; then
-          start=$i
-          ((i++))
-          while (( i < n )) && [[ ${s:i:1} != '`' ]]; do
-            if [[ ${s:i:1} == '\' ]]; then ((i+=2)); else ((i++)); fi
-          done
-          (( i < n )) && ((i++))
-          out+=${s:start:i-start}
-        else
-          ((i++))
+    if [[ $c == '\' ]]; then
+      # Backslash outside quotes: bash removes it and keeps the next char.
+      out+=${s:i+1:1}
+      i=$((i+2))
+    elif [[ $c == "'" || $c == '"' ]]; then
+      qc=$c
+      region=""   # resolved content of the quoted region
+      subst=""    # $(...) / `...` parts only (execute even when quoted)
+      i=$((i+1))
+      if [[ $qc == "'" ]]; then
+        # Single quotes: content is literal, backslashes included.
+        while (( i < n )) && [[ ${s:i:1} != "'" ]]; do
+          region+=${s:i:1}
+          i=$((i+1))
+        done
+        (( i < n )) && i=$((i+1))
+      else
+        while (( i < n )); do
+          c=${s:i:1}
+          if [[ $c == '"' ]]; then
+            i=$((i+1)); break
+          elif [[ $c == '\' ]]; then
+            # In double quotes, backslash only escapes $ ` " \ — anything
+            # else keeps both chars (so cur"\l" stays cur\l, not curl).
+            case ${s:i+1:1} in
+              '$'|'`'|'"'|'\') region+=${s:i+1:1} ;;
+              *)               region+=${s:i:2} ;;
+            esac
+            i=$((i+2))
+          elif [[ $c == '$' && ${s:i+1:1} == '(' ]]; then
+            start=$i; depth=1
+            i=$((i+2))
+            while (( i < n )) && (( depth > 0 )); do
+              cc=${s:i:1}
+              if [[ $cc == '\' ]]; then
+                i=$((i+2)); continue
+              elif [[ $cc == '(' ]]; then depth=$((depth+1))
+              elif [[ $cc == ')' ]]; then depth=$((depth-1))
+              fi
+              i=$((i+1))
+            done
+            region+=${s:start:i-start}
+            subst+=${s:start:i-start}
+          elif [[ $c == '`' ]]; then
+            start=$i
+            i=$((i+1))
+            while (( i < n )) && [[ ${s:i:1} != '`' ]]; do
+              if [[ ${s:i:1} == '\' ]]; then i=$((i+2)); else i=$((i+1)); fi
+            done
+            (( i < n )) && i=$((i+1))
+            region+=${s:start:i-start}
+            subst+=${s:start:i-start}
+          else
+            region+=$c
+            i=$((i+1))
+          fi
+        done
+      fi
+      keep=0
+      if [[ $mode == resolve ]]; then
+        keep=1
+      else
+        # Glued to an unquoted word fragment on either side?
+        [[ ${out: -1} == [A-Za-z0-9_/.-] ]] && keep=1
+        [[ ${s:i:1} == [A-Za-z0-9_/.-] ]] && keep=1
+        # At command position (start of string / after a real separator)?
+        if (( keep == 0 )); then
+          t=$out
+          t="${t%"${t##*[![:space:]]}"}"
+          if [[ -z $t ]]; then
+            keep=1
+          else
+            case ${t: -1} in ';'|'&'|'|'|'`'|'(') keep=1 ;; esac
+          fi
         fi
-      done
+      fi
+      if (( keep )); then
+        out+=$region
+      else
+        out+=$subst
+      fi
     else
       out+=$c
-      ((i++))
+      i=$((i+1))
     fi
   done
   printf '%s' "$out"
@@ -147,7 +200,9 @@ strip_quoted_heredoc_bodies() {
   printf '%s' "${out%$'\n'}"
 }
 
-CMD_NOQUOTES=$(strip_quotes_preserving_subst "$(strip_quoted_heredoc_bodies "$CMD")")
+CMD_SANS_HEREDOC=$(strip_quoted_heredoc_bodies "$CMD")
+CMD_NOQUOTES=$(normalize_cmd scan "$CMD_SANS_HEREDOC")
+CMD_RESOLVED=$(normalize_cmd resolve "$CMD_SANS_HEREDOC")
 
 # Command-boundary leading char class. Chars that can legitimately precede
 # a command name in bash:
@@ -165,8 +220,20 @@ CB='(^|[<\\/{,;&|`$([:space:]])'
 TB='([[:space:];&|<>()`,{}]|$)'
 
 # ── Special case: curl (localhost allowed, external blocked) ─────────────────
-if [[ "$CMD" =~ ${CB}curl[[:space:]] ]]; then
-  if ! [[ "$CMD" =~ curl[^\'\"]*https?://(localhost|127\.0\.0\.1|\[::1\])(:[0-9]+)?(/|[[:space:]]|$) ]]; then
+# Detection on CMD_NOQUOTES so quoted prose about curl doesn't trigger it and
+# quote-split forms (cur'l') do; target check on CMD_RESOLVED so quoted URLs
+# are visible (#1). The exemption requires at least one explicit localhost
+# URL AND no other http(s) URL anywhere in the command — the old form
+# exempted the whole command as soon as one localhost URL existed.
+LOCAL_URL_RE='https?://(localhost|127\.0\.0\.1|\[::1\])(:[0-9]+)?(/[^[:space:];&|<>]*)?([[:space:];&|<>]|$)'
+if [[ "$CMD_NOQUOTES" =~ ${CB}curl${TB} ]]; then
+  u=$CMD_RESOLVED
+  has_local=0
+  while [[ $u =~ $LOCAL_URL_RE ]]; do
+    has_local=1
+    u=${u/"${BASH_REMATCH[0]}"/ }
+  done
+  if (( has_local == 0 )) || [[ $u =~ https?:// ]]; then
     block "NETWORK" "'curl' to a non-localhost address can exfiltrate data." "WebFetch tool"
   fi
 fi
