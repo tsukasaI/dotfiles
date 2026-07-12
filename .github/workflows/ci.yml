@@ -1,0 +1,64 @@
+# CI for a live dotfiles repo (#11): the guardrail hooks gate every Bash call
+# of the Claude Code sessions that edit this repo, so regressions here have
+# machine-wide blast radius. Third-party actions are pinned to commit SHAs
+# (renewed by Dependabot, see .github/dependabot.yml).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: shellcheck all shell entrypoints
+        # info-level findings stay visible locally but don't gate CI; the
+        # guardrail hook files can't take disable comments (they are
+        # Edit-protected by block-config-edit.sh, #34).
+        run: |
+          shellcheck -x --severity=warning \
+            setup.sh \
+            scripts/*.sh \
+            claude-code/hooks/*.sh \
+            claude-code/scripts/*.sh \
+            tests/hooks-regression.sh
+
+  json-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: every tracked *.json must parse
+        run: git ls-files '*.json' | xargs -n1 jq empty
+
+  hooks-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: guardrail hook regression suite
+        run: bash tests/hooks-regression.sh
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0 # scan full history, not just the tip
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  flake-check:
+    # aarch64-darwin evaluation needs an arm64 macOS runner; --no-build keeps
+    # it to evaluation only (no package builds on CI minutes).
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: cachix/install-nix-action@a49548c11d9846ad46ecc0115273879b045f001c # v31.10.7
+      - name: nix flake check (evaluation only)
+        run: nix flake check ./nix-darwin --no-build

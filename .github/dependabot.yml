@@ -1,0 +1,8 @@
+# Renewal mechanism for the SHA-pinned actions in workflows (security rule:
+# every content-hash pin needs a way to not silently rot).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
