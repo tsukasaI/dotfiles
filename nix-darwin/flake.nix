@@ -15,7 +15,10 @@
 
   outputs = inputs@{ self, nix-darwin, nixpkgs, ewc, fini, herdr }:
   let
-    system = "aarch64-darwin";
+    # One function per host (#14): adding a second machine is one more mkHost
+    # call under darwinConfigurations, not a copy of the configuration block.
+    mkHost = { primaryUser, system }:
+    let
     configuration = { pkgs, lib, ... }:
     let
       # Pre-compile tree-sitter parsers via Nix so nvim doesn't need a C toolchain at runtime.
@@ -203,14 +206,19 @@
       ];
 
       nix.settings.experimental-features = "nix-command flakes";
-      system.primaryUser = "inouetsukasa";
+      system.primaryUser = primaryUser;
       system.stateVersion = 5;
-      nixpkgs.hostPlatform = "aarch64-darwin";
+      nixpkgs.hostPlatform = system;
+    };
+    in
+    nix-darwin.lib.darwinSystem {
+      modules = [ configuration ];
     };
   in
   {
-    darwinConfigurations."Ino-macbook-air" = nix-darwin.lib.darwinSystem {
-      modules = [ configuration ];
+    darwinConfigurations."Ino-macbook-air" = mkHost {
+      primaryUser = "inouetsukasa";
+      system = "aarch64-darwin";
     };
   };
 }
