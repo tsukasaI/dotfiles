@@ -26,6 +26,27 @@ esac
 
 BASENAME=$(basename "$FILE_PATH")
 
+# Guardrail self-protection (#34): the files that define these guardrails
+# must not be editable by the agent they police — otherwise a single Edit
+# can disarm every rule. Matched on the full path (not basename) so
+# same-named files in other projects stay editable. Both path forms are
+# covered: the repo path (claude-code/hooks/) and the deployed symlink path
+# (.claude/hooks/). Changing these files is a manual, human action — see
+# the hooks-guardrails skill for the procedure.
+case "$FILE_PATH" in
+  */claude-code/hooks/block-dangerous.sh | \
+  */claude-code/hooks/block-config-edit.sh | \
+  */claude-code/hooks/blocklist.conf | \
+  */claude-code/hooks/allowlist.conf | \
+  */.claude/hooks/block-dangerous.sh | \
+  */.claude/hooks/block-config-edit.sh | \
+  */.claude/hooks/blocklist.conf | \
+  */.claude/hooks/allowlist.conf)
+    printf '[BLOCKED: GUARDRAIL_PROTECTION] "%s" defines the PreToolUse guardrails and must not be edited by Claude.\nAsk the user to change it manually (procedure: hooks-guardrails skill).\n' "$BASENAME" >&2
+    exit 2
+    ;;
+esac
+
 # Protected config file patterns
 PROTECTED=(
   '.eslintrc'
