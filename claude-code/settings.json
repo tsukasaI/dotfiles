@@ -213,9 +213,9 @@
   "theme": "custom:dark-ansi-readable",
   "preferredNotifChannel": "ghostty",
   "switchModelsOnFlag": false,
+  "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
   "useAutoModeDuringPlan": true,
-  "copyOnSelect": false,
-  "remoteControlAtStartup": true
+  "copyOnSelect": false
 }
