@@ -9,17 +9,39 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BLOCKLIST="$SCRIPT_DIR/blocklist.conf"
 
-INPUT=$(cat)
-CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
-[[ -z "$CMD" ]] && exit 0
+CMD=""
 
 block() {
   local alt="${3:-}"
   printf '[BLOCKED: %s] %s\n' "$1" "$2"
   [[ -n "$alt" ]] && printf '→ Use instead: %s\n' "$alt"
-  printf 'Blocked command:\n  %s\n' "$CMD"
+  printf 'Blocked command:\n  %s\n' "${CMD:-<unparsed hook input>}"
   exit 2
 } >&2
+
+# Fail closed (#32): any unhandled top-level failure must surface as exit 2
+# (block) — with plain `set -e` the script dies with a non-2 status, which
+# the harness treats as allow. Deliberately NOT `set -E`: the ERR trap must
+# not be inherited by command substitutions — the quote-stripping parser
+# below uses arithmetic statements like ((i++)) whose status is legitimately
+# non-zero when the value is 0, and inheriting the trap there would
+# false-positive-block commands that start with a quote character.
+trap 'block "INTERNAL_ERROR" "guardrail hook crashed unexpectedly — failing closed"' ERR
+
+INPUT=$(cat) || block "INTERNAL_ERROR" "failed to read hook input — failing closed"
+CMD_TYPE=$(printf '%s' "$INPUT" | jq -r '.tool_input.command | type' 2>/dev/null) \
+  || block "INTERNAL_ERROR" "hook input is not valid JSON — failing closed"
+case "$CMD_TYPE" in
+  string) CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command') ;;
+  null)   exit 0 ;;  # payload has no command field — nothing to scan
+  *)      block "INTERNAL_ERROR" "tool_input.command is not a string — failing closed" ;;
+esac
+[[ -z "$CMD" ]] && exit 0
+
+# Fail closed (#33): a missing/unreadable blocklist must block everything,
+# not silently disable every rule below. Asymmetric with the allowlist on
+# purpose: a missing allowlist only loses exceptions, so it may stay soft.
+[[ -r "$BLOCKLIST" ]] || block "INTERNAL_ERROR" "blocklist.conf missing or unreadable — failing closed"
 
 trim() {
   local s=$1

@@ -5,8 +5,23 @@
 
 set -euo pipefail
 
-INPUT=$(cat)
-FILE_PATH=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty')
+deny() {
+  printf '[BLOCKED: %s] %s\n' "$1" "$2" >&2
+  exit 2
+}
+
+# Fail closed (#32-class): unhandled failures must exit 2 (block), not the
+# non-2 status `set -e` produces, which the harness treats as allow.
+trap 'deny "INTERNAL_ERROR" "guardrail hook crashed unexpectedly — failing closed"' ERR
+
+INPUT=$(cat) || deny "INTERNAL_ERROR" "failed to read hook input — failing closed"
+PATH_TYPE=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path | type' 2>/dev/null) \
+  || deny "INTERNAL_ERROR" "hook input is not valid JSON — failing closed"
+case "$PATH_TYPE" in
+  string) FILE_PATH=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path') ;;
+  null)   exit 0 ;;  # payload has no file_path field — nothing to check
+  *)      deny "INTERNAL_ERROR" "tool_input.file_path is not a string — failing closed" ;;
+esac
 [[ -z "$FILE_PATH" ]] && exit 0
 
 BASENAME=$(basename "$FILE_PATH")
