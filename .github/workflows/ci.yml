@@ -27,6 +27,7 @@ jobs:
             scripts/*.sh \
             claude-code/hooks/*.sh \
             claude-code/scripts/*.sh \
+            git/hooks/* \
             tests/hooks-regression.sh
 
   json-validate:

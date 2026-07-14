@@ -116,6 +116,28 @@ expect "$BCE" 2 "bce: symlink-path hook" "$(fp "$HOME/.claude/hooks/block-danger
 expect "$BCE" 0 "bce: same-name other project" "$(fp '/some/other/repo/blocklist.conf')"
 expect "$BCE" 0 "bce: save-transcript.ts" "$(fp "$HOME/dotfiles/claude-code/hooks/save-transcript.ts")"
 
+# ── git/hooks: global gitleaks hook must not be a lefthook shim (#22) ───────
+# `lefthook install -f` (npm postinstall) once clobbered these tracked files
+# through the ~/.config/git/hooks symlink. Catch a clobbered state at CI time.
+check() {
+  local desc=$1; shift
+  total=$((total + 1))
+  if ! "$@" >/dev/null 2>&1; then
+    printf 'FAIL %-36s\n' "$desc"
+    fails=$((fails + 1))
+  fi
+}
+not_grep() { ! grep -q "$1" "$2"; }
+
+check "pre-commit runs gitleaks" grep -q gitleaks git/hooks/pre-commit
+check "pre-commit not a lefthook shim" not_grep call_lefthook git/hooks/pre-commit
+check "pre-push not a lefthook shim" not_grep call_lefthook git/hooks/pre-push
+check "prepare-commit-msg not a shim" not_grep call_lefthook git/hooks/prepare-commit-msg
+check "chain helper present" grep -q run_repo_lefthook git/hooks/lefthook-chain.sh
+check "pre-commit executable" test -x git/hooks/pre-commit
+check "pre-push executable" test -x git/hooks/pre-push
+check "prepare-commit-msg executable" test -x git/hooks/prepare-commit-msg
+
 echo "---"
 echo "$((total - fails))/$total passed"
 ((fails == 0))

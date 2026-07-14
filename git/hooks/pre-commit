@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Global pre-commit hook: block accidental secret commits across all repos.
+# Global pre-commit hook: block accidental secret commits across all repos,
+# then chain into the repo's own lefthook hooks (see lefthook-chain.sh).
 # Active via core.hooksPath (~/.config/git/hooks). Bypass: git commit --no-verify.
+# Locked with `chflags uchg` — to edit: chflags nouchg ~/dotfiles/git/hooks/*
 #
 # Note: repos that set their own core.hooksPath (e.g. husky) override this and
 # will NOT run it — this is a personal baseline, not a guarantee for every repo.
@@ -22,3 +24,7 @@ if ! gitleaks git --staged --no-banner --redact --verbose; then
   printf 'Review the finding above. To bypass intentionally: git commit --no-verify\n' >&2
   exit 1
 fi
+
+# Global checks passed — hand over to the repo's lefthook config, if any.
+. "$(cd "$(dirname "$0")" && pwd)/lefthook-chain.sh"
+run_repo_lefthook pre-commit "$@"

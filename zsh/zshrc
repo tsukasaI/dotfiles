@@ -104,3 +104,11 @@ _osc7_cwd() {
   print -Pn "\e]7;file://localhost${PWD}\e\\"
 }
 add-zsh-hook precmd _osc7_cwd
+
+# Guard: the global gitleaks pre-commit hook lives in ~/dotfiles/git/hooks and
+# has been clobbered by `lefthook install -f` before (dotfiles issue #22).
+# One grep at startup; warn loudly if secret scanning is silently off.
+if [[ $- == *i* ]] && ! grep -q gitleaks "$HOME/dotfiles/git/hooks/pre-commit" 2>/dev/null; then
+  print -P "%F{red}WARNING: global pre-commit hook is not the gitleaks hook — secret scanning is OFF.%f"
+  print -P "%F{red}Restore: cd ~/dotfiles && chflags nouchg git/hooks/* 2>/dev/null; git restore git/hooks/%f"
+fi

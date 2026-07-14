@@ -26,6 +26,9 @@ if [ -e ~/.config/git/hooks ] && [ ! -L ~/.config/git/hooks ]; then
 fi
 ln -sfn "$DOTFILES/git/hooks" ~/.config/git/hooks
 chmod +x "$DOTFILES/git/hooks/"* 2>/dev/null || true
+# Lock hook files so `lefthook install -f` (npm postinstall) can't clobber them
+# through the symlink (#22 recurrence). Unlock to edit: chflags nouchg <file>
+chflags uchg "$DOTFILES/git/hooks/"* 2>/dev/null || true
 
 # SSH (UseKeychain integration)
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
