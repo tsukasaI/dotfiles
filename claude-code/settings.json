@@ -182,23 +182,6 @@
     "type": "command",
     "command": "bun $HOME/dotfiles/claude-code/statusline.ts"
   },
-  "enabledPlugins": {
-    "goal-setter@goal-setter": true
-  },
-  "extraKnownMarketplaces": {
-    "goal-setter": {
-      "source": {
-        "source": "github",
-        "repo": "gotalab/goal-setter-skill"
-      }
-    },
-    "supabase-agent-skills": {
-      "source": {
-        "source": "github",
-        "repo": "supabase/agent-skills"
-      }
-    }
-  },
   "viewMode": "verbose",
   "advisorModel": "fable",
   "askUserQuestionTimeout": "never",
