@@ -40,7 +40,16 @@ function expand(p: string): string {
   return p.startsWith("~") ? join(homedir(), p.slice(1)) : p;
 }
 
-const raw: Config = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+let raw: Config;
+try {
+  raw = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+} catch (e) {
+  console.error(
+    `could not read/parse ${CONFIG_PATH}: ${e instanceof Error ? e.message : e}`,
+  );
+  console.error("copy kb.json.example to kb.json (same directory) and fill in your paths");
+  process.exit(2);
+}
 const cfg = {
   ...raw,
   vault_root: expand(raw.vault_root),

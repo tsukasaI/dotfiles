@@ -62,99 +62,108 @@ function readGitBranch(start: string): { branch: string; isWorktree: boolean } |
   }
 }
 
-const input = await Bun.stdin.json();
-const row1: [number, number, string][] = [];
-const row2: [number, number, string][] = [];
-const row3: [number, number, string][] = [];
+// Everything below reads/derives from stdin JSON whose shape is not under our
+// control (the harness's own schema evolves). Wrap it so a malformed/missing
+// field throws into this catch instead of crashing mid-render and dumping a
+// raw stack trace into the shell prompt — fail silent (no statusline output)
+// is the safe default for a purely cosmetic tool.
+try {
+  const input = await Bun.stdin.json();
+  const row1: [number, number, string][] = [];
+  const row2: [number, number, string][] = [];
+  const row3: [number, number, string][] = [];
 
-// --- Row 1: dir | git | model ---
+  // --- Row 1: dir | git | model ---
 
-const dir = input.workspace?.current_dir;
-if (dir) {
-  const home = Bun.env.HOME ?? "";
-  const display = dir.startsWith(home) ? `~${dir.slice(home.length)}` : dir;
-  row1.push([153, 24, `» ${display}`]);
+  const dir = input.workspace?.current_dir;
+  if (dir) {
+    const home = Bun.env.HOME ?? "";
+    const display = dir.startsWith(home) ? `~${dir.slice(home.length)}` : dir;
+    row1.push([153, 24, `» ${display}`]);
 
-  const git = readGitBranch(dir);
-  if (git) {
-    row1.push([189, 60, `⎇ ${git.branch}${git.isWorktree ? " [wt]" : ""}`]);
+    const git = readGitBranch(dir);
+    if (git) {
+      row1.push([189, 60, `⎇ ${git.branch}${git.isWorktree ? " [wt]" : ""}`]);
+    }
   }
+
+  const modelName = input.model?.display_name ?? input.model?.id;
+  if (modelName) {
+    const short = modelName.replace(/^Claude /, "");
+    row1.push([159, 30, `◇ ${short}`]);
+  }
+
+  // model-mode badges: reasoning effort, extended thinking, output style.
+  // Each field is only present when the corresponding mode is active, so a
+  // missing field simply omits its badge.
+  const effort = input.effort?.level;
+  if (effort) {
+    row1.push([223, 94, `↯ ${effort}`]);
+  }
+  if (input.thinking?.enabled) {
+    row1.push([189, 55, "✻ think"]);
+  }
+  const style = input.output_style?.name;
+  if (style && style !== "default") {
+    row1.push([159, 22, `✎ ${style}`]);
+  }
+
+  // --- Row 2: context bar | rate limits ---
+
+  const ctx = input.context_window?.used_percentage;
+  if (ctx != null) {
+    const [fg, bg] = rlColor(ctx);
+    const filled = Math.round(ctx / 10);
+    const bar = "█".repeat(filled) + "░".repeat(10 - filled);
+    const size = input.context_window?.context_window_size;
+    const sizeLabel = size ? ` /${size >= 1_000_000 ? `${size / 1_000_000}M` : `${size / 1000}k`}` : "";
+    row2.push([fg, bg, `${bar} ${ctx.toFixed(1)}%${sizeLabel}`]);
+  }
+
+  // resets_at is Unix epoch seconds. 5H resets within the day (HH:mm); 7D spans
+  // days, so prefix a weekday.
+  const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  function resetLabel(epochSec: number, withWeekday: boolean): string {
+    const d = new Date(epochSec * 1000);
+    const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return `↻ ${withWeekday ? `${WEEKDAYS[d.getDay()]} ` : ""}${hm}`;
+  }
+
+  const rl = input.rate_limits;
+  for (const [key, label] of [["five_hour", "5H"], ["seven_day", "7D"]] as const) {
+    const p = rl?.[key]?.used_percentage;
+    if (p == null) continue;
+    const [fg, bg] = rlColor(p);
+    const resetsAt = rl?.[key]?.resets_at;
+    const reset = resetsAt ? ` ${resetLabel(resetsAt, key === "seven_day")}` : "";
+    row2.push([fg, bg, `${label} ${p.toFixed(0)}%${reset}`]);
+  }
+
+  // --- Row 3: tokens | lines changed ---
+
+  const inTok = input.context_window?.total_input_tokens ?? 0;
+  const outTok = input.context_window?.total_output_tokens ?? 0;
+  if (inTok > 0 || outTok > 0) {
+    row3.push([250, 239, `≡ ${fmt(inTok)}↓ ${fmt(outTok)}↑`]);
+  }
+
+  const costUsd = input.cost?.total_cost_usd;
+  if (costUsd > 0) {
+    row3.push([250, 238, `$${costUsd.toFixed(2)}`]);
+  }
+
+  const added = input.cost?.total_lines_added ?? 0;
+  const removed = input.cost?.total_lines_removed ?? 0;
+  if (added > 0 || removed > 0) {
+    row3.push([116, 23, `+${added}`]);
+    row3.push([175, 53, `-${removed}`]);
+  }
+
+  // --- Output ---
+
+  if (row1.length > 0) console.log(powerline(row1));
+  if (row2.length > 0) console.log(powerline(row2));
+  if (row3.length > 0) console.log(powerline(row3));
+} catch (err) {
+  console.error(`[statusline] failed: ${err instanceof Error ? err.message : err}`);
 }
-
-const modelName = input.model?.display_name ?? input.model?.id;
-if (modelName) {
-  const short = modelName.replace(/^Claude /, "");
-  row1.push([159, 30, `◇ ${short}`]);
-}
-
-// model-mode badges: reasoning effort, extended thinking, output style.
-// Each field is only present when the corresponding mode is active, so a
-// missing field simply omits its badge.
-const effort = input.effort?.level;
-if (effort) {
-  row1.push([223, 94, `↯ ${effort}`]);
-}
-if (input.thinking?.enabled) {
-  row1.push([189, 55, "✻ think"]);
-}
-const style = input.output_style?.name;
-if (style && style !== "default") {
-  row1.push([159, 22, `✎ ${style}`]);
-}
-
-// --- Row 2: context bar | rate limits ---
-
-const ctx = input.context_window?.used_percentage;
-if (ctx != null) {
-  const [fg, bg] = rlColor(ctx);
-  const filled = Math.round(ctx / 10);
-  const bar = "█".repeat(filled) + "░".repeat(10 - filled);
-  const size = input.context_window?.context_window_size;
-  const sizeLabel = size ? ` /${size >= 1_000_000 ? `${size / 1_000_000}M` : `${size / 1000}k`}` : "";
-  row2.push([fg, bg, `${bar} ${ctx.toFixed(1)}%${sizeLabel}`]);
-}
-
-// resets_at is Unix epoch seconds. 5H resets within the day (HH:mm); 7D spans
-// days, so prefix a weekday.
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-function resetLabel(epochSec: number, withWeekday: boolean): string {
-  const d = new Date(epochSec * 1000);
-  const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  return `↻ ${withWeekday ? `${WEEKDAYS[d.getDay()]} ` : ""}${hm}`;
-}
-
-const rl = input.rate_limits;
-for (const [key, label] of [["five_hour", "5H"], ["seven_day", "7D"]] as const) {
-  const p = rl?.[key]?.used_percentage;
-  if (p == null) continue;
-  const [fg, bg] = rlColor(p);
-  const resetsAt = rl?.[key]?.resets_at;
-  const reset = resetsAt ? ` ${resetLabel(resetsAt, key === "seven_day")}` : "";
-  row2.push([fg, bg, `${label} ${p.toFixed(0)}%${reset}`]);
-}
-
-// --- Row 3: tokens | lines changed ---
-
-const inTok = input.context_window?.total_input_tokens ?? 0;
-const outTok = input.context_window?.total_output_tokens ?? 0;
-if (inTok > 0 || outTok > 0) {
-  row3.push([250, 239, `≡ ${fmt(inTok)}↓ ${fmt(outTok)}↑`]);
-}
-
-const costUsd = input.cost?.total_cost_usd;
-if (costUsd > 0) {
-  row3.push([250, 238, `$${costUsd.toFixed(2)}`]);
-}
-
-const added = input.cost?.total_lines_added ?? 0;
-const removed = input.cost?.total_lines_removed ?? 0;
-if (added > 0 || removed > 0) {
-  row3.push([116, 23, `+${added}`]);
-  row3.push([175, 53, `-${removed}`]);
-}
-
-// --- Output ---
-
-if (row1.length > 0) console.log(powerline(row1));
-if (row2.length > 0) console.log(powerline(row2));
-if (row3.length > 0) console.log(powerline(row3));

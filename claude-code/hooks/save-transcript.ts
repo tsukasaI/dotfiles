@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { Database } from "bun:sqlite";
-import { readFileSync, mkdirSync, realpathSync, chmodSync, statSync, existsSync } from "fs";
+import { readFileSync, mkdirSync, realpathSync, chmodSync, statSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
 
 // --- Types ---
@@ -47,8 +47,15 @@ interface SessionMeta {
 
 // --- Database ---
 
-const DB_DIR = join(Bun.env.HOME!, ".local", "share", "claude-logs");
-const DB_PATH = join(DB_DIR, "logs.db");
+// Computed lazily (not at module scope) so a missing HOME throws inside the
+// top-level try/catch below instead of crashing the process before the
+// fail-safe is installed (both callers below only run inside that try).
+function dbDir(): string {
+  return join(Bun.env.HOME!, ".local", "share", "claude-logs");
+}
+function dbPath(): string {
+  return join(dbDir(), "logs.db");
+}
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS sessions (
@@ -96,6 +103,7 @@ const DB_SIZE_WARN_BYTES = 150 * 1024 * 1024; // 150MB soft warning threshold
 
 function warnIfDbTooLarge(): void {
   try {
+    const DB_PATH = dbPath();
     const mainSize = statSync(DB_PATH).size;
     const walPath = `${DB_PATH}-wal`;
     const walSize = existsSync(walPath) ? statSync(walPath).size : 0;
@@ -111,7 +119,23 @@ function warnIfDbTooLarge(): void {
 }
 
 function openDb(): Database {
+  const DB_DIR = dbDir();
+  const DB_PATH = dbPath();
   mkdirSync(DB_DIR, { recursive: true, mode: 0o700 });
+  // Pre-create the file ourselves at 0o600 before Database's own create-if-
+  // missing open(), which follows the process umask (commonly 0o644) — that
+  // left a window where logs.db briefly existed world/group-readable until
+  // the chmodSync below ran. O_CREAT|O_EXCL ("wx") makes this race-free: it
+  // no-ops if the file already exists, and fails only on a genuine create
+  // race with another process (benign here — the file it created is also
+  // 0o600 by the time either process gets to chmodSync).
+  if (!existsSync(DB_PATH)) {
+    try {
+      writeFileSync(DB_PATH, "", { mode: 0o600, flag: "wx" });
+    } catch (e: unknown) {
+      if ((e as NodeJS.ErrnoException)?.code !== "EEXIST") throw e;
+    }
+  }
   const db = new Database(DB_PATH, { create: true });
   chmodSync(DB_PATH, 0o600);
   db.exec("PRAGMA journal_mode=WAL");
@@ -152,6 +176,15 @@ function redactSecrets(text: string): string {
   let out = text;
   for (const [re, label] of REDACTIONS) out = out.replace(re, label);
   return out;
+}
+
+// project_dir is later surfaced by harvest.ts (sessionStats) into the
+// /weekly-digest skill, which may post it to a GitHub issue in ops_repo — an
+// absolute path embeds the OS username, so redact the HOME prefix at this
+// logging boundary rather than trusting every downstream consumer to do it.
+function redactHome(path: string): string {
+  const home = Bun.env.HOME;
+  return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path;
 }
 
 // --- Transcript parsing ---
@@ -302,7 +335,7 @@ try {
   const endReason = input.reason ?? input.hook_event_name;
   const db = openDb();
   db.transaction(() => {
-    saveSession(db, input.session_id, input.cwd, endReason, meta);
+    saveSession(db, input.session_id, redactHome(input.cwd), endReason, meta);
     saveTranscript(db, input.session_id, redactSecrets(transcript));
     saveSessionDays(db, input.session_id, meta.dayCounts);
   })();

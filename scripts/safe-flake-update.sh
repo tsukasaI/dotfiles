@@ -24,6 +24,17 @@ if [[ ! -f "$REPO_DIR/flake.lock" ]]; then
 fi
 
 cd "$REPO_DIR"
+
+# Fail closed on a pre-existing dirty flake.lock (roundup issue #42 item 4):
+# the failure path below runs `git checkout -- flake.lock` unconditionally
+# when the post-update eval fails, which would silently discard any
+# uncommitted edit already sitting in flake.lock (e.g. a manual
+# `nix flake update <input>`) with no diff shown and no confirmation.
+git diff --quiet -- flake.lock || {
+  echo "error: uncommitted changes in flake.lock — commit or stash before running" >&2
+  exit 1
+}
+
 now=$(date +%s)
 
 inputs=$(jq -r '.nodes.root.inputs | keys[]' flake.lock)
