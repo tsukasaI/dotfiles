@@ -26,7 +26,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | `setup.sh` | First-time symlink installer. Known-fragile on fresh machines (issue #5). |
 | `docs/` | Investigation memos specific to this repo's own subject matter (e.g. `turso-investigation.md`); not a knowledge-management store — see the Vault bullet in Concepts for the cc-memory/vault/docs boundary. |
 | `ghostty/`, `wezterm/` | Terminals: ghostty primary, wezterm fallback, deliberately identical theme/font. |
-| `karabiner/`, `ssh/`, `mise/`, `vscode/` | Small configs. `vscode/` is not deployed and has drifted from the live file (issue #28). `mise/config.toml` is near-empty on purpose — toolchains come from Nix. |
+| `karabiner/`, `ssh/`, `mise/` | Small configs. `mise/config.toml` is near-empty on purpose — toolchains come from Nix. |
 
 ## Commands
 

@@ -10,7 +10,6 @@ Personal dotfiles for macOS (Apple Silicon) managed with nix-darwin.
 ├── nvim/          # Neovim with lazy.nvim
 ├── zsh/           # Shell config and aliases
 ├── ghostty/       # Terminal emulator
-├── vscode/        # Editor settings
 ├── mise/          # Task runner config
 ├── git/           # Git configuration
 └── claude-code/   # Claude Code permissions and hooks
