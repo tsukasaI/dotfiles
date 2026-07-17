@@ -21,6 +21,11 @@ Personal dotfiles for macOS (Apple Silicon) managed with nix-darwin.
 - macOS (Apple Silicon)
 - [Nix](https://nixos.org/download) with flakes enabled
 - [Homebrew](https://brew.sh)
+- `herdr` (installed via the `nix-darwin/flake.nix` flake input) self-installs
+  `~/.claude/hooks/herdr-agent-state.sh`, wired to the `SessionStart` hook in
+  `claude-code/settings.json`. This file lives outside the repo and outside
+  `setup.sh`'s symlinks — it's managed entirely by `herdr` (reinstalling or
+  updating the integration overwrites it), not version-controlled here.
 
 ## Installation
 
@@ -142,6 +147,7 @@ GIT | git switch -d | git switch -d detaches HEAD
 - `setup.sh` fails on symlink conflicts: remove the existing target (e.g. `rm ~/.zshrc`) and re-run.
 - Claude Code hooks do nothing: confirm `~/.claude/settings.json` resolves on this host and `$HOME/dotfiles/...` paths exist.
 - Homebrew cask conflict after `cleanup = "zap"`: run `brew uninstall --cask <name>` manually, then rebuild.
+- `SessionStart` hook errors or is missing: on a fresh machine, `~/.claude/hooks/herdr-agent-state.sh` doesn't exist until `herdr` has run its own install step (it is not cloned or symlinked by this repo). Run the `herdr` integration setup for Claude Code, or remove the `SessionStart` entry in `claude-code/settings.json` if you don't use `herdr`.
 
 ## License
 

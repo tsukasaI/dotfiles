@@ -96,7 +96,7 @@ The analyzer is read-only. It walks `~/.claude/projects/<encoded-cwd>/*.jsonl`, 
 
 6. **Naming new skills**: when promoting any cluster (meta or single), do not auto-name. Show the user `first_words` / `sample_first_words`, samples, and proposed scope, and ask them for `name` + `description`. Then write `SKILL.md` with that input.
 
-7. **Final summary**: how many were applied, how many skipped, which paths changed. If any change touches a file under `~/.claude/...` (which is a symlink into the dotfiles repo), end with: `Changes landed in /Users/inouetsukasa/dotfiles/claude-code/...; run \`git status\` to review.` Do not commit automatically.
+7. **Final summary**: how many were applied, how many skipped, which paths changed. If any change touches a file under `~/.claude/...` (which is a symlink into the dotfiles repo), end with: `Changes landed in ~/dotfiles/claude-code/...; run \`git status\` to review.` Do not commit automatically.
 
 ### Scope rules (minimum scope)
 
@@ -171,7 +171,7 @@ The analyzer is read-only. It walks `~/.claude/projects/<encoded-cwd>/*.jsonl` a
 
    **Only on `y`** perform `Edit` (or `Write` if creating a new rules file). Use the resolved real path (see Symlinks below). Apply changes one item at a time — never bulk Edit.
 
-3. **Final summary**: applied N, skipped M, files touched. If any change landed under `~/.claude/CLAUDE.md` or `~/.claude/rules/...`, end with `Changes landed in /Users/inouetsukasa/dotfiles/claude-code/...; run \`git status\` to review.` Do not commit automatically.
+3. **Final summary**: applied N, skipped M, files touched. If any change landed under `~/.claude/CLAUDE.md` or `~/.claude/rules/...`, end with `Changes landed in ~/dotfiles/claude-code/...; run \`git status\` to review.` Do not commit automatically.
 
 ### Scope rules (minimum scope)
 

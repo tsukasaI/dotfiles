@@ -23,6 +23,12 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 |---|---|---|
 | `save-transcript.ts` | `*` | Save session transcript to SQLite (async) |
 
+### SessionStart
+
+| Script | Matcher | Description |
+|---|---|---|
+| `~/.claude/hooks/herdr-agent-state.sh` | `*` | Reports agent session state to `herdr`. **Not part of this repo** — self-installed by the `herdr` flake package outside `setup.sh`'s symlinks; see root `README.md` Prerequisites/Troubleshooting. |
+
 ## Session Log Storage
 
 Session transcripts are persisted to SQLite at `~/.local/share/claude-logs/logs.db`.
