@@ -28,7 +28,8 @@ jobs:
             claude-code/hooks/*.sh \
             claude-code/scripts/*.sh \
             git/hooks/* \
-            tests/hooks-regression.sh
+            tests/hooks-regression.sh \
+            tests/rules-paths-sync.sh
 
   json-validate:
     runs-on: ubuntu-latest
@@ -43,6 +44,17 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: guardrail hook regression suite
         run: bash tests/hooks-regression.sh
+
+  rules-paths-sync:
+    # #43: the paths: frontmatter in atomicity/code-review/data-handling/
+    # encoding/error-handling.md is byte-identical by necessity (no include
+    # mechanism for per-file frontmatter); catch drift mechanically instead
+    # of relying on 5 identical hand-edits staying in sync.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: rules paths: frontmatter sync check
+        run: bash tests/rules-paths-sync.sh
 
   gitleaks:
     runs-on: ubuntu-latest
