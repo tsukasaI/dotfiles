@@ -122,6 +122,15 @@
       };
 
       # Homebrew（Nixで管理できないもの用）
+      #
+      # NOTE (issue #12): the cooling-period philosophy applied to flake/lazy
+      # updates (scripts/safe-*-update.sh) does NOT apply here. autoUpdate +
+      # upgrade unconditionally pull and upgrade every cask/formula on every
+      # `darwin-rebuild switch`, and cleanup = "zap" deletes app data/state
+      # for anything not declared below (not just uninstalling it) — on the
+      # same automatic, unreviewed cadence. This asymmetry is accepted for
+      # now; revisit by disabling autoUpdate/upgrade (forcing explicit
+      # `brew upgrade`) if a zap ever destroys something unexpectedly.
       homebrew = {
         enable = true;
         onActivation = {
@@ -212,6 +221,14 @@
       ];
 
       nix.settings.experimental-features = "nix-command flakes";
+      # Store hygiene (issue #12): without these the Nix store grows
+      # unbounded — nothing here ever reclaims old generations/derivations.
+      nix.optimise.automatic = true;
+      nix.gc = {
+        automatic = true;
+        interval = { Weekday = 0; };
+        options = "--delete-older-than 30d";
+      };
       system.primaryUser = primaryUser;
       system.stateVersion = 5;
       nixpkgs.hostPlatform = system;
