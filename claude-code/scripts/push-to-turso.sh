@@ -48,7 +48,8 @@ command -v sqlite3 >/dev/null 2>&1 || { echo "sqlite3 が見つかりません�
 
 # --- 1. WAL-consistent snapshot ---
 SNAP="$(mktemp -t claude-logs-snap.XXXXXX)"
-trap 'rm -f "$SNAP" "$SNAP-wal" "$SNAP-shm"' EXIT
+PUSH_SQL="$(mktemp -t claude-logs-push.XXXXXX)"
+trap 'rm -f "$SNAP" "$SNAP-wal" "$SNAP-shm" "$PUSH_SQL"' EXIT
 sqlite3 "$DB" ".backup '$SNAP'"
 
 echo "Local DB: $DB"
@@ -105,11 +106,14 @@ TRANSCRIPT_SQL="SELECT 'INSERT OR IGNORE INTO transcript_raw (session_id,transcr
 DAYS_SQL="SELECT 'INSERT OR IGNORE INTO session_days (session_id,day,message_count) VALUES ('||quote(session_id)||','||quote(day)||','||quote(message_count)||');' FROM session_days;"
 
 echo "Pushing rows..."
-if {
-      sqlite3 "$SNAP" "$SESSIONS_SQL"
-      sqlite3 "$SNAP" "$TRANSCRIPT_SQL"
-      sqlite3 "$SNAP" "$DAYS_SQL"
-    } | turso db shell "$TURSO_DB"; then
+# Each producer writes to a shared file rather than feeding a pipe: a brace-group
+# piped into another command only exposes the LAST command's exit status, so an
+# earlier sqlite3 failure would go unnoticed. Chaining with && checks every
+# producer's exit code individually before we ever call the push a success.
+if sqlite3 "$SNAP" "$SESSIONS_SQL" > "$PUSH_SQL" \
+   && sqlite3 "$SNAP" "$TRANSCRIPT_SQL" >> "$PUSH_SQL" \
+   && sqlite3 "$SNAP" "$DAYS_SQL" >> "$PUSH_SQL" \
+   && turso db shell "$TURSO_DB" < "$PUSH_SQL"; then
   echo "送信コマンド成功。"
 else
   echo "送信に失敗しました。ローカルは無変更（次回は OR IGNORE で再開可能）。" >&2
@@ -157,9 +161,11 @@ echo "Deleting confirmed rows from local..."
 sqlite3 "$DB" <<SQL
 ATTACH '$SNAP' AS snap;
 PRAGMA foreign_keys=OFF;
+BEGIN IMMEDIATE;
 DELETE FROM transcript_raw WHERE session_id IN (SELECT session_id FROM snap.transcript_raw);
 DELETE FROM session_days   WHERE (session_id, day) IN (SELECT session_id, day FROM snap.session_days);
 DELETE FROM sessions       WHERE session_id IN (SELECT session_id FROM snap.sessions);
+COMMIT;
 DETACH snap;
 SQL
 
