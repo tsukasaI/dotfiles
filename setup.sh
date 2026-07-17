@@ -1,30 +1,48 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
-DOTFILES="$HOME/dotfiles"
+DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "Setting up symlinks..."
 
+# Symlink $1 -> $2. If $2 already exists as a real file/dir (not a symlink),
+# back it up with a timestamp first instead of silently overwriting or
+# (for directories) linking inside it. No-op on re-run once $2 is already
+# the right symlink. Fails closed if $1 doesn't exist, so a wrong $DOTFILES
+# (e.g. cloned to a different path) aborts loudly instead of leaving a
+# dangling symlink.
+link_with_backup() {
+  local src="$1" dest="$2"
+  if [[ ! -e "$src" ]]; then
+    echo "Error: source '$src' does not exist (is \$DOTFILES correct?)" >&2
+    exit 1
+  fi
+  if [[ -e "$dest" && ! -L "$dest" ]]; then
+    local backup
+    backup="${dest}.backup.$(date +%Y%m%d-%H%M%S)"
+    mv "$dest" "$backup"
+    echo "Backed up existing $dest to $backup"
+  fi
+  ln -sfn "$src" "$dest"
+}
+
 # ~/.config symlinks
-ln -sfn "$DOTFILES/nvim" ~/.config/nvim
-ln -sfn "$DOTFILES/ghostty" ~/.config/ghostty
-ln -sfn "$DOTFILES/wezterm" ~/.config/wezterm
+mkdir -p ~/.config
+link_with_backup "$DOTFILES/nvim" ~/.config/nvim
+link_with_backup "$DOTFILES/ghostty" ~/.config/ghostty
+link_with_backup "$DOTFILES/wezterm" ~/.config/wezterm
 mkdir -p ~/.config/karabiner
-ln -sfn "$DOTFILES/karabiner/karabiner.json" ~/.config/karabiner/karabiner.json
+link_with_backup "$DOTFILES/karabiner/karabiner.json" ~/.config/karabiner/karabiner.json
 
 
 # Home directory symlinks
-ln -sfn "$DOTFILES/zsh/zshrc" ~/.zshrc
-ln -sfn "$DOTFILES/git/gitconfig" ~/.gitconfig
+link_with_backup "$DOTFILES/zsh/zshrc" ~/.zshrc
+link_with_backup "$DOTFILES/git/gitconfig" ~/.gitconfig
 mkdir -p ~/.config/git
-ln -sfn "$DOTFILES/git/ignore" ~/.config/git/ignore
-ln -sfn "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
-if [ -e ~/.config/git/hooks ] && [ ! -L ~/.config/git/hooks ]; then
-  # shellcheck disable=SC2046  # timestamp expands to digits and dashes only; real fix tracked in #5
-  mv ~/.config/git/hooks ~/.config/git/hooks.backup.$(date +%Y%m%d-%H%M%S)
-fi
-ln -sfn "$DOTFILES/git/hooks" ~/.config/git/hooks
+link_with_backup "$DOTFILES/git/ignore" ~/.config/git/ignore
+link_with_backup "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
+link_with_backup "$DOTFILES/git/hooks" ~/.config/git/hooks
 chmod +x "$DOTFILES/git/hooks/"* 2>/dev/null || true
 # Lock hook files so `lefthook install -f` (npm postinstall) can't clobber them
 # through the symlink (#22 recurrence). Unlock to edit: chflags nouchg <file>
@@ -32,20 +50,16 @@ chflags uchg "$DOTFILES/git/hooks/"* 2>/dev/null || true
 
 # SSH (UseKeychain integration)
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
-if [ -e ~/.ssh/config ] && [ ! -L ~/.ssh/config ]; then
-  # shellcheck disable=SC2046  # timestamp expands to digits and dashes only; real fix tracked in #5
-  mv ~/.ssh/config ~/.ssh/config.backup.$(date +%Y%m%d-%H%M%S)
-fi
-ln -sfn "$DOTFILES/ssh/config" ~/.ssh/config
+link_with_backup "$DOTFILES/ssh/config" ~/.ssh/config
 
 # Claude Code
 mkdir -p ~/.claude
-ln -sfn "$DOTFILES/claude-code/skills" ~/.claude/skills
-ln -sfn "$DOTFILES/claude-code/rules" ~/.claude/rules
-ln -sfn "$DOTFILES/claude-code/agents" ~/.claude/agents
-ln -sfn "$DOTFILES/claude-code/themes" ~/.claude/themes
-ln -sfn "$DOTFILES/claude-code/settings.json" ~/.claude/settings.json
-ln -sfn "$DOTFILES/claude-code/CLAUDE.md" ~/.claude/CLAUDE.md
+link_with_backup "$DOTFILES/claude-code/skills" ~/.claude/skills
+link_with_backup "$DOTFILES/claude-code/rules" ~/.claude/rules
+link_with_backup "$DOTFILES/claude-code/agents" ~/.claude/agents
+link_with_backup "$DOTFILES/claude-code/themes" ~/.claude/themes
+link_with_backup "$DOTFILES/claude-code/settings.json" ~/.claude/settings.json
+link_with_backup "$DOTFILES/claude-code/CLAUDE.md" ~/.claude/CLAUDE.md
 chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
 
 echo "Done."
