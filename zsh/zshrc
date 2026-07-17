@@ -9,9 +9,13 @@ _cached_eval() {
   local cache_dir="$HOME/.cache/zsh"
   local cache="$cache_dir/$name.zsh"
   local bin=$(command -v ${cmd%% *} 2>/dev/null)
-  if [[ -n "$bin" && ( ! -f "$cache" || "$bin" -nt "$cache" ) ]]; then
+  if [[ -z "$bin" ]]; then
+    rm -f "$cache" # tool gone: drop stale cache, don't source it
+    return
+  fi
+  if [[ ! -f "$cache" || "$bin" -nt "$cache" ]]; then
     mkdir -p "$cache_dir"
-    eval "$cmd" > "$cache"
+    eval "$cmd" > "$cache.tmp" && mv -f "$cache.tmp" "$cache" # atomic write
   fi
   [[ -f "$cache" ]] && source "$cache"
 }
@@ -22,7 +26,12 @@ _cached_eval mise-activate "mise activate zsh"
 [[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
 # Added by Antigravity
-export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
+_antigravity_bin="$HOME/.antigravity/antigravity/bin"
+case ":$PATH:" in
+  *":$_antigravity_bin:"*) ;;
+  *) export PATH="$_antigravity_bin:$PATH" ;;
+esac
+unset _antigravity_bin
 
 # ============================================
 # History
