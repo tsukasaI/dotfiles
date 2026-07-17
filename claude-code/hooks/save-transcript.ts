@@ -86,6 +86,7 @@ function openDb(): Database {
   const db = new Database(DB_PATH, { create: true });
   chmodSync(DB_PATH, 0o600);
   db.exec("PRAGMA journal_mode=WAL");
+  db.exec("PRAGMA busy_timeout=5000");
   db.exec(SCHEMA);
   return db;
 }
@@ -126,6 +127,15 @@ function redactSecrets(text: string): string {
 
 // --- Transcript parsing ---
 
+// ts is an ISO 8601 UTC timestamp; bucket by local calendar day so late-night/
+// early-morning sessions attribute to the day the user experienced, not the
+// UTC day (see _shared/harvest.ts localYMD for the same fix in a sibling file).
+function localDay(ts: string): string {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function sumTokens(usage: Usage): { input: number; output: number } {
   return {
     input:
@@ -164,7 +174,7 @@ function parseTranscript(lines: string[]): SessionMeta {
 
     const isMessage = entry.type === "user" || entry.type === "assistant";
     if (ts && isMessage) {
-      const day = ts.slice(0, 10);
+      const day = localDay(ts);
       meta.dayCounts.set(day, (meta.dayCounts.get(day) ?? 0) + 1);
     }
 
@@ -249,9 +259,9 @@ function saveSessionDays(
 
 // --- Main ---
 
-const input: HookInput = await Bun.stdin.json();
-
 try {
+  const input: HookInput = await Bun.stdin.json();
+
   const claudeDir = join(Bun.env.HOME!, ".claude");
   const resolved = realpathSync(input.transcript_path);
   if (!resolved.startsWith(claudeDir + "/")) process.exit(0);
