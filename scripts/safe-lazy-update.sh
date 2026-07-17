@@ -84,11 +84,22 @@ done
 
 rm "$before"
 
+declare -i restore_failed=0
 if (( ${#reverted[@]} > 0 )); then
   echo "syncing installed plugins back to reverted commits..."
-  nvim --headless "+Lazy! restore" +qa 2>/dev/null || true
+  if ! nvim --headless "+Lazy! restore" +qa; then
+    # Restore couldn't force the disk state back to lazy-lock.json's commits;
+    # this script has no further fallback, so surface it loudly (#39) instead
+    # of the prior `|| true`, which let the cooling revert silently no-op.
+    echo "WARNING: Lazy! restore failed — installed plugins may not match lazy-lock.json. Run :Lazy restore manually." >&2
+    restore_failed=1
+  fi
 fi
 
 echo "---"
 echo "accepted: $accepted, skipped: $skipped, unchanged: $unchanged"
 echo "review diff with: git -C $DOTFILES diff nvim/lazy-lock.json"
+
+if (( restore_failed )); then
+  exit 1
+fi
