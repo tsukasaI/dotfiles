@@ -7,6 +7,9 @@
 	name = tsukasa inoue
 	email = 65926267+tsukasaI@users.noreply.github.com
 	signingkey = 6C34D18450CD695F
+# Forward-provisioning: ~/oss/ doesn't exist yet, so this include never fires today.
+# gitconfig-oss is deployed by setup.sh and swaps user.email for future OSS work under
+# ~/oss/ — kept intentionally until that directory exists (see #29).
 [includeIf "gitdir:~/oss/"]
 	path = ~/.config/git/gitconfig-oss
 [commit]

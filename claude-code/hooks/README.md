@@ -8,7 +8,7 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 
 | Script | Matcher | Description |
 |---|---|---|
-| `block-dangerous.sh` | `Bash` | Block dangerous shell commands defined in `blocklist.conf` |
+| `block-dangerous.sh` | `Bash` | Block dangerous shell commands defined in `blocklist.conf`; commands matching `allowlist.conf` bypass the blocklist |
 | `block-config-edit.sh` | `Edit\|Write` | Block edits to linter/formatter config files |
 
 ### PostToolUse
@@ -60,6 +60,14 @@ transcript_raw (
   session_id TEXT PRIMARY KEY,
   transcript_jsonl TEXT,  -- raw JSONL content
   size_bytes INTEGER,
+  FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+)
+
+session_days (
+  session_id TEXT,
+  day TEXT,
+  message_count INTEGER DEFAULT 0,
+  PRIMARY KEY (session_id, day),
   FOREIGN KEY (session_id) REFERENCES sessions(session_id)
 )
 ```

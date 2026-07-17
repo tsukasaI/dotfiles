@@ -11,7 +11,8 @@
 # Flow (one-shot bulk migration / drain):
 #   1. Take a WAL-consistent snapshot of the local DB (.backup) so we don't race the hook.
 #   2. Create the Turso schema if absent (CREATE TABLE IF NOT EXISTS).
-#   3. Stream the snapshot's rows as INSERTs inside one transaction (.bail on) to Turso.
+#   3. Stream the snapshot's rows as INSERTs to Turso. `turso db shell` autocommits
+#      each statement (not one transaction), so INSERT OR IGNORE keeps re-runs idempotent.
 #   4. Gate deletion on BOTH: the push exited 0 AND per-table counts reconcile.
 #   5. Delete from the LIVE local DB only the rows that were in the snapshot, then VACUUM
 #      to reclaim space. Rows added by the hook after the snapshot are left intact.

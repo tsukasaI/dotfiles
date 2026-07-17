@@ -25,14 +25,6 @@ _cached_eval mise-activate "mise activate zsh"
 
 [[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
-# Added by Antigravity
-_antigravity_bin="$HOME/.antigravity/antigravity/bin"
-case ":$PATH:" in
-  *":$_antigravity_bin:"*) ;;
-  *) export PATH="$_antigravity_bin:$PATH" ;;
-esac
-unset _antigravity_bin
-
 # ============================================
 # History
 # ============================================

@@ -3,8 +3,6 @@
 # This won't be added again if you remove it.
 Include ~/.orbstack/ssh/config
 
-Include ~/.colima/ssh_config
-
 Host *
   IgnoreUnknown UseKeychain
   UseKeychain yes
