@@ -6,6 +6,11 @@
 # Per-input cooling defaults:
 #   nixpkgs : NIXPKGS_COOLING_DAYS (default 14)
 #   others  : COOLING_DAYS         (default 7)
+#
+# When ADDING a new flake input, lock only that input with
+# `nix flake update <input-name>` (or `nix flake lock --update-input <input-name>`).
+# Never run a bare `nix flake update` — it refreshes every input at once and
+# bypasses the cooling policy above (#26).
 
 set -euo pipefail
 
