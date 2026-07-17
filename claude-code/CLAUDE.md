@@ -18,7 +18,6 @@
 - Editor: nvim
 - When a command is blocked by PreToolUse hook, present the blocked command so I can run it manually. Never retry with an equivalent command (`unlink` for `rm`, piping around a block, etc.). Before setup work that ends in a hook-protected action (editing linter/formatter configs, destructive git ops), check the protection first — don't discover it after installing/initializing.
 - Enter plan mode when the change spans multiple files/subsystems or involves an architectural decision; single-file fixes don't need a plan. I'll ask when I want more than this default. If the approach breaks down mid-task, stop and re-plan.
-- IMPORTANT: Verify every code change before declaring done — run the build, run the linter, run the tests. If any fail, fix before reporting success. Do not report "should work" without running verification.
 
 # Clarify before acting
 - IMPORTANT: When uncertain, ASK — do not guess. If a request has more than one reasonable interpretation, or you lack information for a choice I would care about, pause and ask via `AskUserQuestion` before acting. Here, asking IS the correct move — not a fallback. Batch the open questions into one call.
@@ -31,10 +30,6 @@
 - Read scope literally: if a request says "this file", keep the change to that file; if it says "all", apply it everywhere. When the scope is unclear, ask rather than generalize.
 
 # Context & Session Management
-- New task → new session. Exception: tightly related follow-ups (e.g. writing docs for a feature just implemented) where re-reading files would be wasteful. NG (new session anyway): an unrelated bug fix in the same repo, or a feature discussed more than a day ago — re-reading cheaply beats carrying stale context.
-- Prefer `/rewind` (Esc Esc) over correction. When an approach fails, rewind to before the failed attempt and re-prompt with what was learned, rather than saying "that didn't work, try X".
-- `/clear` > `/compact` when you know what matters. Writing the brief yourself ("refactoring X, constraint is Y, relevant files are A/B, ruled out Z") produces cleaner context than trusting the model to summarize.
-- Compact proactively, not reactively. Run `/compact` early with a directive (e.g. `/compact focus on the auth refactor, drop the test debugging`) — auto-compact fires when context rot has already degraded the model.
 - Use subagents to keep the main context window clean. Test: "Do I need the tool output again, or just the conclusion?" If just the conclusion → subagent. Good for: verifying results against a spec, exploring other codebases, writing docs from a git diff.
 - Delegation triggers: exploration likely to exceed ~10 tool calls, or 3+ independent subtasks (e.g. multiple unrelated issues) → fan out to subagents instead of serial main-loop work. Once delegated, do NOT duplicate the same reads in the main loop — wait, then verify the conclusions.
 - Verify one load-bearing claim from every subagent report before acting on it — this habit has caught real false positives; keep it.
@@ -59,8 +54,6 @@
 - When delegating to Agent or Workflow `agent()`, pass `model:` explicitly (default `sonnet`) — don't rely on inheritance from the main loop. Escalate above the default only when the subtask meets ≥2 of: (a) no existing pattern in this codebase to imitate, (b) a security/auth/crypto boundary, (c) multiple valid approaches with a real trade-off, (d) it already failed once at the default tier.
   - Example (escalate): "design a cache-invalidation strategy for this service" — no precedent, real trade-offs.
   - NG (stay at default): "write a table-driven test for this function" — a pattern to imitate exists.
-- Search (Grep/Glob/Read) before answering from memory when exploring unfamiliar code or content — bias toward verification over recall.
-- Fan out to parallel subagents (Explore, code-explorer, web-researcher) for independent files or items; run independent work concurrently.
 
 # Advisor usage
 - Use `/advisor` before committing to an approach for: non-trivial algorithm design, debugging that has stalled for two attempts, architectural trade-offs with no clear winner, and security-sensitive logic (auth, crypto, input validation).

@@ -129,6 +129,13 @@ GIT | git switch -d | git switch -d detaches HEAD
 "Read(.env*)", "Read(id_rsa)", "Read(id_ed25519)"
 ```
 
+### Session habits
+
+- New task → new session. Exception: tightly related follow-ups (e.g. writing docs for a feature just implemented) where re-reading files would be wasteful. NG (new session anyway): an unrelated bug fix in the same repo, or a feature discussed more than a day ago — re-reading cheaply beats carrying stale context.
+- Prefer `/rewind` (Esc Esc) over correction. When an approach fails, rewind to before the failed attempt and re-prompt with what was learned, rather than saying "that didn't work, try X".
+- `/clear` > `/compact` when you know what matters. Writing the brief yourself ("refactoring X, constraint is Y, relevant files are A/B, ruled out Z") produces cleaner context than trusting the model to summarize.
+- Compact proactively, not reactively. Run `/compact` early with a directive (e.g. `/compact focus on the auth refactor, drop the test debugging`) — auto-compact fires when context rot has already degraded the model.
+
 ## Troubleshooting
 
 - `darwin-rebuild switch` fails with a user mismatch: ensure `system.primaryUser` in `nix-darwin/flake.nix` matches `whoami`.

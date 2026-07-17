@@ -27,6 +27,8 @@ paths:
 Apply this checklist to your own diff before declaring a task complete — you are reviewer #1.
 Source: distilled from [google/eng-practices](https://github.com/google/eng-practices).
 
+Three faces of review, not one: this file is self-review, applied automatically to your own diff; `/code-review` reviews your working diff on demand (`--fix`/`--comment`); the `code-reviewer` agent gives an independent, read-only pass.
+
 ## Self-review checklist
 - **Design**: Does the change fit the existing architecture? Right pieces in the right places?
 - **Complexity**: Solve the present problem only. Over-engineering for speculative future requirements is a defect.
