@@ -284,18 +284,34 @@ done
 
 # ── Pipe-to-shell / pipe-to-interpreter injection ───────────────────────────
 # Includes script interpreters that read commands from stdin (python, node, etc.)
-if [[ "$CMD" =~ \|[[:space:]]*(bash|sh|zsh|dash|fish|ksh|python|python3|node|perl|ruby|php)([[:space:]]|$) ]]; then
+# Scanned on CMD_NOQUOTES (#7): raw-$CMD scanning here false-positived on quoted
+# prose like `git commit -m "curl x | bash today"` — a standalone quoted argument
+# is dropped by quote-stripping, so it no longer matches, while an unquoted pipe
+# (the actual injection vector) is untouched by stripping and still matches; a
+# quote-split form (`|'bash'`) is restored at command position and still matches.
+if [[ "$CMD_NOQUOTES" =~ \|[[:space:]]*(bash|sh|zsh|dash|fish|ksh|python|python3|node|perl|ruby|php)([[:space:]]|$) ]]; then
   block "CODE_INJECTION" "Piping into a shell or script interpreter can execute arbitrary code."
 fi
 
 # ── /dev/tcp and /dev/udp (bash network pseudo-devices) ─────────────────────
-if [[ "$CMD" =~ /dev/(tcp|udp)/ ]]; then
+# Scanned on CMD_NOQUOTES (#7), same rationale as the pipe-injection check above:
+# quoted prose mentioning /dev/tcp/... no longer false-positives, and an actual
+# unquoted /dev/tcp/host/port still matches.
+if [[ "$CMD_NOQUOTES" =~ /dev/(tcp|udp)/ ]]; then
   block "NETWORK" "Bash /dev/tcp|udp opens covert network channels."
 fi
 
 # ── ANSI-C $'...' strings hide command names via \xNN / \NNN escapes ────────
 # Bash decodes $'\x72\x6d' to literal "rm" at runtime, so the scanner can't
 # see the underlying command. Block any use of $'...' to close this hole.
+# Deliberately kept on raw $CMD, NOT $CMD_NOQUOTES (#7): normalize_cmd treats a
+# $'...' string as an ordinary single-quoted argument. Since it isn't glued to
+# an unquoted fragment or sitting at command position, quote-stripping drops
+# the whole region — including the closing quote character — which would erase
+# every $'...' occurrence from CMD_NOQUOTES and make this check permanently
+# blind, not just narrower. Raw $CMD is the only view where this check can see
+# its own target, so it also fires on prose that merely mentions $'...' — an
+# accepted trade-off, not an oversight.
 if [[ "$CMD" =~ \$\' ]]; then
   block "CODE_INJECTION" "ANSI-C \$'...' strings can hide command names via escape sequences."
 fi
