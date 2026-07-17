@@ -21,9 +21,14 @@
     let
     configuration = { pkgs, lib, ... }:
     let
-      # Pre-compile tree-sitter parsers via Nix so nvim doesn't need a C toolchain at runtime.
+      # NOTE (issue #27): this does NOT actually give nvim precompiled parsers at
+      # runtime. In practice nvim-treesitter (the lazy.nvim plugin) self-compiles
+      # go/rust/toml/etc. into ~/.local/share/nvim/site/parser/*.so on first use,
+      # using the Xcode CLT C toolchain — this derivation's rtp prepend has no
+      # observed effect. `proto` dropped below since it never shows up in the
+      # resulting parser list either way.
       treesitterParsers = pkgs.vimPlugins.nvim-treesitter.withPlugins (p: with p; [
-        rust toml go gomod gowork gosum proto
+        rust toml go gomod gowork gosum
       ]);
       neovimWithParsers = pkgs.symlinkJoin {
         name = "neovim-with-parsers";
@@ -107,6 +112,7 @@
         clippy
         rustfmt
         rust-analyzer
+        lldb
       ]);
 
       # Touch ID for sudo (works inside tmux/screen via pam_reattach)

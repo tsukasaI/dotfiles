@@ -2,7 +2,7 @@ return {
   'dnlhc/glance.nvim',
   cmd = 'Glance',
   keys = {
-    -- 'gp' = goto-preview (peek)。`gd` (本物のジャンプ) と棲み分け。
+    -- 'gp' = goto-preview (peek)。`gd` は未定義(issue #27) — Vim ネイティブのバッファ内検索のみ。
     { 'gpd', '<cmd>Glance definitions<cr>',      desc = 'Glance: definitions' },
     { 'gpr', '<cmd>Glance references<cr>',       desc = 'Glance: references' },
     { 'gpi', '<cmd>Glance implementations<cr>',  desc = 'Glance: implementations' },
