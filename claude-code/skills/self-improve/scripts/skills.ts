@@ -1,6 +1,15 @@
 #!/usr/bin/env bun
 
-import { readFileSync, readdirSync, statSync, realpathSync, existsSync } from "fs";
+import {
+  readFileSync,
+  readdirSync,
+  statSync,
+  realpathSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  renameSync,
+} from "fs";
 import { join, dirname } from "path";
 
 const HOME = Bun.env.HOME!;
@@ -207,6 +216,57 @@ interface ScanResult {
   oldest_session_ms: number | null;
 }
 
+// --- Incremental cursor (#40) ---
+// Every prior run re-read and re-parsed every in-window .jsonl file from
+// scratch (189MB / 507 files and growing). A session's transcript stops
+// changing once the session ends, so we cache each file's extracted result
+// keyed by (mtimeMs, size) and only re-parse files that are new or changed
+// (i.e. the still-active session). The cache is rebuilt each run to contain
+// exactly the current in-window file set, so it can't grow past the data it
+// mirrors — files that age out of the window are dropped automatically.
+const CACHE_DIR = join(HOME, ".local", "share", "claude-self-improve");
+const CACHE_PATH = join(CACHE_DIR, "skills-scan-cache.json");
+const CACHE_VERSION = 1;
+
+interface SessionExtract {
+  invocations: SkillInvocation[];
+  prompts: PromptEntry[];
+  sessionStartMs: number | null;
+}
+
+interface CacheEntry extends SessionExtract {
+  mtimeMs: number;
+  size: number;
+}
+
+interface CacheFile {
+  version: number;
+  files: Record<string, CacheEntry>;
+}
+
+function loadCache(): CacheFile {
+  try {
+    const parsed = JSON.parse(readFileSync(CACHE_PATH, "utf-8"));
+    if (parsed && parsed.version === CACHE_VERSION && parsed.files && typeof parsed.files === "object") {
+      return parsed;
+    }
+  } catch {
+    // missing/corrupt cache — fall back to a full rescan this run
+  }
+  return { version: CACHE_VERSION, files: {} };
+}
+
+function saveCache(cache: CacheFile): void {
+  try {
+    mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
+    const tmp = `${CACHE_PATH}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify(cache));
+    renameSync(tmp, CACHE_PATH);
+  } catch (e) {
+    console.error(`warn: could not persist self-improve scan cache: ${e}`);
+  }
+}
+
 function scan(): ScanResult {
   const result: ScanResult = {
     invocations: [],
@@ -217,15 +277,20 @@ function scan(): ScanResult {
 
   if (!existsSync(PROJECTS_DIR)) return result;
 
+  const oldCache = loadCache();
+  const newCache: CacheFile = { version: CACHE_VERSION, files: {} };
+
   for (const projEntry of readdirSync(PROJECTS_DIR, { withFileTypes: true })) {
     if (!projEntry.isDirectory()) continue;
     const projDir = join(PROJECTS_DIR, projEntry.name);
-    walkJsonl(projDir, result);
+    walkJsonl(projDir, result, oldCache, newCache);
   }
+
+  saveCache(newCache);
   return result;
 }
 
-function walkJsonl(dir: string, result: ScanResult): void {
+function walkJsonl(dir: string, result: ScanResult, oldCache: CacheFile, newCache: CacheFile): void {
   let entries: { name: string; isDir: boolean; isFile: boolean }[];
   try {
     entries = readdirSync(dir, { withFileTypes: true }).map((e) => ({
@@ -239,7 +304,7 @@ function walkJsonl(dir: string, result: ScanResult): void {
   for (const e of entries) {
     const full = join(dir, e.name);
     if (e.isDir) {
-      walkJsonl(full, result);
+      walkJsonl(full, result, oldCache, newCache);
       continue;
     }
     if (!e.isFile || !e.name.endsWith(".jsonl")) continue;
@@ -250,18 +315,33 @@ function walkJsonl(dir: string, result: ScanResult): void {
       continue;
     }
     if (st.mtimeMs < CUTOFF_MS) continue;
-    processSession(full, result);
+
+    const cached = oldCache.files[full];
+    const extract =
+      cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size
+        ? cached
+        : extractSession(full);
+    newCache.files[full] = { mtimeMs: st.mtimeMs, size: st.size, ...extract };
+
+    result.sessions_scanned++;
+    result.invocations.push(...extract.invocations);
+    result.prompts.push(...extract.prompts);
+    if (extract.sessionStartMs !== null) {
+      if (result.oldest_session_ms === null || extract.sessionStartMs < result.oldest_session_ms) {
+        result.oldest_session_ms = extract.sessionStartMs;
+      }
+    }
   }
 }
 
-function processSession(file: string, result: ScanResult): void {
+function extractSession(file: string): SessionExtract {
+  const extract: SessionExtract = { invocations: [], prompts: [], sessionStartMs: null };
   let raw: string;
   try {
     raw = readFileSync(file, "utf-8");
   } catch {
-    return;
+    return extract;
   }
-  result.sessions_scanned++;
   let sessionCwd: string | null = null;
   let sessionStartMs: number | null = null;
 
@@ -283,7 +363,7 @@ function processSession(file: string, result: ScanResult): void {
     const content = entry.message?.content;
     if (!content || typeof content === "string") {
       if (entry.type === "user" && typeof content === "string") {
-        recordPrompt(content, tsStr, sessionCwd, entry.isMeta === true, result);
+        recordPrompt(content, tsStr, sessionCwd, entry.isMeta === true, extract);
       }
       continue;
     }
@@ -294,7 +374,7 @@ function processSession(file: string, result: ScanResult): void {
         if (tu.name === "Skill") {
           const skillName = typeof tu.input?.skill === "string" ? tu.input.skill : undefined;
           if (skillName) {
-            result.invocations.push({
+            extract.invocations.push({
               skill_name: skillName,
               ts: tsStr ?? "",
               cwd: sessionCwd ?? "",
@@ -314,15 +394,12 @@ function processSession(file: string, result: ScanResult): void {
       for (const block of content) {
         if (block.type !== "text") continue;
         const text = (block as TextBlock).text;
-        recordPrompt(text, tsStr, sessionCwd, entry.isMeta === true, result);
+        recordPrompt(text, tsStr, sessionCwd, entry.isMeta === true, extract);
       }
     }
   }
-  if (sessionStartMs !== null) {
-    if (result.oldest_session_ms === null || sessionStartMs < result.oldest_session_ms) {
-      result.oldest_session_ms = sessionStartMs;
-    }
-  }
+  extract.sessionStartMs = sessionStartMs;
+  return extract;
 }
 
 function recordPrompt(
@@ -330,7 +407,7 @@ function recordPrompt(
   ts: string | undefined,
   cwd: string | null,
   isMeta: boolean,
-  result: ScanResult,
+  extract: SessionExtract,
 ): void {
   if (!text) return;
   if (isMeta) return;
@@ -347,7 +424,7 @@ function recordPrompt(
   if (trimmed.startsWith("<user-prompt-submit-hook>")) return;
   if (/^\[image #\d+]/i.test(trimmed)) return;
   const isSlash = /^\/[a-z][a-z0-9_-]*/i.test(trimmed);
-  result.prompts.push({
+  extract.prompts.push({
     text: trimmed,
     ts: ts ?? "",
     cwd: cwd ?? "",

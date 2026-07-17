@@ -1,6 +1,14 @@
 #!/usr/bin/env bun
 
-import { readFileSync, readdirSync, statSync, existsSync } from "fs";
+import {
+  readFileSync,
+  readdirSync,
+  statSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+  renameSync,
+} from "fs";
 import { join, extname, relative } from "path";
 
 const HOME = Bun.env.HOME!;
@@ -175,17 +183,73 @@ interface ScanResult {
   oldest_session_ms: number | null;
 }
 
+// --- Incremental cursor (#40) ---
+// Every prior run re-read and re-parsed every in-window .jsonl file from
+// scratch (189MB / 507 files and growing). A session's transcript stops
+// changing once the session ends, so we cache each file's extracted result
+// keyed by (mtimeMs, size) and only re-parse files that are new or changed
+// (i.e. the still-active session). The cache is rebuilt each run to contain
+// exactly the current in-window file set, so it can't grow past the data it
+// mirrors — files that age out of the window are dropped automatically.
+const CACHE_DIR = join(HOME, ".local", "share", "claude-self-improve");
+const CACHE_PATH = join(CACHE_DIR, "corrections-scan-cache.json");
+const CACHE_VERSION = 1;
+
+interface SessionExtract {
+  pairs: Pair[];
+  sessionStartMs: number | null;
+}
+
+interface CacheEntry extends SessionExtract {
+  mtimeMs: number;
+  size: number;
+}
+
+interface CacheFile {
+  version: number;
+  files: Record<string, CacheEntry>;
+}
+
+function loadCache(): CacheFile {
+  try {
+    const parsed = JSON.parse(readFileSync(CACHE_PATH, "utf-8"));
+    if (parsed && parsed.version === CACHE_VERSION && parsed.files && typeof parsed.files === "object") {
+      return parsed;
+    }
+  } catch {
+    // missing/corrupt cache — fall back to a full rescan this run
+  }
+  return { version: CACHE_VERSION, files: {} };
+}
+
+function saveCache(cache: CacheFile): void {
+  try {
+    mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
+    const tmp = `${CACHE_PATH}.${process.pid}.tmp`;
+    writeFileSync(tmp, JSON.stringify(cache));
+    renameSync(tmp, CACHE_PATH);
+  } catch (e) {
+    console.error(`warn: could not persist self-improve scan cache: ${e}`);
+  }
+}
+
 function scan(): ScanResult {
   const result: ScanResult = { pairs: [], sessions_scanned: 0, oldest_session_ms: null };
   if (!existsSync(PROJECTS_DIR)) return result;
+
+  const oldCache = loadCache();
+  const newCache: CacheFile = { version: CACHE_VERSION, files: {} };
+
   for (const projEntry of readdirSync(PROJECTS_DIR, { withFileTypes: true })) {
     if (!projEntry.isDirectory()) continue;
-    walkDir(join(PROJECTS_DIR, projEntry.name), result);
+    walkDir(join(PROJECTS_DIR, projEntry.name), result, oldCache, newCache);
   }
+
+  saveCache(newCache);
   return result;
 }
 
-function walkDir(dir: string, result: ScanResult): void {
+function walkDir(dir: string, result: ScanResult, oldCache: CacheFile, newCache: CacheFile): void {
   let entries;
   try {
     entries = readdirSync(dir, { withFileTypes: true });
@@ -195,7 +259,7 @@ function walkDir(dir: string, result: ScanResult): void {
   for (const e of entries) {
     const full = join(dir, e.name);
     if (e.isDirectory()) {
-      walkDir(full, result);
+      walkDir(full, result, oldCache, newCache);
       continue;
     }
     if (!e.isFile() || !e.name.endsWith(".jsonl")) continue;
@@ -206,18 +270,32 @@ function walkDir(dir: string, result: ScanResult): void {
       continue;
     }
     if (st.mtimeMs < CUTOFF_MS) continue;
-    processSession(full, result);
+
+    const cached = oldCache.files[full];
+    const extract =
+      cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size
+        ? cached
+        : extractSession(full);
+    newCache.files[full] = { mtimeMs: st.mtimeMs, size: st.size, ...extract };
+
+    result.sessions_scanned++;
+    result.pairs.push(...extract.pairs);
+    if (extract.sessionStartMs !== null) {
+      if (result.oldest_session_ms === null || extract.sessionStartMs < result.oldest_session_ms) {
+        result.oldest_session_ms = extract.sessionStartMs;
+      }
+    }
   }
 }
 
-function processSession(file: string, result: ScanResult): void {
+function extractSession(file: string): SessionExtract {
+  const extract: SessionExtract = { pairs: [], sessionStartMs: null };
   let raw: string;
   try {
     raw = readFileSync(file, "utf-8");
   } catch {
-    return;
+    return extract;
   }
-  result.sessions_scanned++;
 
   const entries: TranscriptEntry[] = [];
   const byUuid = new Map<string, TranscriptEntry>();
@@ -237,11 +315,7 @@ function processSession(file: string, result: ScanResult): void {
     const ts = e.timestamp ? Date.parse(e.timestamp) : NaN;
     if (!isNaN(ts) && sessionStartMs === null) sessionStartMs = ts;
   }
-  if (sessionStartMs !== null) {
-    if (result.oldest_session_ms === null || sessionStartMs < result.oldest_session_ms) {
-      result.oldest_session_ms = sessionStartMs;
-    }
-  }
+  extract.sessionStartMs = sessionStartMs;
 
   // Build tool_use timeline and tool_result map for failure_loop detection.
   const toolUseTimeline: ToolUseEvent[] = [];
@@ -273,7 +347,7 @@ function processSession(file: string, result: ScanResult): void {
       }
     }
   }
-  detectFailureLoops(toolUseTimeline, toolResults, result.pairs);
+  detectFailureLoops(toolUseTimeline, toolResults, extract.pairs);
 
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i];
@@ -313,7 +387,7 @@ function processSession(file: string, result: ScanResult): void {
       if (!action) continue;
       if (kind === "interrupt" && action.tool_name === "text") continue;
 
-      result.pairs.push({
+      extract.pairs.push({
         kind,
         ts: e.timestamp ?? "",
         cwd: e.cwd ?? sessionCwd,
@@ -325,6 +399,7 @@ function processSession(file: string, result: ScanResult): void {
       });
     }
   }
+  return extract;
 }
 
 function detectFailureLoops(

@@ -33,6 +33,11 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 
 Session transcripts are persisted to SQLite at `~/.local/share/claude-logs/logs.db`.
 
+**Retention**: no automatic deletion. Every row stays local until the user manually
+runs `push-to-turso.sh`, which is the only thing that ever removes rows (and only
+after confirming the upload against Turso). The hook prints a stderr warning
+(non-fatal) if the DB file + WAL exceed 150MB, prompting a manual push.
+
 ### Schema
 
 ```sql

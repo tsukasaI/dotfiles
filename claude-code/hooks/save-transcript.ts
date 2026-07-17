@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { Database } from "bun:sqlite";
-import { readFileSync, mkdirSync, realpathSync, chmodSync } from "fs";
+import { readFileSync, mkdirSync, realpathSync, chmodSync, statSync, existsSync } from "fs";
 import { join } from "path";
 
 // --- Types ---
@@ -79,7 +79,36 @@ const SCHEMA = `
     FOREIGN KEY (session_id) REFERENCES sessions(session_id)
   );
   CREATE INDEX IF NOT EXISTS idx_session_days_day ON session_days(day);
+  CREATE INDEX IF NOT EXISTS idx_sessions_started_at ON sessions(started_at);
 `;
+
+// --- Size warning (#40) ---
+// transcript_raw stores the full JSONL text per session and is the dominant
+// contributor to logs.db's unbounded growth (239MB + 42MB WAL observed). We
+// deliberately do NOT auto-prune it here: push-to-turso.sh only deletes a
+// local row after its upload is confirmed against Turso, so every row still
+// present in logs.db is by definition not yet archived — an age-based
+// auto-prune in this hook would silently destroy transcripts whose only copy
+// was local (e.g. the user hasn't run the manual push in >30 days). Per the
+// issue's own recommendation, the sanctioned floor is a size warning; the
+// only way rows leave logs.db is the user running push-to-turso.sh by hand.
+const DB_SIZE_WARN_BYTES = 150 * 1024 * 1024; // 150MB soft warning threshold
+
+function warnIfDbTooLarge(): void {
+  try {
+    const mainSize = statSync(DB_PATH).size;
+    const walPath = `${DB_PATH}-wal`;
+    const walSize = existsSync(walPath) ? statSync(walPath).size : 0;
+    const totalMb = (mainSize + walSize) / 1024 / 1024;
+    if (mainSize + walSize > DB_SIZE_WARN_BYTES) {
+      console.error(
+        `[save-transcript] warning: logs.db is ${totalMb.toFixed(1)}MB (threshold ${(DB_SIZE_WARN_BYTES / 1024 / 1024).toFixed(0)}MB) — run push-to-turso.sh by hand to archive and compact`,
+      );
+    }
+  } catch {
+    // best-effort; never fail the hook over a size check
+  }
+}
 
 function openDb(): Database {
   mkdirSync(DB_DIR, { recursive: true, mode: 0o700 });
@@ -278,6 +307,7 @@ try {
     saveSessionDays(db, input.session_id, meta.dayCounts);
   })();
   db.close();
+  warnIfDbTooLarge();
 } catch (err) {
   console.error(`[save-transcript] failed: ${err instanceof Error ? err.message : err}`);
   process.exit(0);
