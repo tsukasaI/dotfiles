@@ -30,8 +30,10 @@
 
 set -euo pipefail
 
-COOLING_DAYS="${COOLING_DAYS:-7}"
-NIXPKGS_COOLING_DAYS="${NIXPKGS_COOLING_DAYS:-14}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/cooling.sh
+source "$SCRIPT_DIR/lib/cooling.sh"
+
 LOCK_PATH="nix-darwin/flake.lock"
 
 if ! command -v jq >/dev/null 2>&1; then

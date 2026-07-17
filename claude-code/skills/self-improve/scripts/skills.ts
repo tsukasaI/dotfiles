@@ -6,14 +6,10 @@ import {
   statSync,
   realpathSync,
   existsSync,
-  mkdirSync,
-  writeFileSync,
-  renameSync,
 } from "fs";
 import { join, dirname } from "path";
+import { HOME, PROJECTS_DIR, loadCache, saveCache, walkProjectTranscripts, type CacheFile } from "../../_shared/transcript-walk";
 
-const HOME = Bun.env.HOME!;
-const PROJECTS_DIR = join(HOME, ".claude", "projects");
 const WINDOW_DAYS = 90;
 const NOW = Date.now();
 const CUTOFF_MS = NOW - WINDOW_DAYS * 24 * 3600 * 1000;
@@ -224,6 +220,9 @@ interface ScanResult {
 // (i.e. the still-active session). The cache is rebuilt each run to contain
 // exactly the current in-window file set, so it can't grow past the data it
 // mirrors — files that age out of the window are dropped automatically.
+// Walk + cache I/O mechanics are shared with corrections.ts via
+// _shared/transcript-walk.ts (#9); only per-session extraction and result
+// aggregation below are specific to skills.ts.
 const CACHE_DIR = join(HOME, ".local", "share", "claude-self-improve");
 const CACHE_PATH = join(CACHE_DIR, "skills-scan-cache.json");
 const CACHE_VERSION = 1;
@@ -232,39 +231,6 @@ interface SessionExtract {
   invocations: SkillInvocation[];
   prompts: PromptEntry[];
   sessionStartMs: number | null;
-}
-
-interface CacheEntry extends SessionExtract {
-  mtimeMs: number;
-  size: number;
-}
-
-interface CacheFile {
-  version: number;
-  files: Record<string, CacheEntry>;
-}
-
-function loadCache(): CacheFile {
-  try {
-    const parsed = JSON.parse(readFileSync(CACHE_PATH, "utf-8"));
-    if (parsed && parsed.version === CACHE_VERSION && parsed.files && typeof parsed.files === "object") {
-      return parsed;
-    }
-  } catch {
-    // missing/corrupt cache — fall back to a full rescan this run
-  }
-  return { version: CACHE_VERSION, files: {} };
-}
-
-function saveCache(cache: CacheFile): void {
-  try {
-    mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
-    const tmp = `${CACHE_PATH}.${process.pid}.tmp`;
-    writeFileSync(tmp, JSON.stringify(cache));
-    renameSync(tmp, CACHE_PATH);
-  } catch (e) {
-    console.error(`warn: could not persist self-improve scan cache: ${e}`);
-  }
 }
 
 function scan(): ScanResult {
@@ -277,61 +243,24 @@ function scan(): ScanResult {
 
   if (!existsSync(PROJECTS_DIR)) return result;
 
-  const oldCache = loadCache();
-  const newCache: CacheFile = { version: CACHE_VERSION, files: {} };
+  const oldCache = loadCache<SessionExtract>(CACHE_PATH, CACHE_VERSION);
+  const newCache: CacheFile<SessionExtract> = { version: CACHE_VERSION, files: {} };
 
-  for (const projEntry of readdirSync(PROJECTS_DIR, { withFileTypes: true })) {
-    if (!projEntry.isDirectory()) continue;
-    const projDir = join(PROJECTS_DIR, projEntry.name);
-    walkJsonl(projDir, result, oldCache, newCache);
-  }
+  const { sessionsScanned, oldestSessionMs } = walkProjectTranscripts(
+    CUTOFF_MS,
+    oldCache,
+    newCache,
+    extractSession,
+    (extract) => {
+      result.invocations.push(...extract.invocations);
+      result.prompts.push(...extract.prompts);
+    },
+  );
+  result.sessions_scanned = sessionsScanned;
+  result.oldest_session_ms = oldestSessionMs;
 
-  saveCache(newCache);
+  saveCache(CACHE_PATH, CACHE_DIR, newCache);
   return result;
-}
-
-function walkJsonl(dir: string, result: ScanResult, oldCache: CacheFile, newCache: CacheFile): void {
-  let entries: { name: string; isDir: boolean; isFile: boolean }[];
-  try {
-    entries = readdirSync(dir, { withFileTypes: true }).map((e) => ({
-      name: e.name,
-      isDir: e.isDirectory(),
-      isFile: e.isFile(),
-    }));
-  } catch {
-    return;
-  }
-  for (const e of entries) {
-    const full = join(dir, e.name);
-    if (e.isDir) {
-      walkJsonl(full, result, oldCache, newCache);
-      continue;
-    }
-    if (!e.isFile || !e.name.endsWith(".jsonl")) continue;
-    let st;
-    try {
-      st = statSync(full);
-    } catch {
-      continue;
-    }
-    if (st.mtimeMs < CUTOFF_MS) continue;
-
-    const cached = oldCache.files[full];
-    const extract =
-      cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size
-        ? cached
-        : extractSession(full);
-    newCache.files[full] = { mtimeMs: st.mtimeMs, size: st.size, ...extract };
-
-    result.sessions_scanned++;
-    result.invocations.push(...extract.invocations);
-    result.prompts.push(...extract.prompts);
-    if (extract.sessionStartMs !== null) {
-      if (result.oldest_session_ms === null || extract.sessionStartMs < result.oldest_session_ms) {
-        result.oldest_session_ms = extract.sessionStartMs;
-      }
-    }
-  }
 }
 
 function extractSession(file: string): SessionExtract {

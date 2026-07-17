@@ -25,6 +25,7 @@ jobs:
           shellcheck -x --severity=warning \
             setup.sh \
             scripts/*.sh \
+            scripts/lib/*.sh \
             claude-code/hooks/*.sh \
             claude-code/scripts/*.sh \
             git/hooks/* \

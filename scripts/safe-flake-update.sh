@@ -14,9 +14,11 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/cooling.sh
+source "$SCRIPT_DIR/lib/cooling.sh"
+
 REPO_DIR="${REPO_DIR:-$HOME/dotfiles/nix-darwin}"
-COOLING_DAYS="${COOLING_DAYS:-7}"
-NIXPKGS_COOLING_DAYS="${NIXPKGS_COOLING_DAYS:-14}"
 
 if [[ ! -f "$REPO_DIR/flake.lock" ]]; then
   echo "error: $REPO_DIR/flake.lock not found" >&2
@@ -34,8 +36,6 @@ git diff --quiet -- flake.lock || {
   echo "error: uncommitted changes in flake.lock — commit or stash before running" >&2
   exit 1
 }
-
-now=$(date +%s)
 
 inputs=$(jq -r '.nodes.root.inputs | keys[]' flake.lock)
 
@@ -64,7 +64,7 @@ for input in $inputs; do
     continue
   fi
 
-  age_days=$(( (now - last_modified) / 86400 ))
+  age_days=$(cooling_age_days "$last_modified")
 
   # Cross-check the self-reported lastModified against the commit date on
   # GitHub (#36). lastModified is not covered by any hash in flake.lock, so
@@ -107,11 +107,11 @@ for input in $inputs; do
   fi
 
   if (( age_days < threshold )); then
-    printf '[skip] %-12s age %dd < %dd\n' "$input" "$age_days" "$threshold"
+    cooling_msg_skip 12 "$input" "$age_days" "$threshold"
     mv "$before" flake.lock
     skipped+=1
   else
-    printf '[ok]   %-12s age %dd%s\n' "$input" "$age_days" "$verified"
+    cooling_msg_ok 12 "$input" "$age_days" "$verified"
     rm "$before"
     accepted+=1
   fi

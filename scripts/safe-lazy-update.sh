@@ -7,10 +7,13 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/cooling.sh
+source "$SCRIPT_DIR/lib/cooling.sh"
+
 DOTFILES="${DOTFILES:-$HOME/dotfiles}"
 NVIM_DATA="${NVIM_DATA:-$HOME/.local/share/nvim/lazy}"
 LOCK="$DOTFILES/nvim/lazy-lock.json"
-COOLING_DAYS="${COOLING_DAYS:-7}"
 
 if [[ ! -f "$LOCK" ]]; then
   echo "error: $LOCK not found" >&2
@@ -28,9 +31,6 @@ if ! jq empty "$LOCK" 2>/dev/null; then
   echo "error: lazy-lock.json corrupt after update, restored from backup" >&2
   exit 1
 fi
-
-now=$(date +%s)
-threshold_sec=$((COOLING_DAYS * 86400))
 
 declare -i accepted=0 skipped=0 unchanged=0
 reverted=()
@@ -66,18 +66,17 @@ for plugin in $(jq -r 'keys[]' "$LOCK"); do
     continue
   fi
 
-  age_sec=$(( now - committer_ts ))
-  age_days=$(( age_sec / 86400 ))
+  age_days=$(cooling_age_days "$committer_ts")
 
-  if (( age_sec < threshold_sec )); then
-    printf '[skip] %-32s age %dd < %dd\n' "$plugin" "$age_days" "$COOLING_DAYS"
+  if (( age_days < COOLING_DAYS )); then
+    cooling_msg_skip 32 "$plugin" "$age_days" "$COOLING_DAYS"
     tmp=$(mktemp)
     jq --arg p "$plugin" --arg c "$old_commit" '.[$p].commit = $c' "$LOCK" > "$tmp"
     mv "$tmp" "$LOCK"
     reverted+=("$plugin")
     skipped+=1
   else
-    printf '[ok]   %-32s age %dd\n' "$plugin" "$age_days"
+    cooling_msg_ok 32 "$plugin" "$age_days"
     accepted+=1
   fi
 done
