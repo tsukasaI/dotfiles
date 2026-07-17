@@ -18,9 +18,16 @@ if [[ ! -f "$LOCK" ]]; then
 fi
 
 before=$(mktemp -t lazy-lock.before.XXXXXX)
+trap 'rm -f "$before"' EXIT
 cp "$LOCK" "$before"
 
 nvim --headless "+Lazy! update" +qa 2>/dev/null || true
+
+if ! jq empty "$LOCK" 2>/dev/null; then
+  mv "$before" "$LOCK"
+  echo "error: lazy-lock.json corrupt after update, restored from backup" >&2
+  exit 1
+fi
 
 now=$(date +%s)
 threshold_sec=$((COOLING_DAYS * 86400))
