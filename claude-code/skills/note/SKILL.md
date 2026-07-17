@@ -70,6 +70,15 @@ When appending to an existing note:
 - Update `updated:` in the frontmatter; merge (never remove) `tags`/`sources`.
 - If the new content contradicts an existing entry, surface the contradiction to the
   user BEFORE writing; record the resolution explicitly in the new entry.
+- **Concurrency guard (optimistic check):** another session may append to the same
+  note between your Step 2 Read and this Write. Right after the Read, capture a
+  fingerprint (`shasum -a 256 <file>` or `stat -f %m <file>`). Immediately before
+  Write/Edit — as the last action, not earlier — re-run the same fingerprint check.
+  If it changed, STOP: do not write. Re-read the file, re-merge your new section
+  against the current content, and re-check the fingerprint again before writing.
+  Since each entry lives under its own dated `## YYYY-MM-DD: <entry title>` heading,
+  a retried merge is naturally idempotent — it cannot clobber a section another
+  session already added.
 
 If the file already exists but is not a match for appending (name collision), ask.
 

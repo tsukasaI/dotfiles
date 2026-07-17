@@ -59,6 +59,15 @@ Mode selection from the invocation:
 5. After presenting, update `ideas_file`: Read it, merge the new candidates under
    `## candidates` (status: idea, added: today). Do not touch `## archive` except to
    move items the user explicitly drops.
+   - **Concurrency guard (optimistic check):** another session may be writing to
+     `ideas_file` at the same time. Right after this Read, capture a fingerprint
+     (`shasum -a 256 <ideas_file>` or `stat -f %m <ideas_file>`). Immediately before
+     the Write/Edit that persists the merge — as the last action, not earlier —
+     re-run the same fingerprint check. If it changed, STOP: do not write. Re-read
+     `ideas_file`, re-merge your candidates against the current content (skip any
+     candidate another session already added), and re-check the fingerprint again
+     before writing. Each candidate is its own list item, so a retried merge is
+     idempotent.
    *Done:* ideas_file updated with new entries under `## candidates`.
 6. End by asking which candidate to outline (→ Mode B), or none.
    *Done:* user chose a candidate (→ Mode B) or explicitly declined.
