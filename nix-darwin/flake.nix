@@ -7,6 +7,10 @@
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     ewc.url = "github:tsukasaI/ewc";
     ewc.inputs.nixpkgs.follows = "nixpkgs";
+    # ewc's transitive git-hooks input pins its own (older) nixpkgs unless told
+    # to follow root here too (issue #12): without this, flake.lock ends up
+    # with two materialized nixpkgs closures instead of one.
+    ewc.inputs.git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     fini.url = "github:tsukasaI/fini";
     fini.inputs.nixpkgs.follows = "nixpkgs";
     herdr.url = "github:ogulcancelik/herdr";
