@@ -120,7 +120,7 @@
     ],
     "defaultMode": "default"
   },
-  "model": "claude-opus-4-6[1M]",
+  "model": "opus[1M]",
   "hooks": {
     "PostToolUse": [
       {
