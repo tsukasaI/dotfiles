@@ -146,6 +146,13 @@ expect "$BCE" 0 "bce: pyproject.toml without ruff section" "$(fp "$tmp_pyproject
 expect "$BCE" 0 "bce: unrelated .toml file" "$(fp "$tmp_pyproject/no-ruff/random.toml")"
 rm -rf "$tmp_pyproject"
 
+# ── block-config-edit.sh: lockfile protection ───────────────────────────────
+expect "$BCE" 2 "bce: flake.lock" "$(fp '/x/nix-darwin/flake.lock')"
+expect "$BCE" 2 "bce: lazy-lock.json" "$(fp '/x/nvim/lazy-lock.json')"
+expect "$BCE" 2 "bce: package-lock.json" "$(fp '/x/package-lock.json')"
+expect "$BCE" 0 "bce: flake.nix" "$(fp '/x/nix-darwin/flake.nix')"
+expect "$BCE" 0 "bce: Cargo.toml" "$(fp '/x/Cargo.toml')"
+
 # ── block-config-edit.sh: guardrail self-protection (#34) ───────────────────
 expect "$BCE" 2 "bce: repo blocklist.conf" "$(fp "$HOME/dotfiles/claude-code/hooks/blocklist.conf")"
 expect "$BCE" 2 "bce: repo block-dangerous.sh" "$(fp "$HOME/dotfiles/claude-code/hooks/block-dangerous.sh")"
