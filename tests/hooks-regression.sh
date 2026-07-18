@@ -196,9 +196,10 @@ expect_wu 0 "wu: outside a git repo" "$wu_tmp/norepo" '{}'
 expect_wu 0 "wu: bad JSON fails open" "$wu_tmp/dirty" 'not json'
 rm -rf "$wu_tmp"
 
-# ── git/hooks: global gitleaks hook must not be a lefthook shim (#22) ───────
-# `lefthook install -f` (npm postinstall) once clobbered these tracked files
-# through the ~/.config/git/hooks symlink. Catch a clobbered state at CI time.
+# ── lefthook.yaml: this repo's own pre-commit gitleaks check ────────────────
+# Global core.hooksPath was retired in favor of per-repo lefthook (lefthook
+# refuses to `install` while a global hooksPath is set). Catch regressions
+# where the root lefthook.yaml stops running gitleaks.
 check() {
   local desc=$1; shift
   total=$((total + 1))
@@ -207,16 +208,8 @@ check() {
     fails=$((fails + 1))
   fi
 }
-not_grep() { ! grep -q "$1" "$2"; }
 
-check "pre-commit runs gitleaks" grep -q gitleaks git/hooks/pre-commit
-check "pre-commit not a lefthook shim" not_grep call_lefthook git/hooks/pre-commit
-check "pre-push not a lefthook shim" not_grep call_lefthook git/hooks/pre-push
-check "prepare-commit-msg not a shim" not_grep call_lefthook git/hooks/prepare-commit-msg
-check "chain helper present" grep -q run_repo_lefthook git/hooks/lefthook-chain.sh
-check "pre-commit executable" test -x git/hooks/pre-commit
-check "pre-push executable" test -x git/hooks/pre-push
-check "prepare-commit-msg executable" test -x git/hooks/prepare-commit-msg
+check "root lefthook.yaml runs gitleaks" grep -qE '^\s*run:.*gitleaks' lefthook.yaml
 
 echo "---"
 echo "$((total - fails))/$total passed"

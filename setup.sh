@@ -42,11 +42,12 @@ link_with_backup "$DOTFILES/git/gitconfig" ~/.gitconfig
 mkdir -p ~/.config/git
 link_with_backup "$DOTFILES/git/ignore" ~/.config/git/ignore
 link_with_backup "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
-link_with_backup "$DOTFILES/git/hooks" ~/.config/git/hooks
-chmod +x "$DOTFILES/git/hooks/"* 2>/dev/null || true
-# Lock hook files so `lefthook install -f` (npm postinstall) can't clobber them
-# through the symlink (#22 recurrence). Unlock to edit: chflags nouchg <file>
-chflags uchg "$DOTFILES/git/hooks/"* 2>/dev/null || true
+# Clean up the retired global-hooks symlink (dangling since git/hooks/ was
+# removed in favor of per-repo lefthook.yaml; core.hooksPath is unset so this
+# is inert either way, but leaving stale cruft around is confusing).
+if [[ -L ~/.config/git/hooks && "$(readlink ~/.config/git/hooks)" == "$DOTFILES/git/hooks" ]]; then
+  rm ~/.config/git/hooks
+fi
 
 # SSH (UseKeychain integration)
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
@@ -61,5 +62,16 @@ link_with_backup "$DOTFILES/claude-code/themes" ~/.claude/themes
 link_with_backup "$DOTFILES/claude-code/settings.json" ~/.claude/settings.json
 link_with_backup "$DOTFILES/claude-code/CLAUDE.md" ~/.claude/CLAUDE.md
 chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
+
+# Per-repo git hooks (lefthook): this repo's own pre-commit gitleaks check.
+# On a fresh machine setup.sh runs before darwin-rebuild switch, so lefthook
+# may not be on PATH yet — warn loudly instead of silently leaving the hook
+# uninstalled (security.md: disabled security checks must not fail silent).
+if command -v lefthook >/dev/null 2>&1; then
+  (cd "$DOTFILES" && lefthook install)
+else
+  echo "WARNING: lefthook not on PATH — pre-commit gitleaks hook NOT installed." >&2
+  echo "Run 'darwin-rebuild switch' first, then re-run setup.sh (or 'lefthook install' directly)." >&2
+fi
 
 echo "Done."

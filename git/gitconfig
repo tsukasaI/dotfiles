@@ -1,6 +1,5 @@
 [core]
 	editor = nvim
-	hooksPath = ~/.config/git/hooks
 [init]
 	defaultBranch = main
 [user]

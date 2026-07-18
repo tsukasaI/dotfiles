@@ -28,7 +28,6 @@ jobs:
             scripts/lib/*.sh \
             claude-code/hooks/*.sh \
             claude-code/scripts/*.sh \
-            git/hooks/* \
             tests/hooks-regression.sh \
             tests/rules-paths-sync.sh
 

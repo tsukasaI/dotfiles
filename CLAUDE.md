@@ -7,8 +7,9 @@ symlink script. Public repo: `tsukasaI/dotfiles`.
 **This repo is live.** Most directories are symlinked into `$HOME` by
 `setup.sh`, and the Claude Code hooks/statusline are referenced from
 `settings.json` by absolute `$HOME/dotfiles/...` paths. An edit here
-immediately changes the running system — the shell, the global git hooks,
-and the guardrails of the very Claude Code session doing the editing.
+immediately changes the running system — the shell, this repo's own git
+hooks (lefthook), and the guardrails of the very Claude Code session doing
+the editing.
 There is no staging or deploy step (hooks apply on the next tool call,
 `settings.json` on the next session).
 
@@ -21,7 +22,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | `.claude/` | Project-scoped Claude state for *this repo only* (plans, memory, local settings). Not the same thing as `claude-code/`. |
 | `nvim/` | lazy.nvim config: one file per plugin in `lua/plugins/` with that plugin's keymaps inside its spec; global options/keymaps in `init.lua`; LSP servers in `lsp/<name>.lua`, enabled at the bottom of `init.lua`. |
 | `zsh/zshrc` | Hand-written, no framework. `_cached_eval` caches slow init output (mise/zoxide/fzf). Custom prompt — starship was removed. |
-| `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`; `hooks/` are the global hooks (via `core.hooksPath`): pre-commit runs gitleaks, then all hooks chain into the repo's own lefthook via `lefthook-chain.sh` — no `lefthook install` needed anywhere. Files are locked with `chflags uchg` (see Pitfalls). |
+| `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks — `core.hooksPath` was retired (see Pitfalls); this repo's own pre-commit gitleaks check lives in the root `lefthook.yaml`, installed per-repo via `lefthook install` (see `setup.sh`). |
 | `scripts/` | `safe-flake-update.sh`, `safe-lazy-update.sh`, `safe-update-all.sh` — cooling-period dependency updates. |
 | `setup.sh` | First-time symlink installer. Known-fragile on fresh machines (issue #5). |
 | `docs/` | Investigation memos specific to this repo's own subject matter (e.g. `turso-investigation.md`); not a knowledge-management store — see the Vault bullet in Concepts for the cc-memory/vault/docs boundary. |
@@ -40,8 +41,9 @@ There is no staging or deploy step (hooks apply on the next tool call,
   `echo '{"tool_input":{"command":"grep foo"}}' | claude-code/hooks/block-dangerous.sh; echo $?`
   — exit 0 = allow, exit 2 = block.
 - CI (`.github/workflows/ci.yml`) runs shellcheck, `tests/hooks-regression.sh`
-  (guardrail-hook + git-hooks assertions), and a gitleaks history scan on every
-  push/PR to main. There is still no linter config for other file types.
+  (guardrail-hook + `lefthook.yaml` assertions), and a gitleaks history scan
+  on every push/PR to main. There is still no linter config for other file
+  types.
 
 ## Concepts
 
@@ -90,11 +92,15 @@ There is no staging or deploy step (hooks apply on the next tool call,
   production immediately, committed or not. Check `git status` before assuming
   committed state equals running state. (`skills/_shared/kb.json` is the one
   deliberately untracked file — issue #24.)
-- **`git/hooks/*` are immutable-flagged.** `chflags uchg` protects them from
-  `lefthook install -f` (npm postinstall) clobbering them through the
-  `~/.config/git/hooks` symlink (issue #22, recurred once). Any edit — including
-  `git pull`/`git restore` touching those paths — fails until
-  `chflags nouchg git/hooks/*`; re-lock afterwards (or re-run setup.sh).
+- **Global git hooks were retired, on purpose.** `core.hooksPath` used to
+  chain into each repo's own lefthook config, but lefthook (and Python
+  `pre-commit`) refuse to `install` while a global hooksPath is set — a
+  structural conflict with normal `lefthook install` usage, not a one-off
+  bug. Every repo, including language-less ones like this one, now carries
+  its own `lefthook.yaml` with at least a gitleaks pre-commit check,
+  installed via `lefthook install` (see `setup.sh`). Don't reintroduce a
+  global `core.hooksPath` — it will silently break `lefthook install` in
+  every other repo on this machine again.
 - **Trust files over docs.** The README's package lists and clone URL
   (issue #13), the flake's "tree-sitter parsers precompiled via Nix" comment
   (issue #27), and parts of `hooks/README.md` are known-stale. When any doc —

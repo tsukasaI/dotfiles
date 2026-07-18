@@ -89,6 +89,7 @@
         git
         lazygit
         gitleaks
+        lefthook
 
         # Cloud / DevOps
         awscli2
