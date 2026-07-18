@@ -238,6 +238,21 @@ if [[ "$CMD_NOQUOTES" =~ ${CB}curl${TB} ]]; then
   fi
 fi
 
+# ── Special case: rsync (local-to-local allowed, remote host blocked) (#20) ──
+# Detection on CMD_NOQUOTES so quoted prose about rsync doesn't trigger it;
+# remote-indicator check on CMD_RESOLVED so a quoted host spec is visible.
+# Mirrors rsync's own remote-path convention: an argument is a remote spec
+# when it is (optionally `user@`)`host:` — with the colon immediately
+# followed by more path/module text — or an `rsync://` URL. Plain local
+# paths (`./src/`, `/abs/dst/`, `../x`) never contain a bare `host:` token,
+# so this doesn't need a curl-style allowlist of "safe" hosts.
+RSYNC_REMOTE_RE='(^|[[:space:]])(rsync://|([A-Za-z0-9_.-]+@)?[A-Za-z0-9_.-]+:[^[:space:]])'
+if [[ "$CMD_NOQUOTES" =~ ${CB}rsync${TB} ]]; then
+  if [[ "$CMD_RESOLVED" =~ $RSYNC_REMOTE_RE ]]; then
+    block "NETWORK" "rsync to/from a remote host can transfer files over the network." "local-only rsync (no host: or rsync:// argument) is allowed"
+  fi
+fi
+
 # ── Special case: git push --force / -f blocked, --force-with-lease allowed ──
 if [[ "$CMD_NOQUOTES" =~ ${CB}git[[:space:]]+push([[:space:]]|$) ]]; then
   if [[ "$CMD_NOQUOTES" =~ (^|[[:space:]])(--force([[:space:]]|$)|-f([[:space:]]|$)) ]]; then
@@ -263,7 +278,7 @@ fi
 # Single-statement bounded via [^;&|<>]* to avoid false-positives like
 # `cat README.md && echo done > .env`. Regex stored in a variable because
 # bash's [[ ]] tokenizer treats `;&` (case fall-through) as a syntax token.
-SECRET_READ_RE='(cat|head|tail|less|more|bat|nano|vim|nvim)[[:space:]]+[^;&|<>]*(\.env([.][a-zA-Z0-9_-]+)?|\.pem|\.key|\.p12|id_rsa|id_ed25519|id_ecdsa|id_dsa|credentials?|kubeconfig|\.kube/config|\.npmrc|\.netrc|\.pgpass|\.aws/[^;&|<>[:space:]]*|\.docker/config\.json|\.config/gcloud/[^;&|<>[:space:]]*)([[:space:]]|$|[;&|<>])'
+SECRET_READ_RE='(cat|head|tail|less|more|bat|nano|vim|nvim)[[:space:]]+[^;&|<>]*(\.env([.][a-zA-Z0-9_-]+)?|\.pem|\.key|\.p12|id_rsa|id_ed25519|id_ecdsa|id_dsa|credentials?|\.?secrets?([.][a-zA-Z0-9_-]+)?|kubeconfig|\.kube/config|\.npmrc|\.netrc|\.pgpass|\.aws/[^;&|<>[:space:]]*|\.docker/config\.json|\.config/gcloud/[^;&|<>[:space:]]*)([[:space:]]|$|[;&|<>])'
 if [[ "$CMD_NOQUOTES" =~ ${CB}${SECRET_READ_RE} ]]; then
   block "CREDENTIAL" "Reader command targets a secret file (.env* / key material / cloud & registry credentials)." "built-in Read tool (respects deny rules)"
 fi

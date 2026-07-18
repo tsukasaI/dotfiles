@@ -115,6 +115,17 @@ expect "$BD" 2 "real /dev/udp" "$(cmd 'exec 3<>/dev/udp/10.0.0.1/4444')"
 expect "$BD" 2 "real ANSI-C obfuscated rm" "$(cmd "\$'\\x72\\x6d' -rf /tmp/x")"
 expect "$BD" 2 "commit msg with ANSI-C prose (kept raw, intentional)" "$(cmd "git commit -m \"explain the \$'x' obfuscation quirk\"")"
 
+# ── block-dangerous.sh: blocklist false positives + long-flag bypasses (#20) ──
+expect "$BD" 0 "secretary_report.py (secret substring FP)" "$(cmd 'python secretary_report.py')"
+expect "$BD" 0 "credentials-lookup/ (credential substring FP)" "$(cmd 'ls credentials-lookup/')"
+expect "$BD" 0 "local-to-local rsync" "$(cmd 'rsync -a ./src/ ./dst/')"
+expect "$BD" 2 "rsync to remote host" "$(cmd 'rsync -a ./src/ user@host:/backup/')"
+expect "$BD" 2 "cat secrets.yaml (real secret file read)" "$(cmd 'cat secrets.yaml')"
+expect "$BD" 2 "git tag --delete (long-flag bypass closed)" "$(cmd 'git tag --delete v1.0')"
+expect "$BD" 2 "git branch --delete (long-flag bypass closed)" "$(cmd 'git branch --delete feature-x')"
+expect "$BD" 2 "git tag -d (short form still blocks)" "$(cmd 'git tag -d v1.0')"
+expect "$BD" 2 "git branch -d (short form still blocks)" "$(cmd 'git branch -d feature-x')"
+
 # ── block-config-edit.sh: fail closed + linter configs ──────────────────────
 expect "$BCE" 2 "bce: bad JSON" 'not json'
 expect "$BCE" 2 "bce: non-string file_path" '{"tool_input":{"file_path":["a"]}}'
@@ -122,6 +133,18 @@ expect "$BCE" 2 "bce: empty stdin" ''
 expect "$BCE" 0 "bce: no file_path field" '{"tool_input":{"command":"ls"}}'
 expect "$BCE" 2 "bce: eslintrc" "$(fp '/x/.eslintrc')"
 expect "$BCE" 0 "bce: normal source file" "$(fp '/x/main.ts')"
+
+# ── block-config-edit.sh: pyproject.toml ruff-section-conditional (#20) ─────
+# pyproject.toml also holds unrelated project metadata, so it's only
+# protected when it actually contains a [tool.ruff] section.
+tmp_pyproject=$(mktemp -d)
+mkdir -p "$tmp_pyproject/with-ruff" "$tmp_pyproject/no-ruff"
+printf '[tool.ruff]\nline-length = 100\n' > "$tmp_pyproject/with-ruff/pyproject.toml"
+printf '[project]\nname = "x"\n' > "$tmp_pyproject/no-ruff/pyproject.toml"
+expect "$BCE" 2 "bce: pyproject.toml with [tool.ruff] section" "$(fp "$tmp_pyproject/with-ruff/pyproject.toml")"
+expect "$BCE" 0 "bce: pyproject.toml without ruff section" "$(fp "$tmp_pyproject/no-ruff/pyproject.toml")"
+expect "$BCE" 0 "bce: unrelated .toml file" "$(fp "$tmp_pyproject/no-ruff/random.toml")"
+rm -rf "$tmp_pyproject"
 
 # ── block-config-edit.sh: guardrail self-protection (#34) ───────────────────
 expect "$BCE" 2 "bce: repo blocklist.conf" "$(fp "$HOME/dotfiles/claude-code/hooks/blocklist.conf")"

@@ -79,4 +79,18 @@ for pattern in "${PROTECTED[@]}"; do
   esac
 done
 
+# pyproject.toml is ruff's most common config location, but it also holds
+# unrelated project metadata (deps, build system, etc.) that legitimately
+# needs editing (#20) — so only protect it when a [tool.ruff] section is
+# actually present, not unconditionally like the dedicated ruff.toml files
+# above. A pyproject.toml that doesn't exist yet (new file via Write) has no
+# ruff config to protect, so it's allowed.
+if [[ "$BASENAME" == "pyproject.toml" && -f "$FILE_PATH" ]]; then
+  CONTENT=$(cat "$FILE_PATH" 2>/dev/null) || CONTENT=""
+  if [[ "$CONTENT" =~ \[tool\.ruff(\.|\]) ]]; then
+    printf '[BLOCKED: CONFIG_PROTECTION] "%s" contains a [tool.ruff] section; editing linter/formatter config is not allowed.\nFix the code to satisfy the tool, not the other way around.\n' "$BASENAME" >&2
+    exit 2
+  fi
+fi
+
 exit 0
