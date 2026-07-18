@@ -1,6 +1,9 @@
 # Interactive skills (retro etc.)
 
 Rules for skills that interview me (retro, and any future Q&A-style skill).
+Scope: skills whose purpose is recording my answers as statements. Slot-filling
+skills that gather short factual parameters (e.g. /mkgoal) are NOT covered —
+they batch all open slots into one AskUserQuestion call per their own SKILL.md.
 
 - One question per message. STOP and wait for my answer — never call
   ScheduleWakeup or any self-advancing tool mid-interview, and never bundle
