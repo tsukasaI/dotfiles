@@ -260,6 +260,20 @@ if [[ "$CMD_NOQUOTES" =~ ${CB}git[[:space:]]+push([[:space:]]|$) ]]; then
   fi
 fi
 
+# ── Special case: git commit -n (short form of --no-verify) ──────────────────
+# The long form --no-verify is a blocklist substring rule; the -n short form
+# hides in flag clusters (-an, -nm) the blocklist grammar can't express.
+# Scoped to `git commit` — for `git push`, -n means --dry-run (harmless).
+# In a cluster, n counts only when preceded solely by argument-less short
+# options [aeiopqsvz]: an arg-taking letter (-m/-u/-t/-F/-C/-S) consumes the
+# rest of the cluster as its argument, so -uno (untracked-files=no) and
+# -mnote (glued message) stay allowed.
+if [[ "$CMD_NOQUOTES" =~ ${CB}git[[:space:]]+commit${TB} ]]; then
+  if [[ "$CMD_NOQUOTES" =~ (^|[[:space:]])-[aeiopqsvz]*n[a-zA-Z]*${TB} ]]; then
+    block "GIT" "git commit -n (--no-verify) skips the pre-commit hooks." "fix the failing check, or ask the user to bypass deliberately"
+  fi
+fi
+
 # ── Special case: gh api with a DELETE method (#2) ──────────────────────────
 # `gh api` reaches the full authenticated GitHub REST surface, so `-X DELETE`
 # can destroy the same resources the GITHUB blocklist rules (gh repo delete

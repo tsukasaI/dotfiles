@@ -126,6 +126,15 @@ expect "$BD" 2 "git branch --delete (long-flag bypass closed)" "$(cmd 'git branc
 expect "$BD" 2 "git tag -d (short form still blocks)" "$(cmd 'git tag -d v1.0')"
 expect "$BD" 2 "git branch -d (short form still blocks)" "$(cmd 'git branch -d feature-x')"
 
+# ── block-dangerous.sh: pre-commit bypass (--no-verify / git commit -n) ─────
+# With verification anchored on pre-commit, hook bypass is the biggest hole.
+expect "$BD" 2 "git commit --no-verify" "$(cmd 'git commit --no-verify -m "x"')"
+expect "$BD" 2 "git commit -n" "$(cmd 'git commit -n -m "x"')"
+expect "$BD" 2 "git commit -anm (cluster)" "$(cmd 'git commit -anm "x"')"
+expect "$BD" 0 "git push -n (dry-run, not commit)" "$(cmd 'git push -n origin main')"
+expect "$BD" 0 "git commit -uno (arg-taking -u)" "$(cmd 'git commit -uno -m "x"')"
+expect "$BD" 0 "commit msg mentioning --no-verify" "$(cmd 'git commit -m "use --no-verify for emergencies"')"
+
 # ── block-config-edit.sh: fail closed + linter configs ──────────────────────
 expect "$BCE" 2 "bce: bad JSON" 'not json'
 expect "$BCE" 2 "bce: non-string file_path" '{"tool_input":{"file_path":["a"]}}'
