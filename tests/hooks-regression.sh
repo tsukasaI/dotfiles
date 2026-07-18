@@ -171,6 +171,31 @@ expect "$BCE" 2 "bce: symlink-path hook" "$(fp "$HOME/.claude/hooks/block-danger
 expect "$BCE" 0 "bce: same-name other project" "$(fp '/some/other/repo/blocklist.conf')"
 expect "$BCE" 0 "bce: save-transcript.ts" "$(fp "$HOME/dotfiles/claude-code/hooks/save-transcript.ts")"
 
+# ── warn-uncommitted.sh (Stop hook): commit reminder, fails open ────────────
+# Cwd-dependent (the hook checks ITS cwd's git state), so each case runs in a
+# purpose-built temp dir instead of the repo root the rest of the suite uses.
+WU="$PWD/claude-code/hooks/warn-uncommitted.sh"
+expect_wu() {
+  local want=$1 desc=$2 dir=$3 payload=$4 got
+  (cd "$dir" && printf '%s' "$payload" | "$WU" >/dev/null 2>&1)
+  got=$?
+  total=$((total + 1))
+  if [[ "$got" != "$want" ]]; then
+    printf 'FAIL %-36s want=%s got=%s\n' "$desc" "$want" "$got"
+    fails=$((fails + 1))
+  fi
+}
+wu_tmp=$(mktemp -d)
+mkdir -p "$wu_tmp/dirty" "$wu_tmp/clean" "$wu_tmp/norepo"
+git -C "$wu_tmp/dirty" init -q && touch "$wu_tmp/dirty/wip.txt"
+git -C "$wu_tmp/clean" init -q
+expect_wu 2 "wu: dirty repo blocks stop" "$wu_tmp/dirty" '{"stop_hook_active":false}'
+expect_wu 0 "wu: clean repo allows stop" "$wu_tmp/clean" '{"stop_hook_active":false}'
+expect_wu 0 "wu: stop_hook_active no loop" "$wu_tmp/dirty" '{"stop_hook_active":true}'
+expect_wu 0 "wu: outside a git repo" "$wu_tmp/norepo" '{}'
+expect_wu 0 "wu: bad JSON fails open" "$wu_tmp/dirty" 'not json'
+rm -rf "$wu_tmp"
+
 # ── git/hooks: global gitleaks hook must not be a lefthook shim (#22) ───────
 # `lefthook install -f` (npm postinstall) once clobbered these tracked files
 # through the ~/.config/git/hooks symlink. Catch a clobbered state at CI time.

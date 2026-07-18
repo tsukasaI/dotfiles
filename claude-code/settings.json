@@ -176,6 +176,18 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/dotfiles/claude-code/hooks/warn-uncommitted.sh",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
