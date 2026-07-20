@@ -140,6 +140,10 @@
           {
             "type": "command",
             "command": "$HOME/dotfiles/claude-code/hooks/block-dangerous.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/dotfiles/claude-code/hooks/shguard-shadow.sh"
           }
         ]
       },
