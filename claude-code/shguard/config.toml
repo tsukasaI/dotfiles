@@ -1,0 +1,16 @@
+# shguard user policy for this machine.
+#
+# Deployed to ~/.config/shguard/config.toml via a setup.sh symlink so it
+# stays versioned and CI-testable — shguard itself only reads the resolved
+# ~/.config path and has no project-local config discovery, by design.
+#
+# Schema (see shguard's rules/blocklist.toml for the authoritative version):
+#   [[deny]]  - hard-blocks a command shape (id, reason, command/command_prefix,
+#               optional required_flags/required_tokens/targets)
+#   [[ask]]   - same shape, surfaces a confirmation instead of a hard block
+#   [[allow]] - can only downgrade an Ask that shguard's own structural
+#               analysis produced; it can never override a deny/ask match,
+#               built-in or defined here (see docs/shguard-migration-deltas.md)
+#
+# Precedence: deny > ask > allow, evaluated across the built-in blocklist and
+# this file together.

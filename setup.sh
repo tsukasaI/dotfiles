@@ -34,6 +34,8 @@ link_with_backup "$DOTFILES/ghostty" ~/.config/ghostty
 link_with_backup "$DOTFILES/wezterm" ~/.config/wezterm
 mkdir -p ~/.config/karabiner
 link_with_backup "$DOTFILES/karabiner/karabiner.json" ~/.config/karabiner/karabiner.json
+mkdir -p ~/.config/shguard
+link_with_backup "$DOTFILES/claude-code/shguard/config.toml" ~/.config/shguard/config.toml
 
 
 # Home directory symlinks
