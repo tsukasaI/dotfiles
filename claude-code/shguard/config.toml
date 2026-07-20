@@ -274,22 +274,50 @@ command = "printenv"
 # =====================================================================
 # Shell escape / code injection
 #
-# bash/sh/zsh/dash -c are deliberately NOT ported here (unlike the old
-# blanket blocklist.conf rules for them): shguard unwraps these and
-# recurses into the inner command's own safety (confirmed: `bash -c 'rm -rf
-# /'` -> deny via the built-in rm-rf rule; `bash -c 'grep foo bar'` -> deny
-# via dotfiles-tool-policy-grep below; `bash -c 'echo hi'` -> allow). A
-# blanket deny rule on those four would be unreachable dead code — the
-# recursion is a strict improvement over the old regex hook's "block
-# everything, can't verify contents" approach, not a gap. ksh/fish -c are
-# NOT unwrapped (brush-parser doesn't parse their dialects), so they still
-# need explicit rules below.
+# bash/sh/zsh/dash get a BLANKET rule below (no required_flags), not a
+# `-c`-scoped one: shguard unwraps `command -c '<string>'` for these four
+# and recurses into the inner command's own safety (confirmed: `bash -c
+# 'rm -rf /'` -> deny via the built-in rm-rf rule; `bash -c 'grep foo bar'`
+# -> deny via dotfiles-tool-policy-grep below; `bash -c 'echo hi'` ->
+# allow), so a `required_flags = ["c"]` rule would be unreachable dead code
+# for the -c case specifically. But bare `bash script.sh` (no -c, a script
+# FILE reference) is NOT recursed into — shguard doesn't read the file —
+# and was uncovered entirely until this blanket rule was added (found via
+# the migration's parity check: `ba'sh' script.sh` was silently allowed).
+# Verified the blanket form coexists correctly with -c recursion (doesn't
+# make `bash -c 'echo hi'` start denying) and, as a bonus, closes the
+# newline-as-separator gap in the old hook's STRICT_CB check (issue #44):
+# `echo setup` + newline + `bash script.sh` now denies, because shguard's
+# real parser (unlike regex boundary classes) treats the newline as an
+# actual command separator and evaluates `bash script.sh` on its own.
+# ksh/fish -c are NOT unwrapped (brush-parser doesn't parse their
+# dialects), so they keep the narrower `-c`-scoped rules below instead.
 # =====================================================================
 
 [[deny]]
 id = "dotfiles-code-eval"
 reason = "eval executes arbitrary strings as shell code"
 command = "eval"
+
+[[deny]]
+id = "dotfiles-code-bash"
+reason = "bash script.sh executes an unreviewed script file; bash -c is handled by shguard's own recursion into the inner command"
+command = "bash"
+
+[[deny]]
+id = "dotfiles-code-sh"
+reason = "sh script.sh executes an unreviewed script file; sh -c is handled by shguard's own recursion into the inner command"
+command = "sh"
+
+[[deny]]
+id = "dotfiles-code-zsh"
+reason = "zsh script.sh executes an unreviewed script file; zsh -c is handled by shguard's own recursion into the inner command"
+command = "zsh"
+
+[[deny]]
+id = "dotfiles-code-dash"
+reason = "dash script.sh executes an unreviewed script file; dash -c is handled by shguard's own recursion into the inner command"
+command = "dash"
 
 [[deny]]
 id = "dotfiles-code-ksh-c"
@@ -566,11 +594,18 @@ id = "dotfiles-secret-read-cat"
 reason = "cat reads a file that looks like a secret/credential store"
 command = "cat"
 targets = [
-    { prefix = ".env" },
-    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" },
-    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
-    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+    { prefix = ".env" }, { prefix = "~/.env" },
+    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
+    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
+    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
+    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
+    { exact = ".npmrc" }, { exact = "~/.npmrc" },
+    { exact = ".netrc" }, { exact = "~/.netrc" },
+    { exact = ".pgpass" }, { exact = "~/.pgpass" },
+    { prefix = ".aws/" }, { prefix = "~/.aws/" },
+    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
+    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
 ]
 
 [[deny]]
@@ -578,11 +613,18 @@ id = "dotfiles-secret-read-head"
 reason = "head reads a file that looks like a secret/credential store"
 command = "head"
 targets = [
-    { prefix = ".env" },
-    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" },
-    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
-    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+    { prefix = ".env" }, { prefix = "~/.env" },
+    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
+    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
+    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
+    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
+    { exact = ".npmrc" }, { exact = "~/.npmrc" },
+    { exact = ".netrc" }, { exact = "~/.netrc" },
+    { exact = ".pgpass" }, { exact = "~/.pgpass" },
+    { prefix = ".aws/" }, { prefix = "~/.aws/" },
+    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
+    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
 ]
 
 [[deny]]
@@ -590,11 +632,18 @@ id = "dotfiles-secret-read-tail"
 reason = "tail reads a file that looks like a secret/credential store"
 command = "tail"
 targets = [
-    { prefix = ".env" },
-    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" },
-    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
-    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+    { prefix = ".env" }, { prefix = "~/.env" },
+    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
+    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
+    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
+    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
+    { exact = ".npmrc" }, { exact = "~/.npmrc" },
+    { exact = ".netrc" }, { exact = "~/.netrc" },
+    { exact = ".pgpass" }, { exact = "~/.pgpass" },
+    { prefix = ".aws/" }, { prefix = "~/.aws/" },
+    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
+    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
 ]
 
 [[deny]]
@@ -602,11 +651,18 @@ id = "dotfiles-secret-read-less"
 reason = "less reads a file that looks like a secret/credential store"
 command = "less"
 targets = [
-    { prefix = ".env" },
-    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" },
-    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
-    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+    { prefix = ".env" }, { prefix = "~/.env" },
+    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
+    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
+    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
+    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
+    { exact = ".npmrc" }, { exact = "~/.npmrc" },
+    { exact = ".netrc" }, { exact = "~/.netrc" },
+    { exact = ".pgpass" }, { exact = "~/.pgpass" },
+    { prefix = ".aws/" }, { prefix = "~/.aws/" },
+    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
+    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
 ]
 
 [[deny]]
@@ -614,11 +670,18 @@ id = "dotfiles-secret-read-more"
 reason = "more reads a file that looks like a secret/credential store"
 command = "more"
 targets = [
-    { prefix = ".env" },
-    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" },
-    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
-    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+    { prefix = ".env" }, { prefix = "~/.env" },
+    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
+    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
+    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
+    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
+    { exact = ".npmrc" }, { exact = "~/.npmrc" },
+    { exact = ".netrc" }, { exact = "~/.netrc" },
+    { exact = ".pgpass" }, { exact = "~/.pgpass" },
+    { prefix = ".aws/" }, { prefix = "~/.aws/" },
+    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
+    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
 ]
 
 [[deny]]
@@ -626,11 +689,18 @@ id = "dotfiles-secret-read-bat"
 reason = "bat reads a file that looks like a secret/credential store"
 command = "bat"
 targets = [
-    { prefix = ".env" },
-    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" },
-    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
-    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+    { prefix = ".env" }, { prefix = "~/.env" },
+    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
+    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
+    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
+    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
+    { exact = ".npmrc" }, { exact = "~/.npmrc" },
+    { exact = ".netrc" }, { exact = "~/.netrc" },
+    { exact = ".pgpass" }, { exact = "~/.pgpass" },
+    { prefix = ".aws/" }, { prefix = "~/.aws/" },
+    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
+    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
 ]
 
 [[deny]]
@@ -638,11 +708,18 @@ id = "dotfiles-secret-read-nano"
 reason = "nano opens a file that looks like a secret/credential store"
 command = "nano"
 targets = [
-    { prefix = ".env" },
-    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" },
-    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
-    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+    { prefix = ".env" }, { prefix = "~/.env" },
+    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
+    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
+    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
+    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
+    { exact = ".npmrc" }, { exact = "~/.npmrc" },
+    { exact = ".netrc" }, { exact = "~/.netrc" },
+    { exact = ".pgpass" }, { exact = "~/.pgpass" },
+    { prefix = ".aws/" }, { prefix = "~/.aws/" },
+    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
+    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
 ]
 
 [[deny]]
@@ -650,11 +727,18 @@ id = "dotfiles-secret-read-vim"
 reason = "vim opens a file that looks like a secret/credential store"
 command = "vim"
 targets = [
-    { prefix = ".env" },
-    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" },
-    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
-    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+    { prefix = ".env" }, { prefix = "~/.env" },
+    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
+    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
+    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
+    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
+    { exact = ".npmrc" }, { exact = "~/.npmrc" },
+    { exact = ".netrc" }, { exact = "~/.netrc" },
+    { exact = ".pgpass" }, { exact = "~/.pgpass" },
+    { prefix = ".aws/" }, { prefix = "~/.aws/" },
+    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
+    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
 ]
 
 [[deny]]
@@ -662,11 +746,18 @@ id = "dotfiles-secret-read-nvim"
 reason = "nvim opens a file that looks like a secret/credential store"
 command = "nvim"
 targets = [
-    { prefix = ".env" },
-    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" },
-    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
-    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+    { prefix = ".env" }, { prefix = "~/.env" },
+    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
+    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
+    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
+    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
+    { exact = ".npmrc" }, { exact = "~/.npmrc" },
+    { exact = ".netrc" }, { exact = "~/.netrc" },
+    { exact = ".pgpass" }, { exact = "~/.pgpass" },
+    { prefix = ".aws/" }, { prefix = "~/.aws/" },
+    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
+    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
 ]
 
 # =====================================================================
