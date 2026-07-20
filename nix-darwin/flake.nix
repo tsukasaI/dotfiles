@@ -15,9 +15,11 @@
     fini.inputs.nixpkgs.follows = "nixpkgs";
     herdr.url = "github:ogulcancelik/herdr";
     herdr.inputs.nixpkgs.follows = "nixpkgs";
+    shguard.url = "github:tsukasaI/shguard";
+    shguard.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs@{ self, nix-darwin, nixpkgs, ewc, fini, herdr }:
+  outputs = inputs@{ self, nix-darwin, nixpkgs, ewc, fini, herdr, shguard }:
   let
     # One function per host (#14): adding a second machine is one more mkHost
     # call under darwinConfigurations, not a copy of the configuration block.
@@ -69,6 +71,7 @@
         ewc.packages.${system}.default
         fini.packages.${system}.default
         herdr.packages.${system}.default
+        shguard.packages.${system}.default
       ] ++ (with pkgs; [
         # Modern CLI replacements
         bat
