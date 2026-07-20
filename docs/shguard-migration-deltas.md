@@ -32,6 +32,9 @@ weakening, documented so it isn't mistaken for a bug later.
 | 11 | `sudo` unwrap-recursion | regression (pending upstream) | [shguard#32](https://github.com/tsukasaI/shguard/issues/32) |
 | 12 | `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion | design change (net improvement) | n/a |
 | 13 | Symlinked config: Bash-write self-protection | gap (pending upstream) | [shguard#31](https://github.com/tsukasaI/shguard/issues/31) |
+| 14 | Command-position variable expansion → Ask | design change (more cautious) | n/a |
+| 15 | `git commit -uno` false positive (built-in short-flag clustering) | gap (permanent, minor) | shguard's own documented limitation |
+| 16 | Issue #44 (multi-line `STRICT_CB` bypass) | **closed** by shguard | n/a — confirmed via parity check |
 
 ## 1. Malformed-input fail-closed mode
 
@@ -171,17 +174,30 @@ requiring anyone to remember to re-add it.
 ## 12. `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion (net improvement, not a gap)
 
 Same unwrap-recursion mechanism as #11, but here it's a strict improvement
-over the old hook, not a regression: the old hook blanket-blocked
-**every** `bash -c`/`sh -c`/`zsh -c`/`dash -c` regardless of content
-(it had no way to statically verify what was inside). shguard actually
-parses and judges the inner command — confirmed `bash -c 'rm -rf /'` →
-deny (via the built-in rm-rf rule), `bash -c 'grep foo bar'` → deny (via
-`dotfiles-tool-policy-grep`, i.e. **user** rules apply recursively too,
-not just built-ins), `bash -c 'echo hi'` → allow. `config.toml`
-deliberately has no `dotfiles-code-{bash,sh,zsh,dash}-c` rules — they'd be
-unreachable dead code. `ksh -c`/`fish -c` are **not** unwrapped (brush-parser
-doesn't parse those dialects), so `dotfiles-code-ksh-c`/`dotfiles-code-fish-c`
-still exist as plain rules and work as expected.
+over the old hook for the `-c` case specifically, not a regression: the old
+hook blanket-blocked **every** `bash -c`/`sh -c`/`zsh -c`/`dash -c`
+regardless of content (it had no way to statically verify what was
+inside). shguard actually parses and judges the inner command — confirmed
+`bash -c 'rm -rf /'` → deny (via the built-in rm-rf rule), `bash -c 'grep
+foo bar'` → deny (via `dotfiles-tool-policy-grep`, i.e. **user** rules
+apply recursively too, not just built-ins), `bash -c 'echo hi'` → allow
+(where the old hook denied unconditionally).
+
+`config.toml`'s `dotfiles-code-{bash,sh,zsh,dash}` rules are **blanket**
+(no `required_flags = ["c"]`), not `-c`-scoped — an earlier draft of this
+port had `-c`-scoped versions and reasoned the whole category was
+unreachable dead code, which was wrong: the `-c` shape is superseded by
+recursion (a `required_flags=["c"]` rule genuinely never fires), but bare
+`bash script.sh` (a script *file* reference, no inline content to recurse
+into) is a different shape that recursion does **not** cover — shguard
+doesn't read the referenced file. That shape was silently uncovered until
+the parity check caught it (`ba'sh' script.sh` → allow). The blanket rule
+fixes that without breaking `-c` recursion (verified: `bash -c 'echo hi'`
+still allows with the blanket rule present) and, as a side effect, closes
+issue #44 — see #16 below. `ksh -c`/`fish -c` are **not** unwrapped
+(brush-parser doesn't parse those dialects), so `dotfiles-code-ksh-c`/
+`dotfiles-code-fish-c` keep their narrower `-c`-scoped form and work as
+plain rules.
 
 ## 13. Symlinked config: Bash-write self-protection gap
 
@@ -198,3 +214,42 @@ session would currently succeed. Filed as
 **hard gate** on full cutover (migration plan step 7) — until it lands, an
 agent policed solely by shguard (no `block-dangerous.sh` running
 alongside) could rewrite its own guard config via Bash.
+
+## 14. Command-position variable expansion → Ask (more cautious, not a gap)
+
+`"$HOME/dotfiles/setup.sh" --help` → old hook: allow (no blocklist pattern
+matches an unresolvable variable expansion, so it silently falls through).
+shguard: **ask** — its structural gate treats an unresolvable command-position
+substitution (`$VAR`, `$(...)`, backticks — "which command will run cannot
+be determined statically") as needing confirmation, per its own documented
+design. Not a config bug, not fixable in `config.toml`, and arguably safer
+than the old hook's silent allow — listed here so a future reader doesn't
+mistake the extra prompt for a regression.
+
+## 15. `git commit -uno` false positive (shguard's own built-in limitation)
+
+`git commit -uno -m "x"` → old hook: allow (cluster-aware — recognizes
+`-u` takes an argument, so the `n`/`o` after it aren't independent short
+flags). shguard's **built-in** `git-commit-no-verify-short` rule
+(`required_flags = ["n|--no-verify"]`) denies this — its short-flag-cluster
+matching reads `-uno` as containing a clustered `-n`, missing that `-u`
+takes a value. This is already documented as a known limitation in
+shguard's own `rules/blocklist.toml` comment ("Known false-positive edge:
+a `-m` message argument starting with `-` and containing `n` may trigger,
+same class of imprecision as the dotfiles hook") — not something this
+migration introduced or can fix from the user-config side. Not filed as a
+new upstream issue since it's already acknowledged upstream.
+
+## 16. Issue #44 (multi-line `STRICT_CB` bypass) — closed
+
+The migration plan speculated shguard's real AST parsing "likely closes
+[issue #44] as a side effect" and asked to confirm rather than assume.
+Confirmed via the parity check, **after** adding the blanket
+`dotfiles-code-{bash,sh,zsh,dash}` rules (#12): `echo setup` + newline +
+`bash script.sh` → shguard denies (via `dotfiles-code-bash` matching the
+second command), while the live `block-dangerous.sh` still allows it (the
+open bug — `STRICT_CB`'s boundary class doesn't treat a bare newline as a
+separator). shguard's real parser splits the newline-separated command
+list into independent commands and evaluates each, which is exactly the
+class of bug `STRICT_CB`'s regex-based boundary matching can't express.
+Recorded on the issue itself when this migration reaches cutover.
