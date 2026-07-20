@@ -14,3 +14,690 @@
 #
 # Precedence: deny > ask > allow, evaluated across the built-in blocklist and
 # this file together.
+#
+# This file ports claude-code/hooks/blocklist.conf's categories that aren't
+# already covered by shguard's built-in blocklist (rules/blocklist.toml).
+# Every `dotfiles-*` id below is namespaced to avoid colliding with a
+# built-in id (merge_user_config is additive-only: an id collision is a
+# load-time error, not an override).
+#
+# What's deliberately NOT here — see docs/shguard-migration-deltas.md for
+# the full list and reasoning: curl-localhost-only / rsync-local-only
+# (blocked on shguard upstream issue #30, except_targets), pipe-to-interpreter
+# beyond the built-in curl|wget -> sh pipeline, heredoc-fed interpreters
+# (python <<EOF etc.), the ANSI-C $'...' raw-string check, /dev/tcp|udp for
+# arbitrary commands, the general CREDENTIAL "any command mentioning
+# secret/credential" case, and full secret-file-reader path coverage
+# (extension-suffix patterns like *.pem/*.key aren't expressible with
+# exact/prefix target matching).
+
+# =====================================================================
+# Privilege escalation
+# =====================================================================
+
+# NOTE: currently unreachable. shguard unwraps `sudo <cmd>` and recurses
+# into <cmd>'s own safety instead of matching argv[0]="sudo" literally
+# (confirmed: `sudo whoami` -> allow, `env sudo ls` -> allow, while `doas`/
+# `su` are NOT given this treatment and this same rule shape works fine for
+# them below). Filed as shguard issue #32 (tsukasaI/shguard). Kept here so
+# the protection activates automatically once that's fixed upstream, rather
+# than being silently absent — see docs/shguard-migration-deltas.md.
+[[deny]]
+id = "dotfiles-privilege-sudo"
+reason = "sudo grants root-level access"
+command = "sudo"
+
+[[deny]]
+id = "dotfiles-privilege-su"
+reason = "su switches to another user account"
+command = "su"
+
+[[deny]]
+id = "dotfiles-privilege-doas"
+reason = "doas grants elevated privileges"
+command = "doas"
+
+# =====================================================================
+# File destruction (beyond the built-in rm-rf-dangerous-target rule)
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-file-rm"
+reason = "rm permanently deletes files"
+command = "rm"
+
+[[deny]]
+id = "dotfiles-file-truncate"
+reason = "truncate zeroes out file contents"
+command = "truncate"
+
+[[deny]]
+id = "dotfiles-file-unlink"
+reason = "unlink deletes a file (POSIX equivalent of rm)"
+command = "unlink"
+
+[[deny]]
+id = "dotfiles-file-rmdir"
+reason = "rmdir removes directories"
+command = "rmdir"
+
+# =====================================================================
+# Disk operations (beyond the built-in dd-write-device/mkfs-any-filesystem rules)
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-disk-dd"
+reason = "dd can overwrite raw disk blocks"
+command = "dd"
+
+[[deny]]
+id = "dotfiles-disk-mkfs-bare"
+reason = "mkfs creates a new filesystem, destroying data (bare invocation; built-in rule only covers the mkfs.* family)"
+command = "mkfs"
+
+[[deny]]
+id = "dotfiles-disk-fdisk"
+reason = "fdisk edits partition tables"
+command = "fdisk"
+
+[[deny]]
+id = "dotfiles-disk-gdisk"
+reason = "gdisk edits partition tables"
+command = "gdisk"
+
+[[deny]]
+id = "dotfiles-disk-parted"
+reason = "parted edits partition tables"
+command = "parted"
+
+[[deny]]
+id = "dotfiles-disk-diskutil-erase"
+reason = "diskutil erase permanently destroys disk data"
+command = "diskutil"
+required_tokens = ["erase"]
+
+# =====================================================================
+# Network (curl and rsync deliberately excluded — see header comment)
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-network-netcat"
+reason = "netcat opens raw TCP/UDP connections"
+command = "netcat"
+
+[[deny]]
+id = "dotfiles-network-nc"
+reason = "nc (netcat alias) opens raw TCP/UDP connections"
+command = "nc"
+
+[[deny]]
+id = "dotfiles-network-wget"
+reason = "wget can download or exfiltrate data to/from external hosts"
+command = "wget"
+
+[[deny]]
+id = "dotfiles-network-telnet"
+reason = "telnet opens raw TCP connections to remote hosts"
+command = "telnet"
+
+[[deny]]
+id = "dotfiles-network-ncat"
+reason = "ncat (nmap netcat) opens raw TCP/UDP connections"
+command = "ncat"
+
+[[deny]]
+id = "dotfiles-network-socat"
+reason = "socat opens arbitrary network channels and reverse shells"
+command = "socat"
+
+[[deny]]
+id = "dotfiles-network-dig"
+reason = "dig can leak data to attacker-controlled DNS via subdomain queries"
+command = "dig"
+
+[[deny]]
+id = "dotfiles-network-nslookup"
+reason = "nslookup can leak data via subdomain DNS queries"
+command = "nslookup"
+
+[[deny]]
+id = "dotfiles-network-host"
+reason = "host can leak data via subdomain DNS queries"
+command = "host"
+
+[[deny]]
+id = "dotfiles-network-drill"
+reason = "drill can leak data via subdomain DNS queries"
+command = "drill"
+
+[[deny]]
+id = "dotfiles-network-delv"
+reason = "delv can leak data via subdomain DNS queries"
+command = "delv"
+
+[[deny]]
+id = "dotfiles-network-getent-hosts"
+reason = "getent hosts triggers DNS resolution that can leak data"
+command = "getent"
+required_tokens = ["hosts"]
+
+# =====================================================================
+# Process / service manipulation
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-process-kill"
+reason = "kill terminates system or user processes"
+command = "kill"
+
+[[deny]]
+id = "dotfiles-process-pkill"
+reason = "pkill terminates processes by name"
+command = "pkill"
+
+[[deny]]
+id = "dotfiles-process-killall"
+reason = "killall terminates all matching processes"
+command = "killall"
+
+[[deny]]
+id = "dotfiles-service-launchctl-load"
+reason = "launchctl load can load/alter macOS system services"
+command = "launchctl"
+required_tokens = ["load"]
+
+[[deny]]
+id = "dotfiles-service-launchctl-unload"
+reason = "launchctl unload can unload macOS system services"
+command = "launchctl"
+required_tokens = ["unload"]
+
+[[deny]]
+id = "dotfiles-service-systemctl-enable"
+reason = "systemctl enable can alter Linux system services"
+command = "systemctl"
+required_tokens = ["enable"]
+
+[[deny]]
+id = "dotfiles-service-systemctl-start"
+reason = "systemctl start can start Linux system services"
+command = "systemctl"
+required_tokens = ["start"]
+
+[[deny]]
+id = "dotfiles-service-systemctl-stop"
+reason = "systemctl stop can stop Linux system services"
+command = "systemctl"
+required_tokens = ["stop"]
+
+[[deny]]
+id = "dotfiles-service-systemctl-disable"
+reason = "systemctl disable can disable Linux system services"
+command = "systemctl"
+required_tokens = ["disable"]
+
+# =====================================================================
+# Credential/secret references — best-effort partial port.
+# The old rule matched a bare "secret"/"credential" word on ANY command;
+# shguard rules require a command name, so only the specific subcommand
+# shapes the old rule's own comment called out are ported here. See
+# docs/shguard-migration-deltas.md for the general-case gap.
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-credential-docker-secret"
+reason = "docker secret exposes or manipulates Docker secrets"
+command = "docker"
+required_tokens = ["secret"]
+
+[[deny]]
+id = "dotfiles-credential-kubectl-secret"
+reason = "kubectl secret/secrets exposes or manipulates Kubernetes secrets"
+command = "kubectl"
+required_tokens = ["secret"]
+
+[[deny]]
+id = "dotfiles-credential-kubectl-secrets"
+reason = "kubectl secrets exposes or manipulates Kubernetes secrets"
+command = "kubectl"
+required_tokens = ["secrets"]
+
+# =====================================================================
+# Environment variable exfiltration
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-env-printenv"
+reason = "printenv dumps env vars that may include secrets"
+command = "printenv"
+
+# =====================================================================
+# Shell escape / code injection
+#
+# bash/sh/zsh/dash -c are deliberately NOT ported here (unlike the old
+# blanket blocklist.conf rules for them): shguard unwraps these and
+# recurses into the inner command's own safety (confirmed: `bash -c 'rm -rf
+# /'` -> deny via the built-in rm-rf rule; `bash -c 'grep foo bar'` -> deny
+# via dotfiles-tool-policy-grep below; `bash -c 'echo hi'` -> allow). A
+# blanket deny rule on those four would be unreachable dead code — the
+# recursion is a strict improvement over the old regex hook's "block
+# everything, can't verify contents" approach, not a gap. ksh/fish -c are
+# NOT unwrapped (brush-parser doesn't parse their dialects), so they still
+# need explicit rules below.
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-code-eval"
+reason = "eval executes arbitrary strings as shell code"
+command = "eval"
+
+[[deny]]
+id = "dotfiles-code-ksh-c"
+reason = "ksh -c executes an arbitrary script string"
+command = "ksh"
+required_flags = ["c"]
+
+[[deny]]
+id = "dotfiles-code-fish-c"
+reason = "fish -c executes an arbitrary script string"
+command = "fish"
+required_flags = ["c"]
+
+[[deny]]
+id = "dotfiles-code-xargs"
+reason = "xargs can invoke arbitrary executables (e.g. xargs sh -c)"
+command = "xargs"
+
+[[deny]]
+id = "dotfiles-code-python-c"
+reason = "python -c executes an arbitrary string as Python"
+command = "python"
+required_flags = ["c"]
+
+[[deny]]
+id = "dotfiles-code-python3-c"
+reason = "python3 -c executes an arbitrary string as Python"
+command = "python3"
+required_flags = ["c"]
+
+[[deny]]
+id = "dotfiles-code-node-e"
+reason = "node -e executes an arbitrary string as JavaScript"
+command = "node"
+required_flags = ["e"]
+
+[[deny]]
+id = "dotfiles-code-perl-e"
+reason = "perl -e executes an arbitrary string as Perl"
+command = "perl"
+required_flags = ["e"]
+
+[[deny]]
+id = "dotfiles-code-ruby-e"
+reason = "ruby -e executes an arbitrary string as Ruby"
+command = "ruby"
+required_flags = ["e"]
+
+[[deny]]
+id = "dotfiles-code-php-r"
+reason = "php -r executes an arbitrary string as PHP"
+command = "php"
+required_flags = ["r"]
+
+[[deny]]
+id = "dotfiles-code-source"
+reason = "source loads and executes a file's contents in the current shell"
+command = "source"
+
+[[deny]]
+id = "dotfiles-code-osascript"
+reason = "osascript runs AppleScript, including \"do shell script\" which can shell out"
+command = "osascript"
+
+# =====================================================================
+# Permission / user modification
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-permission-chmod"
+reason = "chmod changes file permissions"
+command = "chmod"
+
+[[deny]]
+id = "dotfiles-permission-chown"
+reason = "chown changes file ownership"
+command = "chown"
+
+[[deny]]
+id = "dotfiles-user-passwd"
+reason = "passwd changes user account passwords"
+command = "passwd"
+
+[[deny]]
+id = "dotfiles-user-useradd"
+reason = "useradd creates user accounts"
+command = "useradd"
+
+[[deny]]
+id = "dotfiles-user-userdel"
+reason = "userdel deletes user accounts"
+command = "userdel"
+
+# =====================================================================
+# Git — destructive operations beyond the built-in blocklist
+# (git push --force, reset --hard, clean, commit --amend/-n/--no-verify,
+# checkout --, rebase, branch -D, stash drop/clear, tag -d/-D/--delete/-f
+# are already covered by shguard's built-in rules)
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-git-reset-merge"
+reason = "git reset --merge irreversibly discards changes from a conflicted merge"
+command = "git"
+required_tokens = ["reset"]
+required_flags = ["--merge"]
+
+[[deny]]
+id = "dotfiles-git-restore"
+reason = "git restore discards uncommitted working tree changes"
+command = "git"
+required_tokens = ["restore"]
+
+[[deny]]
+id = "dotfiles-git-rm"
+reason = "git rm removes tracked files"
+command = "git"
+required_tokens = ["rm"]
+
+# Built-in git-branch-force-delete only covers -D; this adds the safe-looking
+# -d/--delete forms to match the old hook's full strictness.
+[[deny]]
+id = "dotfiles-git-branch-delete-safe"
+reason = "git branch -d/--delete deletes a branch"
+command = "git"
+required_tokens = ["branch"]
+required_flags = ["d|--delete"]
+
+# =====================================================================
+# GitHub CLI destructive operations
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-github-issue-delete"
+reason = "gh issue delete permanently deletes a remote issue"
+command = "gh"
+required_tokens = ["issue", "delete"]
+
+[[deny]]
+id = "dotfiles-github-repo-delete"
+reason = "gh repo delete permanently deletes a remote repository"
+command = "gh"
+required_tokens = ["repo", "delete"]
+
+[[deny]]
+id = "dotfiles-github-release-create"
+reason = "gh release create publishes an outward-facing release (tag/notifications persist even if deleted)"
+command = "gh"
+required_tokens = ["release", "create"]
+
+# Best-effort: catches the separate-token forms (-X DELETE, --method DELETE).
+# Does NOT catch --method=DELETE or -XDELETE (chained value) — see
+# docs/shguard-migration-deltas.md.
+[[deny]]
+id = "dotfiles-github-api-delete-upper"
+reason = "gh api -X DELETE / --method DELETE issues a destructive HTTP DELETE request"
+command = "gh"
+required_tokens = ["api", "DELETE"]
+
+[[deny]]
+id = "dotfiles-github-api-delete-lower"
+reason = "gh api -X delete / --method delete issues a destructive HTTP DELETE request"
+command = "gh"
+required_tokens = ["api", "delete"]
+
+# =====================================================================
+# History manipulation
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-history-clear"
+reason = "history -c/-d clears or deletes shell command history"
+command = "history"
+required_flags = ["c|d"]
+
+# =====================================================================
+# Cron / scheduling
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-scheduling-crontab-edit"
+reason = "crontab -e edits the user crontab"
+command = "crontab"
+required_flags = ["e"]
+
+[[deny]]
+id = "dotfiles-scheduling-crontab-remove"
+reason = "crontab -r removes the user crontab"
+command = "crontab"
+required_flags = ["r"]
+
+# =====================================================================
+# macOS system settings
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-macos-defaults-write"
+reason = "defaults write modifies macOS system/app preferences"
+command = "defaults"
+required_tokens = ["write"]
+
+[[deny]]
+id = "dotfiles-macos-defaults-delete"
+reason = "defaults delete removes macOS system/app preferences"
+command = "defaults"
+required_tokens = ["delete"]
+
+# =====================================================================
+# Docker outward-facing
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-docker-push"
+reason = "docker push publishes images to a registry"
+command = "docker"
+required_tokens = ["push"]
+
+# =====================================================================
+# SSH / remote access
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-ssh-ssh"
+reason = "ssh connects to remote hosts"
+command = "ssh"
+
+[[deny]]
+id = "dotfiles-ssh-scp"
+reason = "scp transfers files to/from remote hosts via SSH"
+command = "scp"
+
+[[deny]]
+id = "dotfiles-ssh-sftp"
+reason = "sftp transfers files to/from remote hosts via SSH"
+command = "sftp"
+
+# =====================================================================
+# Tool policy: prefer gitignore-aware tools
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-tool-policy-grep"
+reason = "grep ignores .gitignore and walks into node_modules / dist / target — use rg (or the built-in Grep tool)"
+command = "grep"
+
+[[deny]]
+id = "dotfiles-tool-policy-egrep"
+reason = "egrep is deprecated grep -E and ignores .gitignore — use rg (supports extended regex by default)"
+command = "egrep"
+
+[[deny]]
+id = "dotfiles-tool-policy-fgrep"
+reason = "fgrep is deprecated grep -F and ignores .gitignore — use rg -F"
+command = "fgrep"
+
+[[deny]]
+id = "dotfiles-tool-policy-find"
+reason = "find ignores .gitignore and walks into node_modules / dist / target — use fd (or the built-in Glob tool)"
+command = "find"
+
+# =====================================================================
+# Secret-file readers — best-effort partial port.
+# Old rule matched by filename SUFFIX/extension across any directory depth
+# (e.g. any path ending in .pem, .env*, or containing "secret"/"credential"
+# with any extension). shguard's `targets` only supports exact/prefix
+# matching on the whole argv token, so directory-prefixed paths and
+# extension-suffix patterns (*.pem, *.key, *.p12) aren't expressible here —
+# only common bare filenames/prefixes are covered. See
+# docs/shguard-migration-deltas.md.
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-secret-read-cat"
+reason = "cat reads a file that looks like a secret/credential store"
+command = "cat"
+targets = [
+    { prefix = ".env" },
+    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" },
+    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
+    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+]
+
+[[deny]]
+id = "dotfiles-secret-read-head"
+reason = "head reads a file that looks like a secret/credential store"
+command = "head"
+targets = [
+    { prefix = ".env" },
+    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" },
+    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
+    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+]
+
+[[deny]]
+id = "dotfiles-secret-read-tail"
+reason = "tail reads a file that looks like a secret/credential store"
+command = "tail"
+targets = [
+    { prefix = ".env" },
+    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" },
+    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
+    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+]
+
+[[deny]]
+id = "dotfiles-secret-read-less"
+reason = "less reads a file that looks like a secret/credential store"
+command = "less"
+targets = [
+    { prefix = ".env" },
+    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" },
+    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
+    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+]
+
+[[deny]]
+id = "dotfiles-secret-read-more"
+reason = "more reads a file that looks like a secret/credential store"
+command = "more"
+targets = [
+    { prefix = ".env" },
+    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" },
+    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
+    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+]
+
+[[deny]]
+id = "dotfiles-secret-read-bat"
+reason = "bat reads a file that looks like a secret/credential store"
+command = "bat"
+targets = [
+    { prefix = ".env" },
+    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" },
+    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
+    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+]
+
+[[deny]]
+id = "dotfiles-secret-read-nano"
+reason = "nano opens a file that looks like a secret/credential store"
+command = "nano"
+targets = [
+    { prefix = ".env" },
+    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" },
+    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
+    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+]
+
+[[deny]]
+id = "dotfiles-secret-read-vim"
+reason = "vim opens a file that looks like a secret/credential store"
+command = "vim"
+targets = [
+    { prefix = ".env" },
+    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" },
+    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
+    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+]
+
+[[deny]]
+id = "dotfiles-secret-read-nvim"
+reason = "nvim opens a file that looks like a secret/credential store"
+command = "nvim"
+targets = [
+    { prefix = ".env" },
+    { exact = "id_rsa" }, { exact = "id_ed25519" }, { exact = "id_ecdsa" }, { exact = "id_dsa" },
+    { exact = "kubeconfig" }, { prefix = ".kube/config" },
+    { exact = ".npmrc" }, { exact = ".netrc" }, { exact = ".pgpass" },
+    { prefix = ".aws/" }, { exact = ".docker/config.json" }, { prefix = ".config/gcloud/" },
+]
+
+# =====================================================================
+# Allowlisted security scanners (ported from allowlist.conf).
+# These tools legitimately read secret-looking files as their normal job.
+# NOTE: this is NOT an override mechanism — [[allow]] can never rescue a
+# match against a deny rule above. It works here only because none of the
+# targets lists above match these four tools' own argv[0] (secretlint/
+# detect-secrets/gitleaks/trufflehog aren't cat/head/tail/etc., and none of
+# the other deny rules' command names match them either). Kept as explicit
+# [[allow]] entries for documentation/audit-trail purposes and to downgrade
+# any structural Ask shguard's parser might otherwise raise on their
+# invocations (e.g. an argument containing "$(...)").
+# =====================================================================
+
+[[allow]]
+id = "dotfiles-allow-secretlint"
+reason = "secretlint is a secret-scanning tool, not a threat"
+command = "secretlint"
+
+[[allow]]
+id = "dotfiles-allow-detect-secrets"
+reason = "detect-secrets is a secret-scanning tool, not a threat"
+command = "detect-secrets"
+
+[[allow]]
+id = "dotfiles-allow-gitleaks"
+reason = "gitleaks is a secret-scanning tool, not a threat"
+command = "gitleaks"
+
+[[allow]]
+id = "dotfiles-allow-trufflehog"
+reason = "trufflehog is a secret-scanning tool, not a threat"
+command = "trufflehog"
