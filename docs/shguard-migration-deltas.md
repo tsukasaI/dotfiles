@@ -20,7 +20,7 @@ weakening, documented so it isn't mistaken for a bug later.
 | # | Area | Status | Tracking |
 |---|------|--------|----------|
 | 1 | Malformed-input fail-closed mode | regression (minor) | not filed — see below |
-| 2 | curl (localhost-only) / rsync (local-only) | gap (pending upstream) | [shguard#30](https://github.com/tsukasaI/shguard/issues/30) |
+| 2 | curl (localhost-only) / rsync (local-only) | gap (pending upstream) | [shguard#48](https://github.com/tsukasaI/shguard/issues/48) |
 | 3 | Pipe-to-interpreter beyond curl\|wget→sh | gap (permanent) | not expressible |
 | 4 | Heredoc-fed interpreters (`python <<EOF`) | gap (permanent) | not expressible |
 | 5 | ANSI-C `$'...'` raw-string check | gap (permanent) | not expressible |
@@ -29,14 +29,15 @@ weakening, documented so it isn't mistaken for a bug later.
 | 8 | `gh api -X DELETE` chained-value form | gap (permanent, partial) | not expressible |
 | 9 | Secret-file readers: extension-suffix / nested paths | gap (permanent, partial) | not expressible |
 | 10 | `--no-verify` on non-git commands | gap (permanent, minor) | not expressible |
-| 11 | `sudo` blanket-deny still unreachable (floors to Ask, not Block) | regression (pending upstream) | [shguard#35](https://github.com/tsukasaI/shguard/issues/35) |
+| 11 | `sudo`/`doas`/`su`/`pkexec`/`run0` privilege escalation | **resolved** — `escalation_floor = "deny"` | [shguard#35](https://github.com/tsukasaI/shguard/issues/35) closed, v0.3.0 |
 | 12 | `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion | design change (net improvement) | n/a |
-| 13 | Symlinked config: Bash-write self-protection | gap (pending upstream) | [shguard#31](https://github.com/tsukasaI/shguard/issues/31) |
+| 13 | Symlinked config: Bash-write self-protection | **resolved** (ticket bookkeeping still open, fix merged) | [shguard#31](https://github.com/tsukasaI/shguard/issues/31) fixed, v0.3.0 |
 | 14 | Command-position variable expansion → Ask | design change (more cautious) | n/a |
 | 15 | `git commit -uno` false positive (built-in short-flag clustering) | gap (permanent, minor) | shguard's own documented limitation |
-| 16 | Issue #44 (multi-line `STRICT_CB` bypass) | **closed** by shguard | n/a — confirmed via parity check |
-| 17 | `doas`/`su`/`pkexec` payload-shielding (shguard#36) | assessed — not a gap here | [shguard#36](https://github.com/tsukasaI/shguard/issues/36) |
-| 18 | Missing/dangling default config path silently drops all user rules | gap (pending upstream) — **new cutover gate** | [shguard#39](https://github.com/tsukasaI/shguard/issues/39) |
+| 16 | dotfiles issue #44 (multi-line `STRICT_CB` bypass) | **closed** by shguard | n/a — confirmed via parity check |
+| 17 | `doas`/`su`/`pkexec` payload-shielding (shguard#36) | assessed — not a gap here | [shguard#36](https://github.com/tsukasaI/shguard/issues/36) fixed in v0.3.0 (ticket open — same multi-issue auto-close quirk as #31) |
+| 18 | Missing/dangling default config path silently drops all user rules | **resolved** for dangling symlinks; residual gap for a clean absent-file case | [shguard#39](https://github.com/tsukasaI/shguard/issues/39) fixed, v0.3.0 |
+| 19 | `except_targets` treats flag values as candidate targets — 55% over-ask on real local curl usage | gap (pending upstream) — **blocks curl/rsync rules** | [shguard#48](https://github.com/tsukasaI/shguard/issues/48) |
 
 ## 1. Malformed-input fail-closed mode
 
@@ -54,10 +55,17 @@ allowed `curl`/`rsync` freely to local targets but asked/blocked for
 remote ones; shguard's `[[allow]]` can only downgrade its own structural
 `Ask`, never a config-defined `ask`/`deny` match, so a broad-ask + narrow-
 allow approximation doesn't work (verified: it would make *every* curl,
-including localhost, ask). Tracked as
-[shguard#30](https://github.com/tsukasaI/shguard/issues/30) (an
-`except_targets` primitive). Until it lands, curl/rsync coverage stays on
-`block-dangerous.sh`, which is why full cutover (migration plan step 7) is
+including localhost, ask).
+
+**Update: the original blocker (`except_targets` not existing,
+[shguard#30](https://github.com/tsukasaI/shguard/issues/30)) is closed
+and the primitive works.** But writing the rules with it surfaced a new,
+more severe problem: see #19 below — `except_targets` treats flag values
+as candidate targets, causing a 55% over-ask rate on real local curl
+usage. That's now the actual blocker
+([shguard#48](https://github.com/tsukasaI/shguard/issues/48)), not #30.
+Until #48 lands, curl/rsync coverage stays on `block-dangerous.sh`,
+which is why full cutover (migration plan's implementation steps) is
 gated on this issue.
 
 ## 3. Pipe-to-interpreter beyond curl\|wget→sh
@@ -160,41 +168,58 @@ hypothetical non-git CLI accepting a `--no-verify`-style flag is no longer
 caught. Low practical impact (no other tool in this workflow is known to
 use that flag), but real.
 
-## 11. `sudo` blanket-deny still unreachable (regression)
+## 11. `sudo`/`doas`/`su`/`pkexec`/`run0` privilege escalation — resolved via `escalation_floor`
 
-Originally confirmed: `sudo <cmd>` is evaluated by shguard recursing into
-`<cmd>`'s own safety rather than matching `argv[0] = "sudo"` literally —
-`sudo whoami` → allow, `env sudo ls` → allow, even though
-`dotfiles-privilege-sudo` (a plain `command = "sudo"` deny rule) exists in
-`config.toml`. The old hook blocked **every** `sudo` invocation
-unconditionally, since privilege escalation itself was the concern,
-independent of the wrapped command's content. `doas`/`su` are **not**
-given this unwrap treatment — the equivalent rules for those work exactly
-as expected.
+History, for context: `sudo <cmd>` was found to be evaluated by shguard
+recursing into `<cmd>`'s own safety rather than matching
+`argv[0] = "sudo"` literally — `sudo whoami` → allow, `env sudo ls` →
+allow, even though `dotfiles-privilege-sudo` (a plain `command = "sudo"`
+deny rule) exists in `config.toml`. The old hook blocked **every** `sudo`
+invocation unconditionally, since privilege escalation itself was the
+concern, independent of the wrapped command's content. `doas`/`su` were
+**not** given this unwrap treatment at the time — the equivalent rules
+for those worked exactly as expected on their own.
 
-**Update (v0.2.0, shguard#32 closed):** the unwrap-recursion itself was
-fixed — `sudo whoami`/`env sudo ls`/`sudo systemctl start nginx` now floor
-to **Ask** rather than silently allowing. But this does **not** make a
-blanket `[[deny]] command = "sudo"` reachable: the fix is a hardcoded
-Ask-floor, not a raise-to-Block, and it's explicitly not liftable by
-config (a `command = "sudo"` deny/allow entry doesn't change it). That
-specific ask was split into a new issue,
-[shguard#35](https://github.com/tsukasaI/shguard/issues/35) (a
-`sudo_floor = "deny"` config key). `dotfiles-privilege-sudo` in
-`config.toml` is still inert as a result — kept in place so protection
-activates automatically once #35 lands, same rationale as before, just
-tracking the right issue now.
+v0.2.0 (shguard#32) fixed the unwrap-recursion to floor at **Ask** rather
+than silently allowing, but a blanket `[[deny]] command = "sudo"` stayed
+unreachable — that gap was split into shguard#35 (a floor-strength config
+key). Separately, shguard#36 found that `doas`/`su`/`pkexec` had the
+*opposite* problem: not unwrapped at all, so a rule targeting the wrapped
+command never saw it through them.
 
-**Version-skew caveat (2026-07-21, independent review finding):** the
-paragraph above describes v0.2.0's *upstream* behavior, verified against
-the shguard repo directly. It does **not** describe what this machine was
-running at the time this section was first written — `nix-darwin/flake.lock`
-still pinned v0.1.0 (rev `7e60f76`), so `sudo whoami` → **allow** (silent,
-not Ask) was the actual live/shadow-tested behavior until the flake pin is
-bumped and `darwin-rebuild switch` run. Every shadow-log entry collected
-before that point reflects 0.1.0, not the v0.2.0 behavior described above
-— don't treat shadow-run conclusions about `sudo` as validated against
-v0.2.0 until the bump is confirmed and the shadow window has run since.
+**Resolution (v0.3.0, shguard#35's fix covering #36 as well): a single
+`escalation_floor` config key.** (Ticket note: #35 is closed; #36's
+ticket still shows open — verified via `gh issue view` — but the fix is
+confirmed merged and working below, the same multi-issue auto-close
+quirk already documented for #31.)
+
+```toml
+escalation_floor = "deny"  # default is "ask"; "allow" is rejected at load
+```
+
+Verified live: `sudo whoami` and `doas whoami` both now **deny**
+outright (not just Ask) with this key set; `escalation_floor = "allow"`
+is correctly rejected at config load (fail-closed, no way to disable the
+floor). It covers `sudo`, `doas`, `su`, `pkexec`, and `run0` uniformly.
+
+**Important nuance, confirmed live and corrected from an earlier draft
+of this entry**: with this repo's full `config.toml` (floor *and* the
+`dotfiles-privilege-sudo`/`-su`/`-doas` rules both present), the reported
+deny reason for `sudo`/`doas`/`su` is the **rule** matching
+("matches blocklist rule \"dotfiles-privilege-sudo\": ..."), not the
+floor's own message — because those three rules match unconditionally
+on `argv[0]` and so always fire alongside the floor. The floor's own
+message ("invoked via pkexec; privilege escalation is gated independent
+of...") only surfaces for vectors this repo has **no** rule for
+(`pkexec`, `run0` — verified live with `pkexec whoami`) or in a config
+that lacks the redundant rules entirely. Net effect is identical either
+way (deny), but the earlier claim that the floor's reason always wins
+was wrong — worth getting right since it affects how to read shguard's
+output when debugging. The three rules genuinely are redundant with the
+floor in place (removing them would change nothing for sudo/doas/su
+specifically), just not in the way originally described. Kept in
+`config.toml` anyway (harmless, and documents intent), rather than
+removed.
 
 ## 12. `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion (net improvement, not a gap)
 
@@ -219,26 +244,37 @@ doesn't read the referenced file. That shape was silently uncovered until
 the parity check caught it (`ba'sh' script.sh` → allow). The blanket rule
 fixes that without breaking `-c` recursion (verified: `bash -c 'echo hi'`
 still allows with the blanket rule present) and, as a side effect, closes
-issue #44 — see #16 below. `ksh -c`/`fish -c` are **not** unwrapped
+dotfiles issue #44 — see #16 below. `ksh -c`/`fish -c` are **not** unwrapped
 (brush-parser doesn't parse those dialects), so `dotfiles-code-ksh-c`/
 `dotfiles-code-fish-c` keep their narrower `-c`-scoped form and work as
 plain rules.
 
-## 13. Symlinked config: Bash-write self-protection gap
+## 13. Symlinked config: Bash-write self-protection gap — resolved
 
 `claude-code/shguard/config.toml` is deployed via a `setup.sh` symlink to
 `~/.config/shguard/config.toml` so the policy stays versioned and
 CI-testable (migration plan step 2). shguard's own `self_protection_toml`
-matches only the *resolved* path; a Bash write targeting the repo-side
+matched only the *resolved* path; a Bash write targeting the repo-side
 real file directly (`echo ... > claude-code/shguard/config.toml`, `tee`,
-`cp`) is caught by neither shguard's self-protection nor
+`cp`) was caught by neither shguard's self-protection nor
 `block-config-edit.sh` (which only gates the Edit/Write tool, not Bash).
-Confirmed live during this migration: a `cp` to that path from an agent
-session would currently succeed. Filed as
-[shguard#31](https://github.com/tsukasaI/shguard/issues/31); this is a
-**hard gate** on full cutover (migration plan step 7) — until it lands, an
-agent policed solely by shguard (no `block-dangerous.sh` running
-alongside) could rewrite its own guard config via Bash.
+Confirmed live during this migration (pre-fix) that a `cp` to that path
+from an agent session would succeed. Filed as
+[shguard#31](https://github.com/tsukasaI/shguard/issues/31).
+
+**Resolved in v0.3.0.** `src/config.rs`'s self-protection now
+canonicalizes the config path and protects both the literal parent
+directory and the canonicalized/resolved target's parent directory.
+Verified live with a real symlink setup matching this repo's deployment
+shape: a `tee` targeting the repo-side real file now correctly denies
+(`shguard-self-protect-config-tee-resolved`), same as the symlink path
+itself. Note: the GitHub *ticket* for #31 still shows OPEN — its closing
+PR referenced multiple issues in one line and GitHub only auto-closed
+the first — but the fix is confirmed merged and working; close the
+ticket manually with this verification note when convenient. Known
+residual limitation (new shguard#44, not blocking): a symlink chain of
+2+ hops only gets its first and last hop protected, not any intermediate
+hop — irrelevant to this repo's single-hop deployment.
 
 ## 14. Command-position variable expansion → Ask (more cautious, not a gap)
 
@@ -265,10 +301,15 @@ same class of imprecision as the dotfiles hook") — not something this
 migration introduced or can fix from the user-config side. Not filed as a
 new upstream issue since it's already acknowledged upstream.
 
-## 16. Issue #44 (multi-line `STRICT_CB` bypass) — closed
+## 16. dotfiles issue #44 (multi-line `STRICT_CB` bypass) — closed
+
+Not to be confused with shguard's own upstream issue #44 (a different,
+unrelated symlink-hop limitation — see #13 above). This is this repo's
+own issue tracker.
 
 The migration plan speculated shguard's real AST parsing "likely closes
-[issue #44] as a side effect" and asked to confirm rather than assume.
+[this repo's issue #44] as a side effect" and asked to confirm rather
+than assume.
 Confirmed via the parity check, **after** adding the blanket
 `dotfiles-code-{bash,sh,zsh,dash}` rules (#12): `echo setup` + newline +
 `bash script.sh` → shguard denies (via `dotfiles-code-bash` matching the
@@ -295,6 +336,15 @@ but it's a Linux polkit tool with no equivalent on this macOS machine —
 low relevance, not acted on. No config change needed; recorded here so a
 future reader checking shguard#36 against this repo doesn't have to
 re-derive that it's already covered.
+
+**Update: fixed in v0.3.0 as part of the `escalation_floor` key** (see
+#11 above) — `doas`/`su`/`pkexec`/`run0` are now covered by the same
+floor mechanism `sudo` is, in addition to this repo's own blanket rules
+already covering the assessment above. Belt and suspenders now, not a
+live gap either way. (Ticket note: verified via `gh issue view 36` that
+the GitHub ticket is still open despite the fix being merged and
+verified live — same multi-issue auto-close quirk documented for #31;
+not re-derived as a live problem here.)
 
 ## 18. Missing/dangling default config path silently drops all user rules
 
@@ -326,8 +376,45 @@ Every user rule not already in the built-in blocklist — `su`/`doas`,
 applying, silently.
 
 Filed as [shguard#39](https://github.com/tsukasaI/shguard/issues/39).
-Treated as a **new cutover gate** alongside #30/#31 (migration plan
-step 7) — a sole-enforcer shguard with this gap means a broken config
-deployment silently reduces to built-in-only coverage instead of
-refusing to run, which is exactly the class of failure the guardrail
-system exists to prevent.
+
+**Resolved in v0.3.0, for the realistic trigger — with one residual
+gap.** The default-path check now uses `symlink_metadata` (`lstat`)
+instead of trusting a plain read error: a dangling symlink or any other
+`lstat` failure now correctly fails closed to `ask`, matching the
+explicit-`$SHGUARD_CONFIG` behavior — verified live (a dangling symlink
+at the resolved config path now returns `ask`, not silent built-in-only
+`allow`). This closes the realistic trigger described above (repo
+move/rename, partial `setup.sh` run, deleted real file — all produce a
+dangling symlink). **Residual gap, not closed by this fix**: a clean
+`lstat` `NotFound` (nothing at that path at all, e.g. a genuinely fresh
+machine where `setup.sh` hasn't run yet and no symlink exists) still
+silently falls back to built-in-only. Narrower than originally recorded,
+still real.
+
+## 19. `except_targets` treats flag values as candidate targets — blocks curl/rsync rules
+
+Writing the curl-localhost-only / rsync-local-only rules (deferred since
+#2 above) surfaced a new, more severe problem than #30 (`except_targets`
+not existing) ever was. Measured against 24 real `curl` invocations
+mined from ~1 month of session transcripts
+(`~/.local/share/claude-logs/logs.db`), using the exact `except_targets`
+config from shguard's own README example plus scheme-less anchors:
+
+- 11 of 24 targeted `localhost`/`127.0.0.1` — should always be `allow`.
+- **6 of those 11 (55%) instead got `ask`** — every miss caused by a
+  value-taking flag (`-o`, `-w`, `--retry-delay`, `-m`, or piped output)
+  being evaluated as a candidate target, not the actual URL.
+- The identical defect affects `rsync`: a purely local-to-local
+  `rsync -a --exclude=".git" ./src/ ./dst/` also asks, since `.git`
+  isn't an exempted target either.
+
+This can't be fixed by enumerating more `except_targets` entries — flag
+values (filenames, format strings, timeouts, exclude patterns, request
+bodies) are unbounded. Filed as
+[shguard#48](https://github.com/tsukasaI/shguard/issues/48). **This is
+now the actual blocker on curl/rsync rules, not #30** (which is closed
+and works correctly for the cases it covers — the primitive itself is
+fine, this is a separate target-detection defect). Both commands remain
+on `block-dangerous.sh`'s existing logic until #48 lands; shipping
+either `[[ask]]` or `[[deny]]` on top of a 55% false-positive rate on
+routine local usage would be a regression, not a parity port.

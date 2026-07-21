@@ -86,7 +86,7 @@ case_ "plain grep (tool policy)"         'grep foo bar.txt'
 case_ "doas (blanket, unaffected by unwrap)" 'doas whoami'
 case_ "su (blanket, unaffected by unwrap)"   'su - root'
 case_ "sudo wrapping a dangerous command"    "sudo rm -rf /"
-case_ "sudo wrapping a benign command"       'sudo whoami' KNOWN_DELTA "delta#11 sudo unwrap — old denies blanket, shguard allow/ask depending on deployed version (see delta doc version-skew caveat)"
+case_ "sudo wrapping a benign command"       'sudo whoami'
 
 # ── Quote/backslash bypass closures (#1) ────────────────────────────────────
 case_ "backslash-split rm"               'r\m -rf /tmp/x'
