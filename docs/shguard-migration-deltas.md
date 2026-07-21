@@ -36,6 +36,7 @@ weakening, documented so it isn't mistaken for a bug later.
 | 15 | `git commit -uno` false positive (built-in short-flag clustering) | gap (permanent, minor) | shguard's own documented limitation |
 | 16 | Issue #44 (multi-line `STRICT_CB` bypass) | **closed** by shguard | n/a — confirmed via parity check |
 | 17 | `doas`/`su`/`pkexec` payload-shielding (shguard#36) | assessed — not a gap here | [shguard#36](https://github.com/tsukasaI/shguard/issues/36) |
+| 18 | Missing/dangling default config path silently drops all user rules | gap (pending upstream) — **new cutover gate** | [shguard#39](https://github.com/tsukasaI/shguard/issues/39) |
 
 ## 1. Malformed-input fail-closed mode
 
@@ -140,12 +141,15 @@ regex are **not** covered:
 
 - Extension-suffix patterns (`*.pem`, `*.key`, `*.p12`, any-extension
   `secret*`/`credential*` files) — there's no suffix/contains matcher.
-- The same filename reached through a directory-prefixed path where the
-  prefix isn't already covered (`cat ./nested/dir/.env` still matches via
-  the `.env` prefix rule only because `prefix` matches from the start of
-  the *token*, which for a relative path starting with `.env` still works;
-  but `cat ./nested/dir/id_rsa` does **not** match `exact = "id_rsa"` since
-  the full token is `./nested/dir/id_rsa`, not `id_rsa`).
+- **Any directory-prefixed path, for every target, not just the `exact`
+  ones.** An earlier version of this note claimed `cat ./nested/dir/.env`
+  still matched via the `.env` `prefix` rule — that was wrong, verified
+  live: it's `allow`. `prefix` matches from the start of the *token*, and
+  `./nested/dir/.env` doesn't start with `.env` — it starts with `./`. So
+  `cat ./nested/dir/.env` (a very ordinary way to reference a project
+  `.env` file one directory down) is just as uncovered as
+  `cat ./nested/dir/id_rsa`. This is a materially bigger gap than
+  originally recorded — it's not limited to the `exact`-matched targets.
 
 ## 10. `--no-verify` on non-git commands
 
@@ -180,6 +184,17 @@ specific ask was split into a new issue,
 `config.toml` is still inert as a result — kept in place so protection
 activates automatically once #35 lands, same rationale as before, just
 tracking the right issue now.
+
+**Version-skew caveat (2026-07-21, independent review finding):** the
+paragraph above describes v0.2.0's *upstream* behavior, verified against
+the shguard repo directly. It does **not** describe what this machine was
+running at the time this section was first written — `nix-darwin/flake.lock`
+still pinned v0.1.0 (rev `7e60f76`), so `sudo whoami` → **allow** (silent,
+not Ask) was the actual live/shadow-tested behavior until the flake pin is
+bumped and `darwin-rebuild switch` run. Every shadow-log entry collected
+before that point reflects 0.1.0, not the v0.2.0 behavior described above
+— don't treat shadow-run conclusions about `sudo` as validated against
+v0.2.0 until the bump is confirmed and the shadow window has run since.
 
 ## 12. `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion (net improvement, not a gap)
 
@@ -280,3 +295,39 @@ but it's a Linux polkit tool with no equivalent on this macOS machine —
 low relevance, not acted on. No config change needed; recorded here so a
 future reader checking shguard#36 against this repo doesn't have to
 re-derive that it's already covered.
+
+## 18. Missing/dangling default config path silently drops all user rules
+
+Found via an independent security review (2026-07-21), not by manual
+testing during the original port. Verified live: when the resolved
+default config path (`~/.config/shguard/config.toml`, no `$SHGUARD_CONFIG`
+override) is missing or a dangling symlink, shguard does **not** fail
+closed — it silently evaluates against the built-in blocklist only, with
+no indication every `dotfiles-*` rule has been dropped:
+
+```
+echo '{"tool_name":"Bash","tool_input":{"command":"grep foo bar"},"hook_event_name":"PreToolUse"}' \
+  | HOME=/tmp/nonexistent-home shguard
+# -> allow ("command cleared all checks") — grep has no built-in rule,
+#    only dotfiles-tool-policy-grep, which was silently skipped
+```
+
+This is asymmetric with the *explicit*-path case: `SHGUARD_CONFIG=/does/not/exist`
+correctly fails closed (`ask`, "refusing to evaluate any command until
+this is fixed"). The gap is specifically in the default-path discovery,
+not the load-failure handling.
+
+Realistic trigger for this repo's deployment (real file in-repo, symlinked
+into `~/.config/shguard/`, migration plan step 2): a repo move/rename, a
+partial fresh-machine `setup.sh` run (known-fragile, issue #5), or
+accidental deletion of the real file all leave the symlink dangling.
+Every user rule not already in the built-in blocklist — `su`/`doas`,
+`ssh`, `kill`, secret-file readers, `TOOL_POLICY`, everything — stops
+applying, silently.
+
+Filed as [shguard#39](https://github.com/tsukasaI/shguard/issues/39).
+Treated as a **new cutover gate** alongside #30/#31 (migration plan
+step 7) — a sole-enforcer shguard with this gap means a broken config
+deployment silently reduces to built-in-only coverage instead of
+refusing to run, which is exactly the class of failure the guardrail
+system exists to prevent.

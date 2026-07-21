@@ -35,6 +35,11 @@ command -v "$SHGUARD_BIN" >/dev/null 2>&1 || {
   exit 1
 }
 
+[[ -x "$BD" ]] || {
+  echo "$BD is missing or not executable — every case would silently read as 'allow' (exit 126/127), not a real comparison" >&2
+  exit 1
+}
+
 fails=0
 total=0
 deltas=0
@@ -74,6 +79,14 @@ case_ "git reset --hard"                 'git reset --hard'
 case_ "git reset soft"                   'git reset HEAD~1'
 case_ "plain rg"                         'rg foo'
 case_ "plain grep (tool policy)"         'grep foo bar.txt'
+
+# ── Privilege escalation (added after an independent review found this
+# category had zero coverage — the one live mismatch on the deployed
+# binary, sudo, was invisible to this script until now) ────────────────
+case_ "doas (blanket, unaffected by unwrap)" 'doas whoami'
+case_ "su (blanket, unaffected by unwrap)"   'su - root'
+case_ "sudo wrapping a dangerous command"    "sudo rm -rf /"
+case_ "sudo wrapping a benign command"       'sudo whoami' KNOWN_DELTA "delta#11 sudo unwrap — old denies blanket, shguard allow/ask depending on deployed version (see delta doc version-skew caveat)"
 
 # ── Quote/backslash bypass closures (#1) ────────────────────────────────────
 case_ "backslash-split rm"               'r\m -rf /tmp/x'

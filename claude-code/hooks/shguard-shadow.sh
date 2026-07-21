@@ -21,12 +21,20 @@ INPUT=$(cat 2>/dev/null)
 
 if [[ -n "$INPUT" ]] && command -v shguard >/dev/null 2>&1; then
   VERDICT=$(printf '%s' "$INPUT" | shguard 2>/dev/null)
+  SHGUARD_EXIT=$?
+  mkdir -p -m 700 "$LOG_DIR" 2>/dev/null
+  [[ -f "$LOG_FILE" ]] || { : > "$LOG_FILE"; chmod 600 "$LOG_FILE"; } 2>/dev/null
+  TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
   if [[ -n "$VERDICT" ]]; then
-    mkdir -p -m 700 "$LOG_DIR" 2>/dev/null
-    [[ -f "$LOG_FILE" ]] || { : > "$LOG_FILE"; chmod 600 "$LOG_FILE"; } 2>/dev/null
-    TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
-    jq -cn --arg ts "$TIMESTAMP" --arg payload_raw "$INPUT" --arg verdict_raw "$VERDICT" \
-      '{timestamp: $ts, payload: ($payload_raw | try fromjson catch $payload_raw), verdict: ($verdict_raw | try fromjson catch $verdict_raw)}' \
+    jq -cn --arg ts "$TIMESTAMP" --arg payload_raw "$INPUT" --arg verdict_raw "$VERDICT" --argjson exit_code "$SHGUARD_EXIT" \
+      '{timestamp: $ts, payload: ($payload_raw | try fromjson catch $payload_raw), verdict: ($verdict_raw | try fromjson catch $verdict_raw), shguard_exit: $exit_code}' \
+      >> "$LOG_FILE" 2>/dev/null
+  else
+    # shguard produced no output at all (crash, killed, etc.) — log this
+    # explicitly instead of silently skipping, so a shadow-log analysis
+    # can't mistake "shguard broke" for "nothing happened here".
+    jq -cn --arg ts "$TIMESTAMP" --arg payload_raw "$INPUT" --argjson exit_code "$SHGUARD_EXIT" \
+      '{timestamp: $ts, payload: ($payload_raw | try fromjson catch $payload_raw), verdict: "EMPTY_VERDICT", shguard_exit: $exit_code}' \
       >> "$LOG_FILE" 2>/dev/null
   fi
 fi
