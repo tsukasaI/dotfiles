@@ -29,12 +29,13 @@ weakening, documented so it isn't mistaken for a bug later.
 | 8 | `gh api -X DELETE` chained-value form | gap (permanent, partial) | not expressible |
 | 9 | Secret-file readers: extension-suffix / nested paths | gap (permanent, partial) | not expressible |
 | 10 | `--no-verify` on non-git commands | gap (permanent, minor) | not expressible |
-| 11 | `sudo` unwrap-recursion | regression (pending upstream) | [shguard#32](https://github.com/tsukasaI/shguard/issues/32) |
+| 11 | `sudo` blanket-deny still unreachable (floors to Ask, not Block) | regression (pending upstream) | [shguard#35](https://github.com/tsukasaI/shguard/issues/35) |
 | 12 | `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion | design change (net improvement) | n/a |
 | 13 | Symlinked config: Bash-write self-protection | gap (pending upstream) | [shguard#31](https://github.com/tsukasaI/shguard/issues/31) |
 | 14 | Command-position variable expansion → Ask | design change (more cautious) | n/a |
 | 15 | `git commit -uno` false positive (built-in short-flag clustering) | gap (permanent, minor) | shguard's own documented limitation |
 | 16 | Issue #44 (multi-line `STRICT_CB` bypass) | **closed** by shguard | n/a — confirmed via parity check |
+| 17 | `doas`/`su`/`pkexec` payload-shielding (shguard#36) | assessed — not a gap here | [shguard#36](https://github.com/tsukasaI/shguard/issues/36) |
 
 ## 1. Malformed-input fail-closed mode
 
@@ -155,9 +156,9 @@ hypothetical non-git CLI accepting a `--no-verify`-style flag is no longer
 caught. Low practical impact (no other tool in this workflow is known to
 use that flag), but real.
 
-## 11. `sudo` unwrap-recursion (regression)
+## 11. `sudo` blanket-deny still unreachable (regression)
 
-Confirmed empirically: `sudo <cmd>` is evaluated by shguard recursing into
+Originally confirmed: `sudo <cmd>` is evaluated by shguard recursing into
 `<cmd>`'s own safety rather than matching `argv[0] = "sudo"` literally —
 `sudo whoami` → allow, `env sudo ls` → allow, even though
 `dotfiles-privilege-sudo` (a plain `command = "sudo"` deny rule) exists in
@@ -165,11 +166,20 @@ Confirmed empirically: `sudo <cmd>` is evaluated by shguard recursing into
 unconditionally, since privilege escalation itself was the concern,
 independent of the wrapped command's content. `doas`/`su` are **not**
 given this unwrap treatment — the equivalent rules for those work exactly
-as expected. Filed as
-[shguard#32](https://github.com/tsukasaI/shguard/issues/32); the
-`dotfiles-privilege-sudo` rule is kept in `config.toml`, currently inert,
-so protection activates automatically once that's fixed rather than
-requiring anyone to remember to re-add it.
+as expected.
+
+**Update (v0.2.0, shguard#32 closed):** the unwrap-recursion itself was
+fixed — `sudo whoami`/`env sudo ls`/`sudo systemctl start nginx` now floor
+to **Ask** rather than silently allowing. But this does **not** make a
+blanket `[[deny]] command = "sudo"` reachable: the fix is a hardcoded
+Ask-floor, not a raise-to-Block, and it's explicitly not liftable by
+config (a `command = "sudo"` deny/allow entry doesn't change it). That
+specific ask was split into a new issue,
+[shguard#35](https://github.com/tsukasaI/shguard/issues/35) (a
+`sudo_floor = "deny"` config key). `dotfiles-privilege-sudo` in
+`config.toml` is still inert as a result — kept in place so protection
+activates automatically once #35 lands, same rationale as before, just
+tracking the right issue now.
 
 ## 12. `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion (net improvement, not a gap)
 
@@ -253,3 +263,20 @@ separator). shguard's real parser splits the newline-separated command
 list into independent commands and evaluates each, which is exactly the
 class of bug `STRICT_CB`'s regex-based boundary matching can't express.
 Recorded on the issue itself when this migration reaches cutover.
+
+## 17. `doas`/`su`/`pkexec` payload-shielding (shguard#36) — assessed, not a gap here
+
+Found upstream while fixing #32: `doas`, `su`, and `pkexec` aren't in
+shguard's `TRANSPARENT_WRAPPERS` list, so unlike `sudo` they're never
+unwrapped at all — a rule targeting the *wrapped* command never sees it
+(`doas rm -rf /` → allow, since the `rm` rule only ever sees `argv[0] =
+"doas"`, not `rm`). Assessed against this config specifically: **not a
+problem here**. `dotfiles-privilege-doas`/`dotfiles-privilege-su` are
+blanket `command = "doas"`/`command = "su"` deny rules with no flag/token
+constraint — they deny the wrapper itself unconditionally, regardless of
+what it wraps, so they never depended on the wrapped command being
+visible in the first place. `pkexec` has no rule in `config.toml` at all,
+but it's a Linux polkit tool with no equivalent on this macOS machine —
+low relevance, not acted on. No config change needed; recorded here so a
+future reader checking shguard#36 against this repo doesn't have to
+re-derive that it's already covered.
