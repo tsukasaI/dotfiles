@@ -35,12 +35,13 @@
 # Privilege escalation
 # =====================================================================
 
-# NOTE: currently unreachable. shguard unwraps `sudo <cmd>` and recurses
-# into <cmd>'s own safety instead of matching argv[0]="sudo" literally
-# (confirmed: `sudo whoami` -> allow, `env sudo ls` -> allow, while `doas`/
-# `su` are NOT given this treatment and this same rule shape works fine for
-# them below). Filed as shguard issue #32 (tsukasaI/shguard). Kept here so
-# the protection activates automatically once that's fixed upstream, rather
+# NOTE: currently unreachable. shguard's v0.2.0 fix for issue #32 made
+# `sudo <cmd>` floor to Ask (not silent Allow) when <cmd> doesn't
+# independently trip a rule, but a blanket deny on argv[0]="sudo" is
+# still not reachable -- that's tracked as a separate issue, #35 (a
+# sudo_floor="deny" config key). `doas`/`su` are NOT given any unwrap
+# treatment and this same rule shape works fine for them below. Kept
+# here so protection activates automatically once #35 lands, rather
 # than being silently absent — see docs/shguard-migration-deltas.md.
 [[deny]]
 id = "dotfiles-privilege-sudo"

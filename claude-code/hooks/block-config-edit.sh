@@ -43,7 +43,9 @@ case "$FILE_PATH" in
   */.claude/hooks/blocklist.conf | \
   */.claude/hooks/allowlist.conf | \
   */claude-code/shguard/config.toml | \
-  */.config/shguard/config.toml)
+  */.config/shguard/config.toml | \
+  */claude-code/hooks/shguard-shadow.sh | \
+  */.claude/hooks/shguard-shadow.sh)
     printf '[BLOCKED: GUARDRAIL_PROTECTION] "%s" defines the PreToolUse guardrails and must not be edited by Claude.\nAsk the user to change it manually (procedure: hooks-guardrails skill).\n' "$BASENAME" >&2
     exit 2
     ;;
