@@ -22,27 +22,39 @@
 # load-time error, not an override).
 #
 # What's deliberately NOT here — see docs/shguard-migration-deltas.md for
-# the full list and reasoning: curl-localhost-only / rsync-local-only
-# (blocked on shguard upstream issue #30, except_targets), pipe-to-interpreter
-# beyond the built-in curl|wget -> sh pipeline, heredoc-fed interpreters
-# (python <<EOF etc.), the ANSI-C $'...' raw-string check, /dev/tcp|udp for
-# arbitrary commands, the general CREDENTIAL "any command mentioning
-# secret/credential" case, and full secret-file-reader path coverage
-# (extension-suffix patterns like *.pem/*.key aren't expressible with
-# exact/prefix target matching).
+# the full list and reasoning: pipe-to-interpreter beyond the built-in
+# curl|wget -> sh pipeline, heredoc-fed interpreters (python <<EOF etc.),
+# the ANSI-C $'...' raw-string check, /dev/tcp|udp for arbitrary commands,
+# the general CREDENTIAL "any command mentioning secret/credential" case,
+# and full secret-file-reader path coverage (extension-suffix patterns
+# like *.pem/*.key aren't expressible with exact/prefix target matching).
+#
+# curl-localhost-only / rsync-local-only are ALSO deliberately absent:
+# except_targets exists (issue #30, closed) but treats flag values as
+# candidate targets, causing a 55% over-ask rate on real local curl usage
+# — issue #48, still open, blocks writing these rules until fixed.
+
+# Privilege escalation floor (issue #35, closed in v0.3.0; also fixes
+# #36's doas/su/pkexec gap, though that ticket itself is still open due
+# to a multi-issue auto-close quirk): denies sudo/doas/su/pkexec/run0
+# outright regardless of whether the wrapped command independently trips
+# a rule. "allow" is rejected at config load (fail-closed, no way to
+# disable this). See docs/shguard-migration-deltas.md #11.
+escalation_floor = "deny"
 
 # =====================================================================
 # Privilege escalation
 # =====================================================================
 
-# NOTE: currently unreachable. shguard's v0.2.0 fix for issue #32 made
-# `sudo <cmd>` floor to Ask (not silent Allow) when <cmd> doesn't
-# independently trip a rule, but a blanket deny on argv[0]="sudo" is
-# still not reachable -- that's tracked as a separate issue, #35 (a
-# sudo_floor="deny" config key). `doas`/`su` are NOT given any unwrap
-# treatment and this same rule shape works fine for them below. Kept
-# here so protection activates automatically once #35 lands, rather
-# than being silently absent — see docs/shguard-migration-deltas.md.
+# NOTE: these three rules are now REDUNDANT (not deactivated) given the
+# escalation_floor above (issue #35, closed in v0.3.0): the floor
+# denies sudo/doas/su outright via its own mechanism, independent of
+# argv[0] rule matching. In practice these rules still "win" the
+# reported reason string since they match unconditionally alongside the
+# floor (verified live: pkexec, which has no rule here, shows the
+# floor's own message; sudo/doas/su show the rule's message instead) —
+# net effect is identical (deny) either way. Kept in place anyway as
+# documentation of intent — see docs/shguard-migration-deltas.md #11.
 [[deny]]
 id = "dotfiles-privilege-sudo"
 reason = "sudo grants root-level access"
