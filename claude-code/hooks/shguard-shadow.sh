@@ -22,7 +22,8 @@ INPUT=$(cat 2>/dev/null)
 if [[ -n "$INPUT" ]] && command -v shguard >/dev/null 2>&1; then
   VERDICT=$(printf '%s' "$INPUT" | shguard 2>/dev/null)
   SHGUARD_EXIT=$?
-  mkdir -p -m 700 "$LOG_DIR" 2>/dev/null
+  mkdir -p "$LOG_DIR" 2>/dev/null
+  chmod 700 "$LOG_DIR" 2>/dev/null
   [[ -f "$LOG_FILE" ]] || { : > "$LOG_FILE"; chmod 600 "$LOG_FILE"; } 2>/dev/null
   TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
   if [[ -n "$VERDICT" ]]; then
