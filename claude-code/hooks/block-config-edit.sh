@@ -89,29 +89,9 @@ for pattern in "${PROTECTED[@]}"; do
   esac
 done
 
-# Cooling-period lockfiles: this repo's CLAUDE.md documents flake.lock and
-# lazy-lock.json as changed only by the safe-*-update scripts (or an explicit
-# `nix flake update`), never by hand — hand-edits bypass the 7/14-day aging
-# window those scripts enforce as supply-chain caution.
-COOLED_LOCKFILES=(
-  'flake.lock'
-  'lazy-lock.json'
-)
-
-for pattern in "${COOLED_LOCKFILES[@]}"; do
-  # shellcheck disable=SC2254
-  case "$BASENAME" in
-    $pattern)
-      printf '[BLOCKED: LOCKFILE_PROTECTION] "%s" is a cooling-period lockfile; hand-edits bypass the aging-aware update policy.\nRegenerate via scripts/safe-flake-update.sh, scripts/safe-lazy-update.sh, or scripts/safe-update-all.sh.\n' "$BASENAME" >&2
-      exit 2
-      ;;
-  esac
-done
-
-# Other package-manager lockfiles: same principle as above (tool-generated,
-# hand-edits drift from what the tool would produce and get silently
-# clobbered on the next install) but this repo has no cooling script for
-# them — regenerate via the tool that owns the file instead.
+# Package-manager lockfiles: tool-generated, hand-edits drift from what the
+# tool would produce and get silently clobbered on the next install —
+# regenerate via the tool that owns the file instead.
 LOCKFILES=(
   'package-lock.json'
   'pnpm-lock.yaml'

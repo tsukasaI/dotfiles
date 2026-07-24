@@ -23,7 +23,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | `nvim/` | lazy.nvim config: one file per plugin in `lua/plugins/` with that plugin's keymaps inside its spec; global options/keymaps in `init.lua`; LSP servers in `lsp/<name>.lua`, enabled at the bottom of `init.lua`. |
 | `zsh/zshrc` | Hand-written, no framework. `_cached_eval` caches slow init output (mise/zoxide/fzf). Custom prompt — starship was removed. |
 | `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks — `core.hooksPath` was retired (see Pitfalls); this repo's own pre-commit gitleaks check lives in the root `lefthook.yaml`, installed per-repo via `lefthook install` (see `setup.sh`). |
-| `scripts/` | `safe-flake-update.sh`, `safe-lazy-update.sh`, `safe-update-all.sh` — cooling-period dependency updates. |
+| `scripts/` | Utility scripts (currently empty after cooling-period removal). |
 | `setup.sh` | First-time symlink installer. Known-fragile on fresh machines (issue #5). |
 | `docs/` | Investigation memos specific to this repo's own subject matter (e.g. `turso-investigation.md`); not a knowledge-management store — see the Vault bullet in Concepts for the cc-memory/vault/docs boundary. |
 | `ghostty/`, `wezterm/` | Terminals: ghostty primary, wezterm fallback, deliberately identical theme/font. |
@@ -34,9 +34,8 @@ There is no staging or deploy step (hooks apply on the next tool call,
 - Apply system config: `sudo darwin-rebuild switch --flake ~/dotfiles/nix-darwin`
   (flake output resolved by hostname; macOS `defaults` changes need logout).
 - Verify a flake change without activating: `darwin-rebuild build --flake ~/dotfiles/nix-darwin`.
-- Update dependencies: `scripts/safe-update-all.sh` (or the flake/lazy script alone).
-  They only update lockfiles and print a diff-review hint; running
-  `darwin-rebuild switch` afterwards is deliberately a separate manual step.
+- Update flake inputs: `nix flake update` (in `nix-darwin/`), then
+  `darwin-rebuild switch` to activate.
 - Test a hook change with a synthetic payload:
   `echo '{"tool_input":{"command":"grep foo"}}' | claude-code/hooks/block-dangerous.sh; echo $?`
   — exit 0 = allow, exit 2 = block.
@@ -47,12 +46,6 @@ There is no staging or deploy step (hooks apply on the next tool call,
 
 ## Concepts
 
-- **Cooling period ("aging-aware" updates)**: the `safe-*` scripts revert any
-  dependency bump whose upstream commit is younger than 7 days (14 for
-  nixpkgs), as supply-chain caution. Corollaries: lazy.nvim's own update
-  checker is disabled in `nvim/lua/config/lazy.lua` — don't re-enable it;
-  `flake.lock` and `lazy-lock.json` are changed only by those scripts (or an
-  explicit `nix flake update`), never by hand.
 - **Contextual Commits**: the commit-body format (see global CLAUDE.md) is
   load-bearing here, not just style — `claude-code/skills/_shared/harvest.ts`
   machine-parses `intent/decision/rejected/constraint/learned` lines to feed

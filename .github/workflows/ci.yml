@@ -24,8 +24,6 @@ jobs:
         run: |
           shellcheck -x --severity=warning \
             setup.sh \
-            scripts/*.sh \
-            scripts/lib/*.sh \
             claude-code/hooks/*.sh \
             claude-code/scripts/*.sh \
             tests/hooks-regression.sh \
@@ -65,35 +63,6 @@ jobs:
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  flake-lock-cooling:
-    # Recurrence prevention for #26: a bare `nix flake update` (e.g. run by
-    # hand while adding a new input) bypasses safe-flake-update.sh's cooling
-    # policy entirely. Re-derive the same policy from git history so a fresh
-    # flake.lock can't land regardless of how it was produced.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 0 # need history to diff flake.lock against its previous state
-      - name: resolve base revision
-        id: base
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            base="$(git merge-base "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}")"
-          else
-            base="${{ github.event.before }}"
-          fi
-          if [[ -z "$base" || "$base" == "0000000000000000000000000000000000000000" ]] || ! git cat-file -e "$base" 2>/dev/null; then
-            echo "no comparable base revision (first commit / force-push) — skipping"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "sha=$base" >> "$GITHUB_OUTPUT"
-          fi
-      - name: flake.lock cooling-period check
-        if: steps.base.outputs.skip == 'false'
-        run: scripts/check-flake-cooling.sh "${{ steps.base.outputs.sha }}" "${{ github.sha }}"
 
   flake-check:
     # aarch64-darwin evaluation needs an arm64 macOS runner; --no-build keeps
