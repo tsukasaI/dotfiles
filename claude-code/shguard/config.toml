@@ -586,6 +586,18 @@ id = "dotfiles-tool-policy-fgrep"
 reason = "fgrep is deprecated grep -F and ignores .gitignore — use rg -F"
 command = "fgrep"
 
+# `command = "grep"` above only matches grep as argv[0] — it doesn't fire
+# when grep is invoked as a git subcommand (`git grep`, `git -C dir grep`).
+# The old hook's bare-word match caught this via substring scanning; this
+# rule ports that specific case. `required_tokens` is positional, so it
+# still misses `git -C dir grep` (a non-flag token before the subcommand) —
+# see docs/shguard-migration-deltas.md #21.
+[[deny]]
+id = "dotfiles-tool-policy-git-grep"
+reason = "git grep — parity with the old hook's bare-word \"grep\" match; prefer rg or the built-in Grep tool"
+command = "git"
+required_tokens = ["grep"]
+
 [[deny]]
 id = "dotfiles-tool-policy-find"
 reason = "find ignores .gitignore and walks into node_modules / dist / target — use fd (or the built-in Glob tool)"
