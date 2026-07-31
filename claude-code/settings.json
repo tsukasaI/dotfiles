@@ -118,7 +118,7 @@
       "Read(**/__pycache__/**)",
       "Read(**/.pytest_cache/**)"
     ],
-    "defaultMode": "default"
+    "defaultMode": "auto"
   },
   "model": "claude-opus-4-6[1M]",
   "hooks": {
