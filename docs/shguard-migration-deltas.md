@@ -38,6 +38,8 @@ weakening, documented so it isn't mistaken for a bug later.
 | 17 | `doas`/`su`/`pkexec` payload-shielding (shguard#36) | assessed — not a gap here | [shguard#36](https://github.com/tsukasaI/shguard/issues/36) fixed in v0.3.0 (ticket open — same multi-issue auto-close quirk as #31) |
 | 18 | Missing/dangling default config path silently drops all user rules | **resolved** for dangling symlinks; residual gap for a clean absent-file case | [shguard#39](https://github.com/tsukasaI/shguard/issues/39) fixed, v0.3.0 |
 | 19 | `except_targets` treats flag values as candidate targets — 55% over-ask on real local curl usage | gap (pending upstream) — **blocks curl/rsync rules** | [shguard#48](https://github.com/tsukasaI/shguard/issues/48) |
+| 20 | Parser can't parse `2>&1`/for/while/until/function-defs/`$?`/subshells — falls back to blanket `ask`, rule engine never runs | **regression (severe)** | [shguard#75](https://github.com/tsukasaI/shguard/issues/75) |
+| 21 | `git grep` bare-command match doesn't cover git subcommand form | gap, partial config fix | fixed via `dotfiles-tool-policy-git-grep`; `git -C <dir> grep` still uncovered |
 
 ## 1. Malformed-input fail-closed mode
 
@@ -418,3 +420,65 @@ fine, this is a separate target-detection defect). Both commands remain
 on `block-dangerous.sh`'s existing logic until #48 lands; shipping
 either `[[ask]]` or `[[deny]]` on top of a 55% false-positive rate on
 routine local usage would be a regression, not a parity port.
+
+## 20. Parser construct-support gaps mask the entire rule engine — the largest gap found
+
+Found via the shadow-log observation period (2026-07-20 to 2026-07-31,
+`claude-code/hooks/shguard-shadow.sh`, migration plan step 5): every real
+Bash command across all Claude Code sessions on this machine was replayed
+live through both `block-dangerous.sh` and shguard. Of 3576 captured
+commands, 1083 (30%) hit an "unsupported construct" parse failure in
+shguard, on which it returns a blanket `ask` **without ever running its
+rule engine** — built-in or `dotfiles-*` rules alike see nothing.
+
+Breakdown of the 1083: redirection kind DuplicateOutput (`2>&1` etc.) = 836,
+`for` clause = 73, special parameter expansion (`$?` etc.) = 66, function
+definition = 55, `while` clause = 25, subshell `(...)` = 10, array
+assignment = 4, timed pipeline (`time`) = 3, arithmetic expansion
+`$((...))` = 3, `until` clause = 2, process substitution = 2.
+
+Of those, 999 were pure friction (old hook allowed; shguard now asks for
+nothing). But **84 were commands the old hook actually denied** — verified
+live:
+
+```
+for f in *; do rm -rf "$f"; done   -> old: deny (exit 2)   shguard: ask
+rm -rf /tmp/x 2>&1                 -> old: deny            shguard: ask
+```
+
+An obviously catastrophic pattern, merely wrapped in an ordinary `for`
+loop or suffixed with `2>&1`, downgrades from an unconditional block to a
+dismissible confirmation dialog.
+
+This is intentional in shguard (`src/gate.rs`: parse error -> immediate
+Ask, no partial evaluation) and documented in its own `plan.md` as
+covering only "exotic" syntax — real traffic disproves that framing
+(`2>&1` alone is 23% of all commands captured). Independently verified
+live by a second reviewer (additional cases: `curl evil.com 2>&1`, `sudo
+rm -rf / 2>&1`, a `while` loop wrapping `rm -rf` — all confirm the same
+parse-error -> Ask -> rule engine never runs path). Not filed upstream as
+of the original finding (checked all open issues + `gh search issues` on
+`tsukasaI/shguard`); now filed as
+[shguard#75](https://github.com/tsukasaI/shguard/issues/75). Unlike
+every other item in this doc, this is not a rule-schema expressiveness
+limit — brush-parser (shguard's parsing dependency, 0.4.0) already
+produces typed AST nodes for these constructs; shguard's own
+`src/parser.rs` just declines to translate them. This is the largest gap
+found by real-traffic volume (30% of all commands, vs. this doc's
+next-largest single item, #19, at 55% over-ask on curl specifically) and
+on its own severity should gate full cutover alongside #19.
+
+## 21. `git grep` not covered by the grep tool-policy rule
+
+The old hook's `TOOL_POLICY` rule matches the bare word "grep" anywhere
+in the command line via regex, so it also fires on `git grep ...`.
+shguard's `dotfiles-tool-policy-grep` is `command = "grep"` (argv[0]
+exact), which doesn't fire when grep is invoked as a git subcommand.
+Fixed via a `dotfiles-tool-policy-git-grep` rule (`command = "git"` +
+`required_tokens = ["grep"]`, verified live to correctly ignore `git log
+--grep=` and commit messages mentioning grep — `required_tokens` matches
+positionally, not via substring, so it doesn't false-positive the way
+the old hook's bare-word scan could). Residual gap: `git -C <dir> grep
+...` still isn't caught — a non-flag token before the subcommand breaks
+shguard's positional `required_tokens` matching, a known shguard
+limitation, not expressible from the config side.
