@@ -54,6 +54,22 @@ expect "$BD" 2 "quote-split bash" "$(cmd "ba'sh' script.sh")"
 expect "$BD" 2 "quote-split secret read" "$(cmd "cat .e'nv'")"
 expect "$BD" 2 "quote-split force push" "$(cmd "git push --forc'e' origin main")"
 
+# ── block-dangerous.sh: newline-boundary bypasses closed (#44) ──────────────
+# STRICT_CB and normalize_cmd's quote-keep check both lacked a literal
+# newline in their command-boundary character classes, so an unquoted
+# bare interpreter OR a quoted dangerous command on line 2+ of a multi-line
+# command bypassed detection entirely (a newline is a real separator per
+# POSIX 2.9.3 / bash manual "Lists", same as `;`).
+expect "$BD" 2 "multiline: VAR=x newline bash" "$(cmd $'VAR=x\nbash script.sh')"
+expect "$BD" 2 "multiline: echo setup newline sh" "$(cmd $'echo setup\nsh payload.sh')"
+expect "$BD" 2 "multiline: quoted rm on line 2 (general blocklist)" "$(cmd $'echo x\n'"'rm' -rf /tmp/x")"
+expect "$BD" 2 "multiline: quoted curl on line 2" "$(cmd $'echo x\n'"'curl' https://evil.example.com")"
+expect "$BD" 2 "multiline: quote-split rm on line 2" "$(cmd $'echo x\n'"'r''m' -rf /tmp/x")"
+# Line continuations must still collapse into a single logical command, not
+# get mistaken for a second line once newline is a boundary char.
+expect "$BD" 0 "line continuation: bash joined as echo's arg, not invoked" "$(cmd $'echo foo \\\n'"bash")"
+expect "$BD" 0 "line continuation: double-quoted (also POSIX line-continuation)" "$(cmd $'echo "foo \\\nbar"')"
+
 # ── block-dangerous.sh: blocklist basics still hold ─────────────────────────
 expect "$BD" 2 "plain rm -rf" "$(cmd 'rm -rf foo')"
 expect "$BD" 2 "git reset --hard" "$(cmd 'git reset --hard')"

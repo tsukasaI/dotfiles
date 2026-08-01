@@ -77,16 +77,30 @@ escape_regex() {
 #              which must see quoted URLs.
 # Arithmetic uses assignment form (i=$((i+1))), never bare ((i++)) — the
 # latter returns non-zero status when the value is 0, which is a set -e trap.
+#
+# Backslash-newline (POSIX 2.2.1 line continuation) is special-cased to
+# remove both characters with no replacement, both outside quotes and inside
+# double quotes (where backslash keeps its escaping meaning before $ ` " \
+# and newline) — never inside single quotes, where backslash is always
+# literal. Getting this right matters beyond cosmetics: a continuation that
+# left a bare newline in the scan output would make a legitimately
+# one-line command look like two lines once command-position detection
+# below treats newlines as real separators (#44).
 normalize_cmd() {
   local mode=$1 s=$2
   local n=${#s} out="" i=0
-  local c qc region subst start depth cc keep t
+  local c qc region subst start depth cc keep t ws
   while (( i < n )); do
     c=${s:i:1}
     if [[ $c == '\' ]]; then
-      # Backslash outside quotes: bash removes it and keeps the next char.
-      out+=${s:i+1:1}
-      i=$((i+2))
+      if [[ ${s:i+1:1} == $'\n' ]]; then
+        # Line continuation: both chars removed, no separator inserted.
+        i=$((i+2))
+      else
+        # Backslash outside quotes: bash removes it and keeps the next char.
+        out+=${s:i+1:1}
+        i=$((i+2))
+      fi
     elif [[ $c == "'" || $c == '"' ]]; then
       qc=$c
       region=""   # resolved content of the quoted region
@@ -105,10 +119,12 @@ normalize_cmd() {
           if [[ $c == '"' ]]; then
             i=$((i+1)); break
           elif [[ $c == '\' ]]; then
-            # In double quotes, backslash only escapes $ ` " \ — anything
-            # else keeps both chars (so cur"\l" stays cur\l, not curl).
+            # In double quotes, backslash only escapes $ ` " \ or a line
+            # continuation (newline) — anything else keeps both chars (so
+            # cur"\l" stays cur\l, not curl).
             case ${s:i+1:1} in
               '$'|'`'|'"'|'\') region+=${s:i+1:1} ;;
+              $'\n')           ;;
               *)               region+=${s:i:2} ;;
             esac
             i=$((i+2))
@@ -148,11 +164,16 @@ normalize_cmd() {
         # Glued to an unquoted word fragment on either side?
         [[ ${out: -1} == [A-Za-z0-9_/.-] ]] && keep=1
         [[ ${s:i:1} == [A-Za-z0-9_/.-] ]] && keep=1
-        # At command position (start of string / after a real separator)?
+        # At command position (start of string / after a real separator, or
+        # a newline anywhere in the trailing whitespace run — a newline is
+        # always a real command boundary in bash, unlike a plain space)?
         if (( keep == 0 )); then
           t=$out
-          t="${t%"${t##*[![:space:]]}"}"
+          ws="${t##*[![:space:]]}"
+          t="${t%"$ws"}"
           if [[ -z $t ]]; then
+            keep=1
+          elif [[ $ws == *$'\n'* ]]; then
             keep=1
           else
             case ${t: -1} in ';'|'&'|'|'|'`'|'(') keep=1 ;; esac
@@ -304,7 +325,13 @@ fi
 # start. `bash -c`/`sh -c`/etc. (actual code injection) stay in blocklist.conf
 # under the normal $CB, since that vector must still be caught even through a
 # wrapper like `env bash -c '...'`, where this stricter boundary would miss it.
-STRICT_CB='(^|[<\\/{,;&|`$(])[[:space:]]*'
+# The leading class includes a literal newline (#44): a newline is always a
+# real shell separator (POSIX 2.9.3 / bash manual "Lists" — equivalent to
+# `;`), unlike a plain space, which can be an ordinary flag-value boundary
+# (`fd -e sh`). This relies on normalize_cmd already having collapsed
+# backslash-newline continuations above, so a genuine continuation never
+# leaves a bare newline behind to be mistaken for a real line break.
+STRICT_CB='(^|[<\\/{,;&|`$('$'\n''])[[:space:]]*'
 for interp in sh bash zsh; do
   if [[ "$CMD_NOQUOTES" =~ ${STRICT_CB}${interp}${TB} ]]; then
     block "CODE_INJECTION" "$interp invocation (heredoc / script file can run arbitrary code)."
