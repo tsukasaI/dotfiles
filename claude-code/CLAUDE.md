@@ -22,6 +22,7 @@
 
 # Clarify before acting
 - IMPORTANT: When uncertain, ASK — do not guess. If a request has more than one reasonable interpretation, or you lack information for a choice I would care about, pause and ask via `AskUserQuestion` before acting. Here, asking IS the correct move — not a fallback. Batch the open questions into one call.
+- After asking a question (AskUserQuestion or in-text), do not start work whose shape depends on the answer. Read-only investigation that is useful under every answer may continue while waiting.
 - Proceed without asking when the request is unambiguous, or a sensible default is obvious and cheaply reversible — both must hold: (a) undoing costs one command or edit, and (b) getting it wrong wastes minutes, not data or trust. State the assumption in one line and continue.
   - Example: "add a test for this function", no path given → default to the existing `_test.go`/`*.test.ts` alongside it; state it, proceed.
   - NG (ask instead): "clean up this file", no scope given — spans formatting, dead code, and structure; guessing wrong means redoing the diff.
