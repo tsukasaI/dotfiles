@@ -3,6 +3,7 @@
 - Use plain `git add` / `git commit` / `git status` inside the current project — the cwd is already the repo. Reserve `-C <path>` for a genuinely different repository.
 - "commitして" with no scope = commit ONLY files changed in this session. If the working tree has unrelated changes mixed in, list them and confirm instead of guessing.
 - Commit after each completed subtask; never start the next subtask while pre-commit fails — fix the check first. Bypass flags (`--no-verify`, `git push --force`) are hook-blocked; use `--force-with-lease` when force is genuinely needed.
+- Git workflow by repo: `dotfiles` and `ops` → commit directly to main and push. Every other repo → NEVER commit to main: create a branch (`<type>/<short-slug>`), open a PR, and stop there — merge only when I say so, via `gh pr merge --squash --delete-branch`.
 - Commit message format (Contextual Commits = Conventional Commits + structured body):
   ```
   <type>(<scope>): <description>
