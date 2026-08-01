@@ -93,6 +93,7 @@
         lazygit
         gitleaks
         lefthook
+        shellcheck
 
         # Cloud / DevOps
         awscli2

@@ -22,7 +22,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | `.claude/` | Project-scoped Claude state for *this repo only* (plans, memory, local settings). Not the same thing as `claude-code/`. |
 | `nvim/` | lazy.nvim config: one file per plugin in `lua/plugins/` with that plugin's keymaps inside its spec; global options/keymaps in `init.lua`; LSP servers in `lsp/<name>.lua`, enabled at the bottom of `init.lua`. |
 | `zsh/zshrc` | Hand-written, no framework. `_cached_eval` caches slow init output (mise/zoxide/fzf). Custom prompt — starship was removed. |
-| `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks — `core.hooksPath` was retired (see Pitfalls); this repo's own pre-commit gitleaks check lives in the root `lefthook.yaml`, installed per-repo via `lefthook install` (see `setup.sh`). |
+| `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks — `core.hooksPath` was retired (see Pitfalls); this repo's own pre-commit/pre-push checks live in the root `lefthook.yaml`, installed per-repo via `lefthook install` (see `setup.sh`). |
 | `scripts/` | Utility scripts (currently empty after cooling-period removal). |
 | `setup.sh` | First-time symlink installer. Known-fragile on fresh machines (issue #5). |
 | `docs/` | Investigation memos specific to this repo's own subject matter (e.g. `turso-investigation.md`); not a knowledge-management store — see the Vault bullet in Concepts for the cc-memory/vault/docs boundary. |
@@ -39,10 +39,15 @@ There is no staging or deploy step (hooks apply on the next tool call,
 - Test a hook change with a synthetic payload:
   `echo '{"tool_input":{"command":"grep foo"}}' | claude-code/hooks/block-dangerous.sh; echo $?`
   — exit 0 = allow, exit 2 = block.
-- CI (`.github/workflows/ci.yml`) runs shellcheck, `tests/hooks-regression.sh`
-  (guardrail-hook + `lefthook.yaml` assertions), and a gitleaks history scan
-  on every push/PR to main. There is still no linter config for other file
-  types.
+- CI (`.github/workflows/ci.yaml`) runs shellcheck (`tests/shellcheck.sh`),
+  `tests/hooks-regression.sh` (guardrail-hook + `lefthook.yaml` assertions),
+  json/rules-paths-sync checks, and a gitleaks history scan on every push/PR
+  to main; `flake-check.yaml` runs `nix flake check` separately, gated to
+  `nix-darwin/**` changes. The same shellcheck + hooks-regression checks also
+  run locally via `lefthook`'s `pre-push` hook (fast json/shellcheck/
+  rules-paths-sync checks run at `pre-commit`) — CI is a backstop, not the
+  only loop, so re-run `lefthook install` after pulling this change. There is
+  still no linter config for other file types.
 
 ## Concepts
 

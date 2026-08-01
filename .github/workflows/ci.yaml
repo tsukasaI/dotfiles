@@ -18,16 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: shellcheck all shell entrypoints
-        # info-level findings stay visible locally but don't gate CI; the
-        # guardrail hook files can't take disable comments (they are
-        # Edit-protected by block-config-edit.sh, #34).
-        run: |
-          shellcheck -x --severity=warning \
-            setup.sh \
-            claude-code/hooks/*.sh \
-            claude-code/scripts/*.sh \
-            tests/hooks-regression.sh \
-            tests/rules-paths-sync.sh
+        run: bash tests/shellcheck.sh
 
   json-validate:
     runs-on: ubuntu-latest
@@ -63,13 +54,3 @@ jobs:
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  flake-check:
-    # aarch64-darwin evaluation needs an arm64 macOS runner; --no-build keeps
-    # it to evaluation only (no package builds on CI minutes).
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: cachix/install-nix-action@a49548c11d9846ad46ecc0115273879b045f001c # v31.10.7
-      - name: nix flake check (evaluation only)
-        run: nix flake check ./nix-darwin --no-build
