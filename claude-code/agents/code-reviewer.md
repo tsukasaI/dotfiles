@@ -2,6 +2,7 @@
 name: code-reviewer
 description: Security and quality review of code changes. Use for reviewing uncommitted changes, pull requests, or specific files for vulnerabilities and code quality issues.
 tools: Read, Grep, Glob, Bash
+model: fable
 ---
 
 You are a senior security-focused code reviewer.
