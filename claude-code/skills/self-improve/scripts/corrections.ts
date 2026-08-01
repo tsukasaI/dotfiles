@@ -1,8 +1,12 @@
 #!/usr/bin/env bun
 
-import { readFileSync, existsSync } from "fs";
+import { Database } from "bun:sqlite";
 import { join, extname, relative } from "path";
-import { HOME, PROJECTS_DIR, loadCache, saveCache, walkProjectTranscripts, type CacheFile } from "../../_shared/transcript-walk";
+
+const HOME = Bun.env.HOME!;
+// Overridable for tests (e.g. pointing at a nonexistent path to exercise the
+// DB-missing error path) — defaults to the standard claude-logs location.
+const LOGS_DB_PATH = Bun.env.CLAUDE_LOGS_DB || join(HOME, ".local", "share", "claude-logs", "logs.db");
 
 const WINDOW_DAYS = 30;
 const NOW = Date.now();
@@ -172,63 +176,98 @@ interface ScanResult {
   pairs: Pair[];
   sessions_scanned: number;
   oldest_session_ms: number | null;
+  errors: string[];
+  db_unavailable: boolean;
 }
-
-// --- Incremental cursor (#40) ---
-// Every prior run re-read and re-parsed every in-window .jsonl file from
-// scratch (189MB / 507 files and growing). A session's transcript stops
-// changing once the session ends, so we cache each file's extracted result
-// keyed by (mtimeMs, size) and only re-parse files that are new or changed
-// (i.e. the still-active session). The cache is rebuilt each run to contain
-// exactly the current in-window file set, so it can't grow past the data it
-// mirrors — files that age out of the window are dropped automatically.
-// Walk + cache I/O mechanics are shared with skills.ts via
-// _shared/transcript-walk.ts (#9); only per-session extraction and result
-// aggregation below are specific to corrections.ts.
-const CACHE_DIR = join(HOME, ".local", "share", "claude-self-improve");
-const CACHE_PATH = join(CACHE_DIR, "corrections-scan-cache.json");
-const CACHE_VERSION = 1;
 
 interface SessionExtract {
   pairs: Pair[];
   sessionStartMs: number | null;
 }
 
+// project_dir may have HOME redacted to "~" by the SessionEnd hook
+// (save-transcript.ts's redactHome) before it was written to logs.db; this
+// machine only ever has one HOME, so expanding it back is unambiguous.
+function expandHome(p: string | null | undefined): string {
+  if (!p) return "";
+  if (p === "~") return HOME;
+  if (p.startsWith("~/")) return HOME + p.slice(1);
+  return p;
+}
+
+// Reads sessions from the claude-logs SQLite DB (written by the SessionEnd
+// hook, claude-code/hooks/save-transcript.ts) instead of walking
+// ~/.claude/projects/<encoded-cwd>/*.jsonl directly. transcript_raw stores
+// the same JSONL text the old per-file walk read, so per-line parsing below
+// is unchanged. Sessions are fetched one at a time (not joined/batched) so
+// peak memory stays proportional to one transcript, not the whole ~149MB
+// table.
 function scan(): ScanResult {
-  const result: ScanResult = { pairs: [], sessions_scanned: 0, oldest_session_ms: null };
-  if (!existsSync(PROJECTS_DIR)) return result;
+  const result: ScanResult = {
+    pairs: [],
+    sessions_scanned: 0,
+    oldest_session_ms: null,
+    errors: [],
+    db_unavailable: false,
+  };
 
-  const oldCache = loadCache<SessionExtract>(CACHE_PATH, CACHE_VERSION);
-  const newCache: CacheFile<SessionExtract> = { version: CACHE_VERSION, files: {} };
+  let db: Database;
+  try {
+    db = new Database(LOGS_DB_PATH, { readonly: true });
+  } catch (e) {
+    result.errors.push(`could not open logs.db at ${LOGS_DB_PATH}: ${e instanceof Error ? e.message : e}`);
+    result.db_unavailable = true;
+    return result;
+  }
 
-  const { sessionsScanned, oldestSessionMs } = walkProjectTranscripts(
-    CUTOFF_MS,
-    oldCache,
-    newCache,
-    extractSession,
-    (extract) => {
+  try {
+    const sessionRows = db
+      .query<{ session_id: string; project_dir: string | null; started_at: string | null }, []>(
+        `SELECT session_id, project_dir, started_at FROM sessions ORDER BY started_at ASC`,
+      )
+      .all();
+    const transcriptStmt = db.query<{ transcript_jsonl: string }, [string]>(
+      `SELECT transcript_jsonl FROM transcript_raw WHERE session_id = ?`,
+    );
+
+    let missingTranscripts = 0;
+    for (const row of sessionRows) {
+      const startMs = row.started_at ? Date.parse(row.started_at) : NaN;
+      if (!isNaN(startMs) && startMs < CUTOFF_MS) continue;
+
+      const trow = transcriptStmt.get(row.session_id);
+      if (!trow || !trow.transcript_jsonl) {
+        missingTranscripts++;
+        continue;
+      }
+
+      const extract = extractSession(trow.transcript_jsonl, row.project_dir);
       result.pairs.push(...extract.pairs);
-    },
-  );
-  result.sessions_scanned = sessionsScanned;
-  result.oldest_session_ms = oldestSessionMs;
+      result.sessions_scanned++;
+      if (extract.sessionStartMs !== null) {
+        if (result.oldest_session_ms === null || extract.sessionStartMs < result.oldest_session_ms) {
+          result.oldest_session_ms = extract.sessionStartMs;
+        }
+      }
+    }
+    if (missingTranscripts > 0) {
+      result.errors.push(`${missingTranscripts} session(s) had no transcript_raw row and were skipped`);
+    }
+  } catch (e) {
+    result.errors.push(`logs.db query failed: ${e instanceof Error ? e.message : e}`);
+  } finally {
+    db.close();
+  }
 
-  saveCache(CACHE_PATH, CACHE_DIR, newCache);
   return result;
 }
 
-function extractSession(file: string): SessionExtract {
+function extractSession(transcriptJsonl: string, projectDir: string | null): SessionExtract {
   const extract: SessionExtract = { pairs: [], sessionStartMs: null };
-  let raw: string;
-  try {
-    raw = readFileSync(file, "utf-8");
-  } catch {
-    return extract;
-  }
 
   const entries: TranscriptEntry[] = [];
   const byUuid = new Map<string, TranscriptEntry>();
-  for (const line of raw.split("\n")) {
+  for (const line of transcriptJsonl.split("\n")) {
     if (!line) continue;
     try {
       const obj: TranscriptEntry = JSON.parse(line);
@@ -237,7 +276,7 @@ function extractSession(file: string): SessionExtract {
     } catch {}
   }
 
-  let sessionCwd = "";
+  let sessionCwd = expandHome(projectDir);
   let sessionStartMs: number | null = null;
   for (const e of entries) {
     if (e.cwd && !sessionCwd) sessionCwd = e.cwd;
@@ -505,13 +544,17 @@ const pairsByKind = scanResult.pairs.reduce((acc, p) => {
 const out = {
   generated_at: new Date(NOW).toISOString(),
   meta: {
+    source: "claude-logs",
     data_window_days: WINDOW_DAYS,
     sessions_scanned: scanResult.sessions_scanned,
     oldest_session: oldestIso,
     total_pairs_collected: scanResult.pairs.length,
     pairs_by_kind: pairsByKind,
+    errors: scanResult.errors,
   },
   correction_pairs: buildClusters(scanResult.pairs),
 };
 
+for (const err of scanResult.errors) console.error(`[corrections.ts] ${err}`);
 console.log(JSON.stringify(out, null, 2));
+if (scanResult.db_unavailable) process.exit(2);

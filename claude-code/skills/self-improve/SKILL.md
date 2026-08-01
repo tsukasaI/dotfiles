@@ -1,6 +1,6 @@
 ---
 name: self-improve
-description: Meta-review of the Claude Code setup by scanning ~/.claude/projects/*.jsonl. Skills mode (default) surfaces unused skills, repeated prompts that should become new skills, and SKILL.md drift. Corrections mode detects repeated correction patterns ([Request interrupted ...], failure loops, explicit correction phrases) and proposes minimum-scope additions to CLAUDE.md or .claude/rules/. User-invoked only, always dry-run, per-item approval.
+description: Meta-review of the Claude Code setup by scanning ~/.local/share/claude-logs/logs.db. Skills mode (default) surfaces unused skills, repeated prompts that should become new skills, and SKILL.md drift. Corrections mode detects repeated correction patterns ([Request interrupted ...], failure loops, explicit correction phrases) and proposes minimum-scope additions to CLAUDE.md or .claude/rules/. User-invoked only, always dry-run, per-item approval.
 argument-hint: [skills|corrections]
 allowed-tools: Bash, Read, Edit, Write, Glob
 disable-model-invocation: true
@@ -33,7 +33,7 @@ Execute the analyzer and capture the JSON:
 bun ${CLAUDE_SKILL_DIR}/scripts/skills.ts
 ```
 
-The analyzer is read-only. It walks `~/.claude/projects/<encoded-cwd>/*.jsonl`, the standard Claude Code transcript store, and emits a JSON report with these sections:
+The analyzer is read-only. It reads `~/.local/share/claude-logs/logs.db`, the SQLite DB the SessionEnd hook writes session transcripts into, and emits a JSON report with these sections:
 
 - `meta` — `sessions_scanned`, `oldest_session`, `data_window_days`, `data_sufficient`
 - `available_skills` — every SKILL.md visible from the current `cwd` (user-global + cwd + ancestors up to git root). Use this when judging whether a new-skill proposal overlaps something that already exists
@@ -125,7 +125,7 @@ Surfaces patterns where the user has corrected or interrupted Claude repeatedly,
 bun ${CLAUDE_SKILL_DIR}/scripts/corrections.ts
 ```
 
-The analyzer is read-only. It walks `~/.claude/projects/<encoded-cwd>/*.jsonl` and emits a JSON report. Key sections:
+The analyzer is read-only. It reads `~/.local/share/claude-logs/logs.db` and emits a JSON report. Key sections:
 
 - `meta` — `sessions_scanned`, `oldest_session`, `data_window_days`, `pairs_by_kind`
 - `correction_pairs[]` — clustered `(kind, tool_name, excerpt)` with sample contexts and `scope_hint`. Sorted: `failure_loop` first, then `interrupt`, then `correction`; by count within each kind.

@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { Database } from "bun:sqlite";
 import {
   readFileSync,
   readdirSync,
@@ -8,7 +9,11 @@ import {
   existsSync,
 } from "fs";
 import { join, dirname } from "path";
-import { HOME, PROJECTS_DIR, loadCache, saveCache, walkProjectTranscripts, type CacheFile } from "../../_shared/transcript-walk";
+
+const HOME = Bun.env.HOME!;
+// Overridable for tests (e.g. pointing at a nonexistent path to exercise the
+// DB-missing error path) — defaults to the standard claude-logs location.
+const LOGS_DB_PATH = Bun.env.CLAUDE_LOGS_DB || join(HOME, ".local", "share", "claude-logs", "logs.db");
 
 const WINDOW_DAYS = 90;
 const NOW = Date.now();
@@ -176,11 +181,67 @@ function parseFrontmatter(raw: string): { name?: string; description?: string } 
   const end = raw.indexOf("\n---", 3);
   if (end < 0) return {};
   const block = raw.slice(3, end);
+  const lines = block.split("\n");
   const out: Record<string, string> = {};
-  for (const line of block.split("\n")) {
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const m = line.match(/^(\w[\w-]*)\s*:\s*(.*)$/);
     if (!m) continue;
-    out[m[1]] = m[2].trim();
+    const key = m[1];
+    const rest = m[2].trim();
+
+    // YAML block scalar indicators: "|" (literal) / ">" (folded), each with
+    // an optional chomping modifier (-/+) and/or explicit indent digit. The
+    // actual value lives on the following more-indented lines — previously
+    // this case fell through to `out[key] = rest`, storing the literal ">"
+    // or "|" instead of the real text.
+    const scalarMatch = rest.match(/^([|>])[+-]?\d*\s*$/);
+    if (scalarMatch) {
+      const style = scalarMatch[1];
+      const bodyLines: string[] = [];
+      let indent: number | null = null;
+      let j = i + 1;
+      for (; j < lines.length; j++) {
+        const l = lines[j];
+        if (l.trim() === "") {
+          bodyLines.push("");
+          continue;
+        }
+        const lineIndent = l.length - l.trimStart().length;
+        if (indent === null) {
+          if (lineIndent === 0) break; // not indented -> not part of this block scalar
+          indent = lineIndent;
+        }
+        if (lineIndent < indent) break;
+        bodyLines.push(l.slice(indent));
+      }
+      while (bodyLines.length > 0 && bodyLines[bodyLines.length - 1] === "") bodyLines.pop();
+
+      if (style === ">") {
+        // Folded: blank lines become a newline; consecutive non-blank lines
+        // join with a space (simplified YAML folding, good enough for a
+        // hand-rolled parser with no YAML dependency).
+        const parts: string[] = [];
+        let para: string[] = [];
+        for (const bl of bodyLines) {
+          if (bl === "") {
+            if (para.length) { parts.push(para.join(" ")); para = []; }
+            parts.push("");
+          } else {
+            para.push(bl);
+          }
+        }
+        if (para.length) parts.push(para.join(" "));
+        out[key] = parts.join("\n");
+      } else {
+        out[key] = bodyLines.join("\n");
+      }
+      i = j - 1;
+      continue;
+    }
+
+    out[key] = rest;
   }
   return out;
 }
@@ -210,22 +271,9 @@ interface ScanResult {
   prompts: PromptEntry[];
   sessions_scanned: number;
   oldest_session_ms: number | null;
+  errors: string[];
+  db_unavailable: boolean;
 }
-
-// --- Incremental cursor (#40) ---
-// Every prior run re-read and re-parsed every in-window .jsonl file from
-// scratch (189MB / 507 files and growing). A session's transcript stops
-// changing once the session ends, so we cache each file's extracted result
-// keyed by (mtimeMs, size) and only re-parse files that are new or changed
-// (i.e. the still-active session). The cache is rebuilt each run to contain
-// exactly the current in-window file set, so it can't grow past the data it
-// mirrors — files that age out of the window are dropped automatically.
-// Walk + cache I/O mechanics are shared with corrections.ts via
-// _shared/transcript-walk.ts (#9); only per-session extraction and result
-// aggregation below are specific to skills.ts.
-const CACHE_DIR = join(HOME, ".local", "share", "claude-self-improve");
-const CACHE_PATH = join(CACHE_DIR, "skills-scan-cache.json");
-const CACHE_VERSION = 1;
 
 interface SessionExtract {
   invocations: SkillInvocation[];
@@ -233,48 +281,91 @@ interface SessionExtract {
   sessionStartMs: number | null;
 }
 
+// project_dir may have HOME redacted to "~" by the SessionEnd hook
+// (save-transcript.ts's redactHome) before it was written to logs.db; this
+// machine only ever has one HOME, so expanding it back is unambiguous.
+function expandHome(p: string | null | undefined): string {
+  if (!p) return "";
+  if (p === "~") return HOME;
+  if (p.startsWith("~/")) return HOME + p.slice(1);
+  return p;
+}
+
+// Reads sessions from the claude-logs SQLite DB (written by the SessionEnd
+// hook, claude-code/hooks/save-transcript.ts) instead of walking
+// ~/.claude/projects/<encoded-cwd>/*.jsonl directly. transcript_raw stores
+// the same JSONL text the old per-file walk read, so per-line parsing below
+// is unchanged. Sessions are fetched one at a time (not joined/batched) so
+// peak memory stays proportional to one transcript, not the whole ~149MB
+// table.
 function scan(): ScanResult {
   const result: ScanResult = {
     invocations: [],
     prompts: [],
     sessions_scanned: 0,
     oldest_session_ms: null,
+    errors: [],
+    db_unavailable: false,
   };
 
-  if (!existsSync(PROJECTS_DIR)) return result;
+  let db: Database;
+  try {
+    db = new Database(LOGS_DB_PATH, { readonly: true });
+  } catch (e) {
+    result.errors.push(`could not open logs.db at ${LOGS_DB_PATH}: ${e instanceof Error ? e.message : e}`);
+    result.db_unavailable = true;
+    return result;
+  }
 
-  const oldCache = loadCache<SessionExtract>(CACHE_PATH, CACHE_VERSION);
-  const newCache: CacheFile<SessionExtract> = { version: CACHE_VERSION, files: {} };
+  try {
+    const sessionRows = db
+      .query<{ session_id: string; project_dir: string | null; started_at: string | null }, []>(
+        `SELECT session_id, project_dir, started_at FROM sessions ORDER BY started_at ASC`,
+      )
+      .all();
+    const transcriptStmt = db.query<{ transcript_jsonl: string }, [string]>(
+      `SELECT transcript_jsonl FROM transcript_raw WHERE session_id = ?`,
+    );
 
-  const { sessionsScanned, oldestSessionMs } = walkProjectTranscripts(
-    CUTOFF_MS,
-    oldCache,
-    newCache,
-    extractSession,
-    (extract) => {
+    let missingTranscripts = 0;
+    for (const row of sessionRows) {
+      const startMs = row.started_at ? Date.parse(row.started_at) : NaN;
+      if (!isNaN(startMs) && startMs < CUTOFF_MS) continue;
+
+      const trow = transcriptStmt.get(row.session_id);
+      if (!trow || !trow.transcript_jsonl) {
+        missingTranscripts++;
+        continue;
+      }
+
+      const extract = extractSession(trow.transcript_jsonl, row.project_dir);
       result.invocations.push(...extract.invocations);
       result.prompts.push(...extract.prompts);
-    },
-  );
-  result.sessions_scanned = sessionsScanned;
-  result.oldest_session_ms = oldestSessionMs;
+      result.sessions_scanned++;
+      if (extract.sessionStartMs !== null) {
+        if (result.oldest_session_ms === null || extract.sessionStartMs < result.oldest_session_ms) {
+          result.oldest_session_ms = extract.sessionStartMs;
+        }
+      }
+    }
+    if (missingTranscripts > 0) {
+      result.errors.push(`${missingTranscripts} session(s) had no transcript_raw row and were skipped`);
+    }
+  } catch (e) {
+    result.errors.push(`logs.db query failed: ${e instanceof Error ? e.message : e}`);
+  } finally {
+    db.close();
+  }
 
-  saveCache(CACHE_PATH, CACHE_DIR, newCache);
   return result;
 }
 
-function extractSession(file: string): SessionExtract {
+function extractSession(transcriptJsonl: string, projectDir: string | null): SessionExtract {
   const extract: SessionExtract = { invocations: [], prompts: [], sessionStartMs: null };
-  let raw: string;
-  try {
-    raw = readFileSync(file, "utf-8");
-  } catch {
-    return extract;
-  }
-  let sessionCwd: string | null = null;
+  let sessionCwd: string | null = expandHome(projectDir) || null;
   let sessionStartMs: number | null = null;
 
-  for (const line of raw.split("\n")) {
+  for (const line of transcriptJsonl.split("\n")) {
     if (!line) continue;
     let entry: TranscriptEntry;
     try {
@@ -661,12 +752,14 @@ const metaClusters = buildMetaClusters(promptClusters);
 const out = {
   generated_at: new Date(NOW).toISOString(),
   meta: {
+    source: "claude-logs",
     data_window_days: WINDOW_DAYS,
     sessions_scanned: scanResult.sessions_scanned,
     oldest_session: oldestIso,
     data_sufficient: dataSufficient,
     skills_found: skills.length,
     total_skill_invocations_in_window: scanResult.invocations.length,
+    errors: scanResult.errors,
   },
   available_skills: skills.map((s) => ({
     name: s.frontmatter.name ?? s.name,
@@ -682,4 +775,6 @@ const out = {
   skill_review_hints: buildSkillReviewHints(skills, listAvailableAgents()),
 };
 
+for (const err of scanResult.errors) console.error(`[skills.ts] ${err}`);
 console.log(JSON.stringify(out, null, 2));
+if (scanResult.db_unavailable) process.exit(2);
