@@ -131,6 +131,15 @@
             "command": "fini \"$(jq -r '.tool_input.file_path')\""
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/dotfiles/claude-code/hooks/mark-session-edit.sh"
+          }
+        ]
       }
     ],
     "PreToolUse": [

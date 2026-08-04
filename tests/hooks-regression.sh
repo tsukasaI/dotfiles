@@ -13,6 +13,7 @@ set -uo pipefail # not -e: failures are counted, not fatal
 cd "$(dirname "$0")/.." || exit 1
 BD=claude-code/hooks/block-dangerous.sh
 BCE=claude-code/hooks/block-config-edit.sh
+MSE=claude-code/hooks/mark-session-edit.sh
 
 fails=0
 total=0
@@ -31,6 +32,8 @@ expect() {
 
 cmd() { jq -cn --arg c "$1" '{tool_input:{command:$c}}'; }
 fp() { jq -cn --arg p "$1" '{tool_input:{file_path:$p}}'; }
+sfp() { jq -cn --arg s "$1" --arg p "$2" '{session_id:$s, tool_input:{file_path:$p}}'; }
+snb() { jq -cn --arg s "$1" --arg p "$2" '{session_id:$s, tool_input:{notebook_path:$p}}'; }
 
 # ── block-dangerous.sh: fail closed on malformed input (#32) ────────────────
 expect "$BD" 2 "bad JSON" 'not json'
@@ -185,13 +188,62 @@ expect "$BCE" 2 "bce: symlink-path hook" "$(fp "$HOME/.claude/hooks/block-danger
 expect "$BCE" 0 "bce: same-name other project" "$(fp '/some/other/repo/blocklist.conf')"
 expect "$BCE" 0 "bce: save-transcript.ts" "$(fp "$HOME/dotfiles/claude-code/hooks/save-transcript.ts")"
 
-# ── warn-uncommitted.sh (Stop hook): commit reminder, fails open ────────────
-# Cwd-dependent (the hook checks ITS cwd's git state), so each case runs in a
-# purpose-built temp dir instead of the repo root the rest of the suite uses.
+# ── mark-session-edit.sh (PostToolUse): records session edits, fails open ──
+mse_tmp=$(mktemp -d)
+printf '%s' "$(sfp abc-123 /repo/foo.txt)" | TMPDIR="$mse_tmp" "$MSE"
+total=$((total + 1))
+if [[ ! -f "$mse_tmp/claude-session-edits/abc-123" ]]; then
+  printf 'FAIL %-36s\n' "mse: writes manifest for valid Edit payload"
+  fails=$((fails + 1))
+fi
+
+printf '%s' "$(snb def-456 /repo/nb.ipynb)" | TMPDIR="$mse_tmp" "$MSE"
+total=$((total + 1))
+if [[ ! -f "$mse_tmp/claude-session-edits/def-456" ]]; then
+  printf 'FAIL %-36s\n' "mse: NotebookEdit's notebook_path is recorded"
+  fails=$((fails + 1))
+fi
+
+# TMPDIR-sandboxed so a regression that writes here (instead of correctly
+# no-op'ing) shows up as an unexpected manifest entry under $mse_tmp, not a
+# silent leak into the real $TMPDIR.
+mse_before=$(find "$mse_tmp/claude-session-edits" -type f 2>/dev/null | wc -l | tr -d ' ')
+total=$((total + 1))
+printf '%s' 'not json' | TMPDIR="$mse_tmp" "$MSE" >/dev/null 2>&1
+got=$?
+mse_after=$(find "$mse_tmp/claude-session-edits" -type f 2>/dev/null | wc -l | tr -d ' ')
+if [[ "$got" != "0" || "$mse_after" != "$mse_before" ]]; then
+  printf 'FAIL %-36s want=0 got=%s\n' "mse: bad JSON fails open" "$got"
+  fails=$((fails + 1))
+fi
+
+total=$((total + 1))
+printf '%s' "$(jq -cn --arg s x '{session_id:$s, tool_input:{command:"ls"}}')" | TMPDIR="$mse_tmp" "$MSE" >/dev/null 2>&1
+got=$?
+if [[ "$got" != "0" || -f "$mse_tmp/claude-session-edits/x" ]]; then
+  printf 'FAIL %-36s want=0 got=%s\n' "mse: no file_path or notebook_path" "$got"
+  fails=$((fails + 1))
+fi
+
+total=$((total + 1))
+printf '%s' "$(sfp '../evil' /repo/foo.txt)" | TMPDIR="$mse_tmp" "$MSE"
+if [[ -e "$mse_tmp/../evil" || -e "$mse_tmp/claude-session-edits/../evil" ]]; then
+  printf 'FAIL %-36s\n' "mse: path-traversal session_id must not escape SESSION_DIR"
+  fails=$((fails + 1))
+fi
+rm -rf "$mse_tmp"
+
+# ── warn-uncommitted.sh (Stop hook): session-scoped commit reminder ────────
+# Cwd-dependent (checks ITS cwd's git state) and manifest-dependent (checks
+# $TMPDIR/claude-session-edits/<session_id>), so each case runs in a
+# purpose-built temp dir/TMPDIR instead of the repo root the rest of the
+# suite uses. "wu: dirty repo but this session has no manifest" is the fix
+# for review-only herdr sessions getting warned about a concurrent
+# session's uncommitted work.
 WU="$PWD/claude-code/hooks/warn-uncommitted.sh"
 expect_wu() {
-  local want=$1 desc=$2 dir=$3 payload=$4 got
-  (cd "$dir" && printf '%s' "$payload" | "$WU" >/dev/null 2>&1)
+  local want=$1 desc=$2 dir=$3 payload=$4 tmpdir=$5 got
+  (cd "$dir" && printf '%s' "$payload" | TMPDIR="$tmpdir" "$WU" >/dev/null 2>&1)
   got=$?
   total=$((total + 1))
   if [[ "$got" != "$want" ]]; then
@@ -200,15 +252,31 @@ expect_wu() {
   fi
 }
 wu_tmp=$(mktemp -d)
-mkdir -p "$wu_tmp/dirty" "$wu_tmp/clean" "$wu_tmp/norepo"
+wu_state=$(mktemp -d)
+mkdir -p "$wu_tmp/dirty" "$wu_tmp/clean" "$wu_tmp/norepo" "$wu_state/claude-session-edits"
 git -C "$wu_tmp/dirty" init -q && touch "$wu_tmp/dirty/wip.txt"
 git -C "$wu_tmp/clean" init -q
-expect_wu 2 "wu: dirty repo blocks stop" "$wu_tmp/dirty" '{"stop_hook_active":false}'
-expect_wu 0 "wu: clean repo allows stop" "$wu_tmp/clean" '{"stop_hook_active":false}'
-expect_wu 0 "wu: stop_hook_active no loop" "$wu_tmp/dirty" '{"stop_hook_active":true}'
-expect_wu 0 "wu: outside a git repo" "$wu_tmp/norepo" '{}'
-expect_wu 0 "wu: bad JSON fails open" "$wu_tmp/dirty" 'not json'
-rm -rf "$wu_tmp"
+printf '%s\0' "$wu_tmp/dirty/wip.txt" > "$wu_state/claude-session-edits/sess-edited"
+printf '%s\0' "/some/other/repo/file.txt" > "$wu_state/claude-session-edits/sess-outside-repo"
+
+# Integration: the manifest mark-session-edit.sh actually writes is the one
+# warn-uncommitted.sh actually reads — locks in the two hooks' shared format
+# (NUL-delimited paths) so format drift between them can't silently ship.
+mkdir -p "$wu_tmp/live" && git -C "$wu_tmp/live" init -q && git -C "$wu_tmp/live" commit -q --allow-empty -m init
+echo hello > "$wu_tmp/live/tracked-edit.txt"
+printf '%s' "$(sfp sess-live "$wu_tmp/live/tracked-edit.txt")" | TMPDIR="$wu_state" "$MSE"
+expect_wu 2 "wu: end-to-end — mark-session-edit.sh's manifest blocks stop" "$wu_tmp/live" '{"stop_hook_active":false,"session_id":"sess-live"}' "$wu_state"
+
+expect_wu 2 "wu: session that touched a dirty in-repo file blocks stop" "$wu_tmp/dirty" '{"stop_hook_active":false,"session_id":"sess-edited"}' "$wu_state"
+expect_wu 0 "wu: dirty repo but this session has no manifest" "$wu_tmp/dirty" '{"stop_hook_active":false,"session_id":"sess-untracked"}' "$wu_state"
+expect_wu 0 "wu: session manifest only has out-of-repo paths" "$wu_tmp/dirty" '{"stop_hook_active":false,"session_id":"sess-outside-repo"}' "$wu_state"
+expect_wu 0 "wu: clean repo even with a manifest" "$wu_tmp/clean" '{"stop_hook_active":false,"session_id":"sess-edited"}' "$wu_state"
+expect_wu 0 "wu: stop_hook_active no loop" "$wu_tmp/dirty" '{"stop_hook_active":true,"session_id":"sess-edited"}' "$wu_state"
+expect_wu 0 "wu: outside a git repo" "$wu_tmp/norepo" '{"session_id":"sess-edited"}' "$wu_state"
+expect_wu 0 "wu: bad JSON fails open" "$wu_tmp/dirty" 'not json' "$wu_state"
+expect_wu 0 "wu: missing session_id fails open" "$wu_tmp/dirty" '{"stop_hook_active":false}' "$wu_state"
+expect_wu 0 "wu: malformed session_id fails open" "$wu_tmp/dirty" '{"stop_hook_active":false,"session_id":"../etc"}' "$wu_state"
+rm -rf "$wu_tmp" "$wu_state"
 
 # ── lefthook.yaml: this repo's own pre-commit gitleaks check ────────────────
 # Global core.hooksPath was retired in favor of per-repo lefthook (lefthook
