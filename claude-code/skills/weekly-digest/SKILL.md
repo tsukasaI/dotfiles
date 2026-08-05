@@ -2,10 +2,11 @@
 name: weekly-digest
 description: >
   Weekly cross-repo activity digest: gathers this week's commits across ~/engineer,
-  Contextual Commit learned/decision/rejected lines, new vault notes, and article-draft
-  movement, then posts the digest as a comment on this week's retro issue in the ops
-  repo (with confirmation). Use for /weekly-digest or 週次ダイジェスト. Feeds the existing
-  /retro workflow — it gathers material, it does not do the reflection.
+  Contextual Commit learned/decision/rejected lines, new cc-memory learnings, and
+  article-draft movement, then posts the digest as a comment on this week's retro
+  issue in the ops repo (with confirmation). Use for /weekly-digest or 週次ダイジェスト.
+  Feeds the existing /retro workflow — it gathers material, it does not do the
+  reflection.
 allowed-tools: Bash, Read, Write, Glob, Grep, AskUserQuestion
 disable-model-invocation: true
 ---
@@ -17,7 +18,7 @@ by `/retro`) does the reflection.** Numbers come from the harvester, never from 
 
 ## Step 1: gather
 
-Read `${CLAUDE_SKILL_DIR}/../_shared/kb.json` (→ `ops_repo`, `ideas_file`). Then:
+Read `${CLAUDE_SKILL_DIR}/../_shared/kb.json` (→ `ops_repo`). Then:
 
 ```
 bun ${CLAUDE_SKILL_DIR}/../_shared/harvest.ts --mode=weekly
@@ -43,7 +44,9 @@ Sections, in order; omit a section only by stating it is empty:
    record verbatim). If there are more than ~30 lines, keep all `learned`/`rejected`
    verbatim and summarize `decision` counts per repo instead — say you did so.
 3. `### Article candidates` — at most 3, only with verbatim evidence, cross-checked
-   against `ideas_file` (skip ones already listed; reference them instead). None →
+   against cc-memory via `search_memory` (skip ones that already surface as an
+   existing `blog_candidate` learning; reference them instead — this is a
+   best-effort check, not exhaustive, since search only returns top matches). None →
    "No new candidates this week."
 4. `### Open threads` — rejected() lines with no follow-up commit, WIP drafts touched
    then abandoned, notes created but marked 推測/unverified. Phrase as questions

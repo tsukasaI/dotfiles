@@ -25,7 +25,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks — `core.hooksPath` was retired (see Pitfalls); this repo's own pre-commit/pre-push checks live in the root `lefthook.yaml`, installed per-repo via `lefthook install` (see `setup.sh`). |
 | `scripts/` | Utility scripts (currently empty after cooling-period removal). |
 | `setup.sh` | First-time symlink installer. Known-fragile on fresh machines (issue #5). |
-| `docs/` | Investigation memos specific to this repo's own subject matter (e.g. `turso-investigation.md`); not a knowledge-management store — see the Vault bullet in Concepts for the cc-memory/vault/docs boundary. |
+| `docs/` | Investigation memos specific to this repo's own subject matter (e.g. `turso-investigation.md`); not a knowledge-management store — see the Personal knowledge store bullet in Concepts for the cc-memory/docs boundary. |
 | `ghostty/`, `wezterm/` | Terminals: ghostty primary, wezterm fallback, deliberately identical theme/font. |
 | `karabiner/`, `ssh/`, `mise/` | Small configs. `mise/config.toml` is near-empty on purpose — toolchains come from Nix. |
 
@@ -63,14 +63,16 @@ There is no staging or deploy step (hooks apply on the next tool call,
   `claude-code/scripts/push-to-turso.sh` uploads that DB and is
   **intentionally manual** — never run or automate it; its credentials are
   deliberately kept out of Claude's process tree.
-- **Vault**: Obsidian vault at `~/engineer/vault`; the `kb`/`note`/`article`/
-  `weekly-digest` skills read or write it. `skills/_shared/kb.json` is
-  gitignored personal config — never commit it (issue #24). **Store
-  boundary**: cc-memory (MCP) holds personal-life facts and Claude-Code
-  session learnings; the vault holds open-ended technical research/TIL meant
-  to be found later by full-text search across topics; a repo's own `docs/`
-  holds investigations specific to that repo's own subject matter (e.g.
-  `docs/turso-investigation.md` here). One store per finding — don't
+- **Personal knowledge store**: cc-memory (MCP) is the sole store for
+  personal-life facts, Claude-Code session learnings, and article-idea
+  candidates (`blog_candidate: true`, surfaced via `search_memory` by
+  `article`/`weekly-digest`). The Obsidian vault and the `kb`/`note` skills
+  were retired — their content was migrated into cc-memory. `skills/_shared/
+  kb.json` is gitignored personal config (git-log harvesting paths for
+  `article`/`weekly-digest`) — never commit it (issue #24). A repo's own
+  `docs/` still holds investigations specific to that repo's own subject
+  matter (e.g. `docs/turso-investigation.md` here), separate from
+  cc-memory's personal-knowledge scope. One store per finding — don't
   duplicate across them.
 
 ## Pitfalls

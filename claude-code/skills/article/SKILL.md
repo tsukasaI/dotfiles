@@ -2,9 +2,9 @@
 name: article
 description: >
   Tech-article pipeline for ~/engineer/qiita_drafts. Three modes — /article (ネタ出し:
-  harvest candidates from Contextual Commit lines, vault notes, and the drafts backlog),
-  /article <topic> (骨子: outline only — the human writes the prose), /article review
-  <file> (レビュー of a human-written draft). Never publishes, never commits.
+  harvest candidates from Contextual Commit lines, cc-memory learnings, and the drafts
+  backlog), /article <topic> (骨子: outline only — the human writes the prose), /article
+  review <file> (レビュー of a human-written draft). Never publishes, never commits.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, WebSearch, WebFetch
 disable-model-invocation: true
 ---
@@ -15,12 +15,12 @@ Division of labor (agreed with the user, consistent with the ops `/blog` philoso
 **AI does ネタ出し and 骨子 (outline). The human writes the body text. AI reviews.**
 Do NOT write article prose paragraphs. Do NOT publish. Do NOT commit.
 
-Root quality: **grounded** — every claim traces to a vault note, commit hash, or
-code reference. Ungrounded = marked 推測 or not included.
+Root quality: **grounded** — every claim traces to a cc-memory learning, commit hash,
+or code reference. Ungrounded = marked 推測 or not included.
 
 ## Step 0: load config
 
-Read `${CLAUDE_SKILL_DIR}/../_shared/kb.json` → `drafts_repo`, `ideas_file`, `notes_dir`.
+Read `${CLAUDE_SKILL_DIR}/../_shared/kb.json` → `drafts_repo`.
 
 Mode selection from the invocation:
 - bare `/article` or ネタ / ネタ出し → **Mode A**
@@ -40,35 +40,35 @@ Mode selection from the invocation:
 2. Cross-reference four evidence pools:
    - `contextual_lines` — especially `learned`/`rejected`/`decision` (non-obvious
      experience = the strongest article material)
-   - `kb.notes` — recently updated vault notes
+   - cc-memory recent learnings — call `search_memory` with 2-3 topic keywords per
+     candidate under consideration (or `get_summary` for a broad recent sweep)
    - `drafts.backlog_ideas` — the README `## future` backlog (prefer reviving an
      existing idea over minting a new one)
    - `drafts.wip` — half-written drafts (finishing these ranks above any new idea)
    *Done:* candidates collected; each is grounded (≥1 verbatim evidence line).
-3. Read `ideas_file` (the ledger) BEFORE proposing: skip candidates already listed
-   unless there is new evidence; never duplicate entries.
-   *Done:* existing ledger loaded; new candidates de-duped against it.
-4. Present a ranked list. Every candidate follows the ledger format defined in the
-   comment at the top of `ideas_file` (title / evidence verbatim with repo@hash or
-   note path / angle / audience / effort: draft-ready | needs-verification |
-   needs-research). Ranking: WIP completion first, then evidence density (≥2
-   independent sources beats 1), then recency.
+3. Before proposing, call `search_memory` with each candidate's key terms to check
+   for an existing `blog_candidate` learning: skip candidates already listed unless
+   there is new evidence; never duplicate entries. `search_memory` only returns the
+   top 10 keyword matches per table — it cannot list every existing candidate, so
+   this is a best-effort dedup, not an exhaustive one.
+   *Done:* dedup search run per candidate; new candidates de-duped against what
+   surfaced.
+4. Present a ranked list. Each candidate: title / status (idea | drafting) /
+   evidence verbatim with repo@hash or learning content / angle / audience /
+   effort: draft-ready | needs-verification | needs-research / added: date.
+   Ranking: WIP completion first, then evidence density (≥2 independent sources
+   beats 1), then recency.
    **A candidate without verbatim evidence must not appear.** If harvest yields
    nothing, say so plainly, show the window used, and offer `--since` widening.
    *Done:* ranked list shown to user, or "nothing found" with window stated.
-5. After presenting, update `ideas_file`: Read it, merge the new candidates under
-   `## candidates` (status: idea, added: today). Do not touch `## archive` except to
-   move items the user explicitly drops.
-   - **Concurrency guard (optimistic check):** another session may be writing to
-     `ideas_file` at the same time. Right after this Read, capture a fingerprint
-     (`shasum -a 256 <ideas_file>` or `stat -f %m <ideas_file>`). Immediately before
-     the Write/Edit that persists the merge — as the last action, not earlier —
-     re-run the same fingerprint check. If it changed, STOP: do not write. Re-read
-     `ideas_file`, re-merge your candidates against the current content (skip any
-     candidate another session already added), and re-check the fingerprint again
-     before writing. Each candidate is its own list item, so a retried merge is
-     idempotent.
-   *Done:* ideas_file updated with new entries under `## candidates`.
+5. After presenting, register each new candidate via `upsert_learnings`
+   (category: other, blog_candidate: true, content: the ledger-format text from
+   step 4, idempotency_key: a stable slug derived from the title, e.g.
+   `article-idea:<topic-slug>`). cc-memory dedupes by idempotency_key server-side,
+   so no separate concurrency guard is needed — a rerun with the same slug is a
+   no-op. Candidates the user explicitly drops: do not delete, just stop
+   resurfacing them in future ranked lists.
+   *Done:* new candidates registered via `upsert_learnings`.
 6. End by asking which candidate to outline (→ Mode B), or none.
    *Done:* user chose a candidate (→ Mode B) or explicitly declined.
 
@@ -83,15 +83,15 @@ Mode selection from the invocation:
      above and say so explicitly ("no clear existing convention found; using plain
      Markdown default") — never guess a new convention silently.
    *Done:* convention identified from ≥2 drafts, or fallback stated explicitly.
-2. **Gather grounding**: search the vault (`/kb`-style rg) for the topic; `git -C
+2. **Gather grounding**: search cc-memory (`search_memory`) for the topic; `git -C
    <repo> show <hash>` for evidence commits from Mode A; read the actual code the
    learned-lines refer to. Every section-level claim traces to one of these three
    sources or is marked `**（推測・要検証）**` — there is no third option.
    - Example: a claim about "why we chose X" traces to a `decision()` line at
      `repo@hash` → cite it inline, no mark needed.
    - NG: "X is generally considered best practice" with no source found in
-     vault/commits/code → search harder or mark `**（推測・要検証）**`, never state
-     it as fact.
+     cc-memory/commits/code → search harder or mark `**（推測・要検証）**`, never
+     state it as fact.
    *Done:* every planned section is grounded (source attached) or marked 推測.
 3. **Write the outline** to `<drafts_repo>/<topic-slug>.md` (lowercase-kebab English
    slug). If the filename exists → AskUserQuestion (append into it / new name / stop).
@@ -142,7 +142,7 @@ Read the given file and review:
 | "骨子だけでなく本文も少し書いておく" | 書かない。本文は人間の仕事。骨子に散文が混ざると「AI が書いた」事実が消えない。 |
 | "エビデンスが見つからないが一般論として書ける" | 書けない。エビデンスなしの claim は **（推測・要検証）** マーク必須。マークなしは嘘。 |
 | "ファイルが既にあるので上書きする" | しない。AskUserQuestion で確認。人間の WIP かもしれない。 |
-| "このトピックは vault にも commit にも無いが、自分の知識で補える" | 補えない。3つのソース（vault / commit / code）に無ければマークするか、検索範囲を広げる。 |
+| "このトピックは cc-memory にも commit にも無いが、自分の知識で補える" | 補えない。3つのソース（cc-memory / commit / code）に無ければマークするか、検索範囲を広げる。 |
 
 ## Hard limits
 

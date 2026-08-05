@@ -3,8 +3,8 @@
  * harvest.ts — cross-repo knowledge harvester for /article and /weekly-digest.
  *
  * Read-only: runs `git log` across ~/engineer repos, extracts Contextual Commit
- * body lines (learned/decision/rejected/constraint/intent), collects recent
- * vault notes, qiita_drafts status, and optional session stats from logs.db.
+ * body lines (learned/decision/rejected/constraint/intent), collects
+ * qiita_drafts status, and optional session stats from logs.db.
  *
  * Usage:
  *   bun harvest.ts --mode=weekly     [--since=YYYY-MM-DD]  # default: last Monday
@@ -22,10 +22,6 @@ import { join, basename, dirname } from "node:path";
 const CONFIG_PATH = join(import.meta.dir, "kb.json");
 
 interface Config {
-  vault_root: string;
-  notes_dir: string;
-  ideas_file: string;
-  legacy_notes: string;
   drafts_repo: string;
   engineer_root: string;
   extra_repos?: string[];
@@ -52,10 +48,6 @@ try {
 }
 const cfg = {
   ...raw,
-  vault_root: expand(raw.vault_root),
-  notes_dir: expand(raw.notes_dir),
-  ideas_file: expand(raw.ideas_file),
-  legacy_notes: expand(raw.legacy_notes),
   drafts_repo: expand(raw.drafts_repo),
   engineer_root: expand(raw.engineer_root),
   logs_db: expand(raw.logs_db),
@@ -155,7 +147,7 @@ async function discoverRepos(): Promise<string[]> {
     warn(`repo discovery failed: ${res.stderr.trim().slice(0, 200)}`);
     return [];
   }
-  const skip = new Set([cfg.vault_root, cfg.drafts_repo]);
+  const skip = new Set([cfg.drafts_repo]);
   const extras = (cfg.extra_repos ?? []).map(expand).filter((p) => existsSync(join(p, ".git")));
   return [...new Set([
     ...res.stdout.split("\n").filter(Boolean).map((p) => dirname(p.replace(/\/$/, ""))),
@@ -233,36 +225,7 @@ async function harvestRepo(repoPath: string): Promise<RepoResult | null> {
   return { repo, count: commits.length, subjects: commits.map((c) => c.subject), contextual };
 }
 
-// ---------- 3. vault notes ----------
-
-interface NoteInfo { path: string; title: string; tags: string[]; updated: string }
-
-function recentNotes(): { exists: boolean; notes: NoteInfo[] } {
-  if (!existsSync(cfg.notes_dir)) return { exists: false, notes: [] };
-  const notes: NoteInfo[] = [];
-  // Parse as local midnight so this matches git log's local-time --since (bare
-  // "YYYY-MM-DD" would otherwise parse as UTC and skew the boundary by the offset).
-  const sinceMs = new Date(`${since}T00:00:00`).getTime();
-  for (const f of readdirSync(cfg.notes_dir)) {
-    if (!f.endsWith(".md")) continue;
-    const full = join(cfg.notes_dir, f);
-    try {
-      const stat = Bun.file(full);
-      if (stat.lastModified < sinceMs) continue;
-      const head = readFileSync(full, "utf8").split("\n").slice(0, 20);
-      const title = head.find((l) => l.startsWith("# "))?.slice(2) ?? f;
-      const tagLine = head.find((l) => l.startsWith("tags:")) ?? "";
-      const tags = [...tagLine.matchAll(/[\w-]+/g)].map((m) => m[0]).filter((t) => t !== "tags");
-      const updated = head.find((l) => l.startsWith("updated:"))?.slice(8).trim() ?? "";
-      notes.push({ path: full, title, tags, updated });
-    } catch (e) {
-      warn(`could not read note ${f}: ${e}`);
-    }
-  }
-  return { exists: true, notes };
-}
-
-// ---------- 4. drafts repo status ----------
+// ---------- 3. drafts repo status ----------
 
 interface DraftsInfo {
   exists: boolean;
@@ -311,7 +274,7 @@ async function draftsStatus(): Promise<DraftsInfo> {
   return { exists: true, wip, changed_recent: changed, backlog_ideas: backlog };
 }
 
-// ---------- 5. session stats (optional) ----------
+// ---------- 4. session stats (optional) ----------
 
 interface SessionStat { project_dir: string; sessions: number; user_messages: number }
 
@@ -343,7 +306,6 @@ const repos = await discoverRepos();
 const repoResults = (await mapLimit(repos, 8, harvestRepo)).filter(
   (r): r is RepoResult => r !== null,
 );
-const kb = recentNotes();
 const drafts = await draftsStatus();
 const sessions = sessionStats();
 
@@ -361,7 +323,6 @@ const out = {
   contextual_lines: repoResults.flatMap((r) =>
     r.contextual.map((c) => ({ repo: r.repo, ...c })),
   ),
-  kb,
   drafts,
   sessions,
 };

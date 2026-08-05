@@ -26,7 +26,8 @@ one investigation, not a recurring report.
 
 - Periodic, cross-repo activity summaries → `weekly-digest` (uses `harvest.ts
   --mode=weekly`, posts to the ops retro issue).
-- Saving one finding from this conversation to the vault → `note`.
+- Saving one finding from this conversation as a personal learning →
+  cc-memory's `save_note`/`upsert_learnings`.
 - Writing a commit message for work you just did → just follow the Contextual
   Commits convention in `~/.claude/CLAUDE.md` (Workflow section, SSoT — don't
   restate the format here).
