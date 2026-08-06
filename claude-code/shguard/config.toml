@@ -29,10 +29,12 @@
 # and full secret-file-reader path coverage (extension-suffix patterns
 # like *.pem/*.key aren't expressible with exact/prefix target matching).
 #
-# curl-localhost-only / rsync-local-only are ALSO deliberately absent:
-# except_targets exists (issue #30, closed) but treats flag values as
-# candidate targets, causing a 55% over-ask rate on real local curl usage
-# — issue #48, still open, blocks writing these rules until fixed.
+# curl (localhost-only) / rsync (local-only) rules ARE included below
+# (dotfiles-network-curl-remote / dotfiles-network-rsync-remote), using the
+# value_flags field: except_targets (issue #30) initially over-asked on
+# ordinary flag values like -o/-X/-H (issue #48, causing a 55% over-ask
+# rate on real local curl usage); #48 landed upstream and is verified live
+# against this file's rules — see docs/shguard-migration-deltas.md #2/#19.
 
 # Privilege escalation floor (issue #35, closed in v0.3.0; also fixes
 # #36's doas/su/pkexec gap, though that ticket itself is still open due
@@ -130,8 +132,35 @@ command = "diskutil"
 required_tokens = ["erase"]
 
 # =====================================================================
-# Network (curl and rsync deliberately excluded — see header comment)
+# Network
 # =====================================================================
+
+[[deny]]
+id = "dotfiles-network-curl-remote"
+reason = "curl to a non-localhost address can exfiltrate data"
+command = "curl"
+value_flags = ["o", "w", "m", "d", "X", "H", "A", "e", "u", "b", "c", "T", "F"]
+except_targets = [
+  { exact = "http://localhost" }, { prefix = "http://localhost:" }, { prefix = "http://localhost/" },
+  { exact = "https://localhost" }, { prefix = "https://localhost:" }, { prefix = "https://localhost/" },
+  { exact = "http://127.0.0.1" }, { prefix = "http://127.0.0.1:" }, { prefix = "http://127.0.0.1/" },
+  { exact = "https://127.0.0.1" }, { prefix = "https://127.0.0.1:" }, { prefix = "https://127.0.0.1/" },
+  { exact = "http://[::1]" }, { prefix = "http://[::1]:" }, { prefix = "http://[::1]/" },
+  { exact = "https://[::1]" }, { prefix = "https://[::1]:" }, { prefix = "https://[::1]/" },
+]
+
+[[deny]]
+id = "dotfiles-network-rsync-remote"
+reason = "rsync to/from a remote host can transfer files over the network"
+command = "rsync"
+value_flags = ["exclude"]
+except_targets = [
+  { prefix = "/" },
+  { prefix = "./" },
+  { prefix = "../" },
+  { prefix = "~" },
+  { exact = "." },
+]
 
 [[deny]]
 id = "dotfiles-network-netcat"

