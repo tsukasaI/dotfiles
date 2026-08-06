@@ -59,7 +59,9 @@
 - When delegating to Agent or Workflow `agent()`, pass `model:` explicitly (default `sonnet`) — don't rely on inheritance from the main loop. Escalate above the default only when the subtask meets ≥2 of: (a) no existing pattern in this codebase to imitate, (b) a security/auth/crypto boundary, (c) multiple valid approaches with a real trade-off, (d) it already failed once at the default tier.
   - Example (escalate): "design a cache-invalidation strategy for this service" — no precedent, real trade-offs.
   - NG (stay at default): "write a table-driven test for this function" — a pattern to imitate exists.
-- Fable review gate: for non-trivial implementation (multiple files/subsystems, a security boundary, or an architectural decision — same bar as plan mode), run the `code-reviewer` subagent before committing and incorporate its findings. NOT for mechanical changes — config edits, dependency/SHA bumps, docs, formatting; those never warrant a fable pass.
+- Fable review gate: for non-trivial implementation (multiple files/subsystems, a security boundary, or an architectural decision — same bar as plan mode), run the `code-reviewer` subagent and incorporate its findings. NOT for mechanical changes — config edits, dependency/SHA bumps, docs, formatting; those never warrant a fable pass. Timing depends on the git workflow above:
+  - `dotfiles`/`ops` (direct-to-main): run it before committing, as before.
+  - Every other repo (branch+PR): skip per-commit review; run it once, automatically, right after `gh pr create` opens the PR — review the PR diff, incorporate findings (push fixups), then stop and report per the branch+PR rule above.
 
 # Advisor usage
 - Use `/advisor` before committing to an approach for: non-trivial algorithm design, debugging that has stalled for two attempts, architectural trade-offs with no clear winner, and security-sensitive logic (auth, crypto, input validation).
