@@ -27,9 +27,9 @@ Launch argument: $ARGUMENTS
 - Setting a goal starts a turn immediately, with the condition itself as the
   directive — the statement is also Claude's first prompt, so it must say WHAT
   to achieve, not only how to check it.
-- The condition may be up to 4,000 characters. Official guidance says a durable
-  condition has three parts: one measurable end state, a stated check, and
-  constraints that must hold along the way. Keep the statement a single line
+- The condition may be up to 4,000 characters. A durable condition has three
+  parts: one measurable end state, a stated check, and constraints that must
+  hold along the way. Keep the statement a single line
   (no line breaks), but never drop a required element for brevity.
 
 ## Slots (all four required)

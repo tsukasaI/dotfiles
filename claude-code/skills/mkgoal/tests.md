@@ -2,7 +2,7 @@
 
 Manual verification suite for `SKILL.md`. Run each in a fresh session and
 compare against the expected behaviour. Re-run after any edit to the skill,
-and whenever the main-loop model changes tier (Opus/Sonnet/Haiku).
+and whenever the main-loop model changes tier.
 
 ## Pass criteria common to all tests
 

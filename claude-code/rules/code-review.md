@@ -36,7 +36,7 @@ Three faces of review, not one: this file is self-review, applied automatically 
 - **Tests**: Cover edges and concurrency. Confirm the test would actually fail if the code broke.
 - **Consistency**: When the style guide is silent, match the surrounding code — including *mechanisms*, not just style. If a sibling function already solves this problem class correctly (conditional-UPDATE claim, idempotency key, display limit), match it; the most common defect is the correct pattern existing one function away.
 - **Duplicated truth**: A value maintained in two unlinked places (full schema vs migrations, infra IDs copied between configs, version pins, hand-computed checksums) needs a single source or a mechanical sync check. Any "manually copy X into Y" step in docs or comments is a defect.
-- **Runs**: Self-review on a diff that doesn't compile is theater — verification (per CLAUDE.md) must already have run.
+- **Runs**: Self-review on a diff that doesn't compile is theater — the relevant build/lint/test commands must already have run and passed.
 - **Every line**: If a line is unclear, don't assume the complexity is justified — simplify it or add a *why* comment.
 - **Context**: A small local change shouldn't cumulatively degrade the file or system.
 
