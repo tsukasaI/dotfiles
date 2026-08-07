@@ -47,7 +47,7 @@ The analyzer is read-only. It reads `~/.local/share/claude-logs/logs.db`, the SQ
 
 1. **Check `meta.data_sufficient`**. If `false`, skip the `dead_skills` section (the analyzer already returns `[]` in that case) and tell the user the dead-skill check needs `data_window_days` of history to be reliable. Continue with `prompt_clusters` and `skill_review_hints` regardless — they don't depend on the window.
 
-2. **Present all candidates in one batch**, then collect decisions. Do not interleave proposals and questions.
+2. **Present all candidates in one batch** — see Shared rules for the answer-format protocol.
 
    Ordering inside the batch:
    1. `dead_skills` (if any)
@@ -69,19 +69,14 @@ The analyzer is read-only. It reads `~/.local/share/claude-logs/logs.db`, the SQ
        <one of: delete this skill / create new skill / edit existing SKILL.md>
    ```
 
-   After listing all N candidates, ask **one** prompt that accepts any of:
-   - `all skip` / `skip all` — skip everything, no further questions
-   - `all n` — same as above (rejection without recording)
-   - per-item answers like `1:y, 2:skip, 3:n, 4:y`
-   - free-form ("only #2", "skip 1 and 3", etc.)
-
-   **Only on `y`** perform the actual Bash / Edit / Write, one item at a time. On `n` / `skip` do nothing for that item.
+   Collect a decision per Shared rules' answer-format protocol, then perform
+   the actual Bash / Edit / Write.
 
 3. **Overlap check is mandatory before proposing a new skill**:
    - For `meta_clusters`: surface `code_overlap_hints` verbatim. If any hint scores ≥ 2, **Read** that skill's SKILL.md (from `available_skills[].path`) and ask the user: "this existing skill seems to cover the same intent — extend it, or still want a new one?" before drafting a new SKILL.md.
    - For `prompt_clusters`: surface `overlap_hints` similarly.
    - Even when both lists are empty, scan `available_skills` once and apply one test: **would invoking that existing skill on this candidate's sample input produce the output the user is asking for?** If yes for any skill → overlap exists, treat it like an `overlap_hints` hit. Lexical keyword match misses cross-domain cases (e.g. an English skill description vs. user-pasted code).
-     - Example: candidate is "search my notes for X" recurring across sessions — `kb`'s description says exactly this; invoking `kb` produces the requested output → overlap; propose extending `kb`, not a new skill.
+     - Example: candidate is "harvest cc-memory learnings into a blog post idea" recurring across sessions — `article`'s Mode A does exactly this via `search_memory`; invoking `article` produces the requested output → overlap; propose extending `article`, not a new skill.
      - NG: candidate is "summarize this PR's diff and post it to the retro issue" — `weekly-digest` posts to the retro issue but doesn't summarize a single PR's diff; invoking it would not satisfy the request → no overlap, proceed.
 
 4. **Read before suggesting** for `skill_review_hints` and any case where overlap is possible:
@@ -96,7 +91,7 @@ The analyzer is read-only. It reads `~/.local/share/claude-logs/logs.db`, the SQ
 
 6. **Naming new skills**: when promoting any cluster (meta or single), do not auto-name. Show the user `first_words` / `sample_first_words`, samples, and proposed scope, and ask them for `name` + `description`. Then write `SKILL.md` with that input.
 
-7. **Final summary**: how many were applied, how many skipped, which paths changed. If any change touches a file under `~/.claude/...` (which is a symlink into the dotfiles repo), end with: `Changes landed in ~/dotfiles/claude-code/...; run \`git status\` to review.` Do not commit automatically.
+7. **Final summary**: per Shared rules below.
 
 ### Scope rules (minimum scope)
 
@@ -139,7 +134,7 @@ The analyzer is read-only. It reads `~/.local/share/claude-logs/logs.db` and emi
 
 1. If `meta.sessions_scanned` is 0 or the candidate list is empty, tell the user and stop. Do not invent suggestions.
 
-2. **Present all candidates in one batch**, then collect decisions. Do not interleave proposals and questions. Order: failure_loop > interrupt > correction (analyzer already sorts).
+2. **Present all candidates in one batch** — see Shared rules for the answer-format protocol. Order: failure_loop > interrupt > correction (analyzer already sorts).
 
    Before rendering, for each candidate **Read the target file** (`scope_target` and related `rules/*.md`) so the proposal text reflects what's actually there. If a similar rule exists, mark the proposal as `strengthen` instead of `append`. If it's a clear duplicate, mark as `skip — duplicate` and omit a proposal line.
 
@@ -163,15 +158,11 @@ The analyzer is read-only. It reads `~/.local/share/claude-logs/logs.db` and emi
        > <rule text>
    ```
 
-   After listing all N candidates, ask **one** prompt that accepts any of:
-   - `all skip` / `skip all` — skip everything
-   - `all n` — same as above
-   - per-item answers like `1:y, 2:skip, 3:n`
-   - free-form ("only #2", "skip 1 and 3")
+   Collect a decision per Shared rules' answer-format protocol, then on `y`
+   perform `Edit` (or `Write` if creating a new rules file) at the resolved
+   real path (see Symlinks below).
 
-   **Only on `y`** perform `Edit` (or `Write` if creating a new rules file). Use the resolved real path (see Symlinks below). Apply changes one item at a time — never bulk Edit.
-
-3. **Final summary**: applied N, skipped M, files touched. If any change landed under `~/.claude/CLAUDE.md` or `~/.claude/rules/...`, end with `Changes landed in ~/dotfiles/claude-code/...; run \`git status\` to review.` Do not commit automatically.
+3. **Final summary**: per Shared rules below.
 
 ### Scope rules (minimum scope)
 
@@ -210,8 +201,18 @@ Use `scope_hint` from the analyzer as the default. Adjust only when reading the 
 
 ## Shared rules (both modes)
 
-- Present candidates as a batch, but apply changes one item at a time (no bulk Edit/Write).
+- Present all candidates in one batch, then collect decisions — do not
+  interleave proposals and questions. After listing all N candidates, ask
+  **one** prompt that accepts any of: `all skip`/`skip all` (skip everything,
+  no further questions), `all n` (same, rejection without recording),
+  per-item answers (`1:y, 2:skip, 3:n, 4:y`), or free-form ("only #2", "skip
+  1 and 3"). **Only on `y`** perform the write, one item at a time — never
+  bulk Edit/Write. On `n`/`skip` do nothing for that item.
 - If the analyzer returns an empty list for a section, just say so — do not invent items.
+- **Final summary**: how many were applied, how many skipped, which paths
+  changed. If any change touches a file under `~/.claude/...` (a symlink into
+  the dotfiles repo), end with: `Changes landed in ~/dotfiles/claude-code/...;
+  run \`git status\` to review.` Do not commit automatically.
 
 ### Symlinks
 
