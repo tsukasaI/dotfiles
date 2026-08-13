@@ -148,6 +148,7 @@
           { name = "tursodatabase/tap"; trusted = true; }  # turso (libSQL cloud CLI)
           { name = "libsql/sqld"; trusted = true; }  # sqld (turso CLI dependency)
           { name = "ariga/tap"; trusted = true; }  # atlas (DB schema migration tool)
+          { name = "charmbracelet/tap"; trusted = true; }  # freeze (code screenshot tool)
         ];
 
         # Nixに移行しないformulae
@@ -158,6 +159,7 @@
           "apw"  # Apple Passwords CLI
           "tursodatabase/tap/turso"  # libSQL/Turso cloud CLI (core "turso" is a different DB engine)
           "ariga/tap/atlas"  # Atlas DB schema migration tool
+          "charmbracelet/tap/freeze"  # generate code screenshots as images
         ];
 
         casks = [
