@@ -60,7 +60,7 @@
   - Example (escalate): "design a cache-invalidation strategy for this service" — no precedent, real trade-offs.
   - NG (stay at default): "write a table-driven test for this function" — a pattern to imitate exists.
 - Fable review gate: applies only to branch+PR repos (not `dotfiles`/`ops`, which never get a `code-reviewer` pass). For non-trivial implementation (multiple files/subsystems, a security boundary, or an architectural decision — same bar as plan mode), run the `code-reviewer` subagent once, automatically, right after `gh pr create` opens the PR — review the PR diff, incorporate findings (push fixups), then stop and report per the branch+PR rule above. NOT for mechanical changes — config edits, dependency/SHA bumps, docs, formatting; those never warrant a fable pass.
-- When you invoke the `code-review` skill on your own initiative (not me typing `/code-review <level>` myself) and I haven't named a level, default to `low`. Only reach for a higher level when the task itself calls for deeper coverage.
+- When you invoke the `code-review` skill on your own initiative (not me typing `/code-review <level>` myself) and I haven't named a level, default to `high`.
 
 # Advisor usage
 - Use `/advisor` before committing to an approach for: non-trivial algorithm design, debugging that has stalled for two attempts, architectural trade-offs with no clear winner, and security-sensitive logic (auth, crypto, input validation).
