@@ -104,6 +104,14 @@ There is no staging or deploy step (hooks apply on the next tool call,
   `cleanup = "zap"` uninstalls anything not declared in the flake;
   `extraFlags = ["--force-cleanup"]` is a temporary workaround pending
   nix-darwin PR #1789.
+- **Homebrew taps can't be content-pinned** — the exception to
+  `rules/security.md`'s pin rule. The taps in `nix-darwin/flake.nix`
+  (`bendews/tap`, `tursodatabase/tap`, `libsql/sqld`, `ariga/tap`) have no
+  content-hash mechanism, and `trusted = true` on each is not optional:
+  Homebrew 5.1+ refuses to install third-party-tap formulae without it
+  (confirmed live in commit `ad07cb8`). Renewal mechanism: re-justify each
+  tap's necessity whenever the tap list changes, and at least quarterly
+  regardless (issue #25).
 - **Known debt is catalogued.** The ~29 open GitHub issues (security /
   architecture / quality / claude-config) already document most structural
   problems, in Japanese, with a 問題の所在 → 推奨される対応方針 structure. Run
