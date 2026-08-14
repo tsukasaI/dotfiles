@@ -213,6 +213,7 @@
   "plansDirectory": ".claude/plans",
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
+  "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "custom:dark-ansi-readable",
   "preferredNotifChannel": "ghostty",
@@ -220,5 +221,16 @@
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "copyOnSelect": false
+  "copyOnSelect": false,
+  "voiceEnabled": true,
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
+  "skillOverrides": {
+    "actions-pin-audit": "off",
+    "article": "off",
+    "failure-archaeology": "off",
+    "weekly-digest": "off"
+  }
 }

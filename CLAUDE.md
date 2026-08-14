@@ -39,15 +39,9 @@ There is no staging or deploy step (hooks apply on the next tool call,
 - Test a hook change with a synthetic payload:
   `echo '{"tool_input":{"command":"grep foo"}}' | claude-code/hooks/block-dangerous.sh; echo $?`
   — exit 0 = allow, exit 2 = block.
-- CI (`.github/workflows/ci.yaml`) runs shellcheck (`tests/shellcheck.sh`),
-  `tests/hooks-regression.sh` (guardrail-hook + `lefthook.yaml` assertions),
-  json/rules-paths-sync checks, and a gitleaks history scan on every push/PR
-  to main; `flake-check.yaml` runs `nix flake check` separately, gated to
-  `nix-darwin/**` changes. The same shellcheck + hooks-regression checks also
-  run locally via `lefthook`'s `pre-push` hook (fast json/shellcheck/
-  rules-paths-sync checks run at `pre-commit`) — CI is a backstop, not the
-  only loop, so re-run `lefthook install` after pulling this change. There is
-  still no linter config for other file types.
+- CI: see `.github/workflows/ci.yaml` and `flake-check.yaml`. CI is a
+  backstop, not the only loop — re-run `lefthook install` after pulling
+  changes to hooks or lefthook config. No linter config for other file types.
 
 ## Concepts
 
