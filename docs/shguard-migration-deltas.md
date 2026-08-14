@@ -40,8 +40,9 @@ weakening, documented so it isn't mistaken for a bug later.
 | 19 | `except_targets` treats flag values as candidate targets — 55% over-ask on real local curl usage | **resolved** — `value_flags` field | [shguard#48](https://github.com/tsukasaI/shguard/issues/48) fixed |
 | 20 | Parser can't parse `2>&1`/for/while/until/function-defs/`$?`/subshells — falls back to blanket `ask`, rule engine never runs | **resolved** | [shguard#75](https://github.com/tsukasaI/shguard/issues/75) fixed |
 | 21 | `git grep` bare-command match doesn't cover git subcommand form | gap, partial config fix | fixed via `dotfiles-tool-policy-git-grep`; `git -C <dir> grep` still uncovered |
-| 22 | `git commit -m "$(...)"` (heredoc-style commit messages) now `ask`s instead of `allow`s | **regression (blocks full cutover)** — not fixable from `config.toml` | [shguard#146](https://github.com/tsukasaI/shguard/issues/146) |
-| 23 | curl userinfo-URL bypass (`localhost:` as userinfo, not port) + rsync bare-relative-path over-block | **regression (security) + friction**, not fixable from `config.toml` | [shguard#147](https://github.com/tsukasaI/shguard/issues/147) filed (userinfo bypass only; rsync sub-gap not filed) |
+| 22 | `git commit -m "$(...)"` (heredoc-style commit messages) now `ask`s instead of `allow`s | **resolved** — no longer the cutover blocker (superseded by #23/#24) | [shguard#146](https://github.com/tsukasaI/shguard/issues/146) fixed |
+| 23 | curl userinfo-URL bypass (`localhost:` as userinfo, not port) + rsync bare-relative-path over-block | **regression (security) — blocks full cutover** (userinfo bypass); friction only (rsync sub-gap), not fixable from `config.toml` | [shguard#147](https://github.com/tsukasaI/shguard/issues/147) open (userinfo bypass only; rsync sub-gap not filed) |
+| 24 | `if`/background job (`&`)/`[[ ]]`/`!` hit the same parse-failure-bypasses-rule-engine path as #20 — #75's fix didn't cover them | **regression — blocks full cutover** | [shguard#191](https://github.com/tsukasaI/shguard/issues/191) filed |
 
 ## 1. Malformed-input fail-closed mode
 
@@ -527,7 +528,7 @@ the old hook's bare-word scan could). Residual gap: `git -C <dir> grep
 shguard's positional `required_tokens` matching, a known shguard
 limitation, not expressible from the config side.
 
-## 22. `git commit -m "$(...)"` (heredoc-style commit messages) now asks instead of allows — blocks full cutover
+## 22. `git commit -m "$(...)"` (heredoc-style commit messages) now asks instead of allows — resolved
 
 Found while writing the shguard-based replacement for
 `tests/hooks-regression.sh` (the full-cutover work), independent of
@@ -559,15 +560,22 @@ this ask is tied to the `git-commit-no-verify-short` rule's own
 match-attempt, a different internal path shguard's `[[allow]]`
 precedence doesn't reach.
 
-Net effect if cutover proceeds as-is: every commit made via the
-mandated heredoc pattern gets one extra confirmation click. Not a
-security regression (more cautious, not less) — a real, daily-workflow
-friction cost across every commit, not an edge case. **This is why
-full cutover (the `settings.json` swap to `shguard-gate.sh`) is paused**
-pending an upstream fix. Filed as
+Net effect while open: every commit made via the mandated heredoc
+pattern got one extra confirmation click. Not a security regression
+(more cautious, not less) — a real, daily-workflow friction cost across
+every commit, not an edge case. This is why full cutover (the
+`settings.json` swap to `shguard-gate.sh`) was paused. Filed as
 [shguard#146](https://github.com/tsukasaI/shguard/issues/146).
 
-## 23. curl userinfo-URL bypass + rsync bare-relative-path over-block
+**Resolved 2026-08-06** (PR #148, "let heredoc/multi-line git commit -m
+messages resolve to Allow"), landed in the pinned commit before this
+repo's flake update to the 2026-08-12 pin. Verified live against the
+installed 0.4.0 binary: the exact repro above now `allow`s. This is no
+longer a cutover blocker on its own — see #24 below for the finding
+that replaces it as the active blocker, and #23 above for the other
+live blocker (curl userinfo bypass).
+
+## 23. curl userinfo-URL bypass + rsync bare-relative-path over-block — userinfo bypass blocks full cutover
 
 Found by a fable code-review pass (2026-08-06) on the #2/#19 curl/rsync
 rules above, before they were committed — verified live, not just read.
@@ -597,6 +605,9 @@ class as delta #9's "no suffix/contains matcher" gap). Locked in as
 `KNOWN_DELTA` cases in `tests/shguard-parity-check.sh`
 (`curl http://localhost:@evil.com`, `curl http://localhost:80@evil.com`)
 so the hole stays visible rather than silently passing parity.
+**Together with #24, this is why full cutover remains paused** — this
+one specifically because it would flip a currently-`deny`d exfiltration
+vector to a silent `allow`, not just a dismissible `ask`.
 
 **`-K`/`--config` deliberately excluded from `value_flags`, unlike the
 other 13 flags.** `curl -K file.cfg` reads additional directives —
@@ -632,3 +643,41 @@ Userinfo bypass filed as
 [shguard#147](https://github.com/tsukasaI/shguard/issues/147). The
 rsync bare-relative-path sub-gap is not filed — pure friction, low
 severity, revisit if/when this migration resumes.
+
+## 24. `if`/background job (`&`)/`[[ ]]`/`!` hit the same parse-failure path as #20 — #75 didn't cover them, blocks full cutover
+
+Found via continued shadow-log observation (`claude-code/hooks/
+shguard-shadow.sh`) after #20's fix (shguard#75, closed 2026-08-01)
+landed. Mining `"unsupported construct"` reasons from the shadow log
+dated after 2026-08-06 (i.e. from the fixed binary) still shows real
+occurrences: `if` clause (43), background job `&` (14), extended test
+`[[ ]]` (12), pipeline negation `!` (1) — all against real commands
+from actual sessions, not synthetic edge cases (e.g. a retry loop with
+`if ! echo "$out" | rg -q ...; then break; fi`).
+
+This is the identical failure shape #20 described — `src/gate.rs`'s
+parse-error path returns a blanket `ask` without ever running the rule
+engine, built-in or `dotfiles-*` rules alike — just for a different set
+of constructs that #75's fix didn't happen to cover. Verified live
+against the installed 0.4.0 binary, same repro pattern as #20:
+
+```
+if true; then <built-in-denied-cmd>; fi   old: deny   shguard: ask ("unsupported construct: if clause")
+<built-in-denied-cmd> &                   old: deny   shguard: ask ("unsupported construct: background job (&)")
+[[ -d /tmp/x ]] && <built-in-denied-cmd>  old: deny   shguard: ask ("unsupported construct: extended test command ([[ ]])")
+```
+
+(`<built-in-denied-cmd>` stands in for a command shguard's own
+built-in blocklist denies unconditionally — omitted verbatim in this
+doc for the same reason it's omitted from the filed issue: this repo's
+own local guardrail hook pattern-matches on the literal string even
+inside a quoted example.)
+
+Same conclusion as #20: not filed as fixable from `config.toml` — this
+is a parser-translation gap in shguard itself, not a rule-schema
+expressiveness limit. Filed as
+[shguard#191](https://github.com/tsukasaI/shguard/issues/191).
+**This, together with #23's userinfo bypass, is why full cutover
+remains paused** even though #22 (the previously-documented blocker)
+is now resolved — resolving #22 replaced the blocker, it didn't clear
+it.

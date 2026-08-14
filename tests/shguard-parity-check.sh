@@ -208,6 +208,26 @@ case_ "bash -c benign (old over-blocks)" "bash -c 'echo hi'" KNOWN_DELTA "delta#
 case_ "bash -c dangerous still deny"     "bash -c 'rm -rf /'"
 case_ "multi-line bash (issue #44 closed by shguard)" "$(printf 'echo setup\nbash script.sh')" KNOWN_DELTA "issue #44 — shguard closes it, old hook still has the bug"
 
+# ── shguard-gate.sh fail-closed on a malformed config ────────────────────
+# Not a shguard-vs-old-hook parity case — this exercises the gate wrapper
+# itself. Guards the magic-string match in shguard-gate.sh (matched on
+# shguard's own "refusing to evaluate any command until this is fixed"
+# message) against silently rotting back to a passthrough `ask` if a
+# future shguard pin rewords that message.
+total=$((total + 1))
+bad_config=$(mktemp)
+trap '[[ -n "${bad_config:-}" ]] && : > "$bad_config"' EXIT
+printf 'not valid toml [[[' > "$bad_config"
+gate_out=$(jq -cn '{tool_name:"Bash",tool_input:{command:"echo hi"},hook_event_name:"PreToolUse"}' \
+  | SHGUARD_CONFIG="$bad_config" claude-code/hooks/shguard-gate.sh 2>/dev/null)
+gate_decision=$(printf '%s' "$gate_out" | jq -r '.hookSpecificOutput.permissionDecision // "PARSE_ERROR"')
+if [[ "$gate_decision" == "deny" ]]; then
+  :
+else
+  fails=$((fails + 1))
+  printf 'FAIL  %-40s expected=deny gate=%s\n' "shguard-gate.sh malformed config" "$gate_decision"
+fi
+
 echo "---"
 echo "$((total - fails - deltas))/$total passed, $deltas known delta(s), $fails unexpected failure(s)"
 ((fails == 0))
