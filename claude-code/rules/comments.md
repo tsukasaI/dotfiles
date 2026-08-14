@@ -1,3 +1,26 @@
+---
+# Loaded only when code files are in context.
+paths:
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.mjs"
+  - "**/*.cjs"
+  - "**/*.go"
+  - "**/*.rs"
+  - "**/*.py"
+  - "**/*.rb"
+  - "**/*.lua"
+  - "**/*.nix"
+  - "**/*.sh"
+  - "**/*.bash"
+  - "**/*.zsh"
+  - "**/*.sql"
+  - "**/*.vue"
+  - "**/*.svelte"
+---
+
 # Comments
 
 Default is still "no comment" (top-level system rule). This file exists to draw the line more
