@@ -226,11 +226,5 @@
   "voice": {
     "enabled": true,
     "mode": "hold"
-  },
-  "skillOverrides": {
-    "actions-pin-audit": "off",
-    "article": "off",
-    "failure-archaeology": "off",
-    "weekly-digest": "off"
   }
 }
