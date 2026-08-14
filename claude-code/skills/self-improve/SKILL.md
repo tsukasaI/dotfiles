@@ -76,8 +76,8 @@ The analyzer is read-only. It reads `~/.local/share/claude-logs/logs.db`, the SQ
    - For `meta_clusters`: surface `code_overlap_hints` verbatim. If any hint scores ≥ 2, **Read** that skill's SKILL.md (from `available_skills[].path`) and ask the user: "this existing skill seems to cover the same intent — extend it, or still want a new one?" before drafting a new SKILL.md.
    - For `prompt_clusters`: surface `overlap_hints` similarly.
    - Even when both lists are empty, scan `available_skills` once and apply one test: **would invoking that existing skill on this candidate's sample input produce the output the user is asking for?** If yes for any skill → overlap exists, treat it like an `overlap_hints` hit. Lexical keyword match misses cross-domain cases (e.g. an English skill description vs. user-pasted code).
-     - Example: candidate is "harvest cc-memory learnings into a blog post idea" recurring across sessions — `article`'s Mode A does exactly this via `search_memory`; invoking `article` produces the requested output → overlap; propose extending `article`, not a new skill.
-     - NG: candidate is "summarize this PR's diff and post it to the retro issue" — `weekly-digest` posts to the retro issue but doesn't summarize a single PR's diff; invoking it would not satisfy the request → no overlap, proceed.
+     - Example: candidate is "turn a vague request into a verifiable /goal statement" recurring across sessions — `mkgoal`'s slot-filling dialogue does exactly this; invoking `mkgoal` produces the requested output → overlap; propose extending `mkgoal`, not a new skill.
+     - NG: candidate is "run performance measurement in CI on every push" — `browser-test` measures LCP/CLS/INP, but interactively in a session, not as CI automation; invoking it would not satisfy the request → no overlap, proceed.
 
 4. **Read before suggesting** for `skill_review_hints` and any case where overlap is possible:
    - Open the existing `SKILL.md` with `Read` before proposing edits.
