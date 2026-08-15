@@ -212,6 +212,10 @@
   "askUserQuestionTimeout": "never",
   "plansDirectory": ".claude/plans",
   "tui": "fullscreen",
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
   "autoMemoryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
@@ -221,10 +225,31 @@
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "copyOnSelect": false,
   "voiceEnabled": true,
-  "voice": {
-    "enabled": true,
-    "mode": "hold"
+  "copyOnSelect": false,
+  "autoMode": {
+    "environment": [
+      "$defaults",
+      "Primary use of Claude Code: general software development across many personal repos, plus a personal life-management repo (tsukasaI/ops: goals, career prep, study notes, decks) that is mostly Markdown/JSONL",
+      "Repository visibility: tsukasaI/dotfiles is public; all other personal repos (including tsukasaI/ops) are private unless stated otherwise",
+      "Source control: personal GitHub account tsukasaI only — no company or org account configured",
+      "Org-specific CLIs: none shared across repos; `deck` (Google Slides sync, k1LoW/deck) is used only in the ops repo — writes (`deck apply`) must never run directly, present for manual run",
+      "Sensitive data locations & audiences (tsukasaI/ops repo, paths relative to repo root): `notes/study-work/go/runtime-secret.md`, `notes/study-work/kubernetes/{helm-commands,helm-vs-kustomize,network-policy-cni-troubleshooting,rbac,cka-imperative-commands-cheatsheet,cka-mock-exam-1}.md`, and anything under `career/` (personal career/job-search data) and `private/` (repo-root dir, gitignored — not the macOS `/private/`) — share only with audiences cleared at the [named+specifics] bar"
+    ],
+    "allow": [
+      "$defaults",
+      "Read-only sqlite3 invocations (`.schema`, `.tables`, `SELECT` queries, or the `-readonly` flag) are allowed without confirmation; writes (`INSERT`/`UPDATE`/`DELETE`/`DROP`/`ALTER`) and `SELECT`s that call side-effecting functions (`writefile()`, `load_extension()`) still go through normal review",
+      "shellcheck invocations are allowed: read-only lint, no side effects",
+      "When the session's working directory is the tsukasaI/ops repo: creating new files or appending to existing ones (never overwriting/truncating) matching `career/prep/*.jsonl`, and appending to `memory/cc-memory-facts.md`, then a `git commit` whose `git add` named only those paths, is allowed without confirmation — this is an intentional exception to the `career/` sensitivity classification, scoped to exactly these paths in this repo: append-only writes to the repo's own tracked content, git-reversible, matches the ops repo's CLAUDE.md Skill Conventions"
+    ],
+    "soft_deny": [
+      "$defaults",
+      "Deleting a GitHub repo (`gh repo delete`) [named+specifics — **must name:** the exact repo to delete] — destructive and outward-facing, confirm the exact target before executing",
+      "`gh pr merge`, including `--auto` [named+specifics — **must name:** merging that PR] — supersedes the default Merge Without Review rule's `--auto`-on-branch-protection exemption: even `gh pr merge --auto` on a branch-protected repo requires the user to explicitly instruct the merge, even once review is complete"
+    ],
+    "hard_deny": [
+      "$defaults",
+      "Only `deck cat` and `deck list` (Google Slides read via k1LoW/deck, used only in the ops repo) may run freely; every other `deck` subcommand, `deck apply` above all, must never be executed by the agent under any circumstances, including explicit user instruction to run it directly — always present the command for the user to copy and run manually"
+    ]
   }
 }
