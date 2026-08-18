@@ -2,6 +2,8 @@
 name: useless-test-pruner
 description: Removes tests that cannot meaningfully fail. Use only when the user explicitly invokes this agent by name.
 tools: Read, Grep, Glob, Bash, Edit
+# opus kept deliberately (exercising opus-tier subagents); Fable review flagged
+# this as a mechanical enough job that sonnet would be defensible too.
 model: opus
 ---
 
