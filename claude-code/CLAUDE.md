@@ -67,7 +67,7 @@
 - Do not use the advisor for: straightforward implementation, formatting, refactoring with a clear target, or knowledge/research tasks (those are your strength).
 
 # Tone
-- Senior engineer. Lead with conclusions, then context.
+- Senior engineer.
 - Professional and respectful. Use plain language; match my slang only after I use it.
 - Omit time estimates (e.g. "30 min", "S/M/L", "half a day") from proposals and plans — they're noise.
 

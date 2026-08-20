@@ -208,6 +208,7 @@
     "command": "bun $HOME/dotfiles/claude-code/statusline.ts"
   },
   "viewMode": "verbose",
+  "outputStyle": "Concise",
   "advisorModel": "fable",
   "askUserQuestionTimeout": "never",
   "plansDirectory": ".claude/plans",
@@ -225,17 +226,7 @@
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "voiceEnabled": true,
-  "copyOnSelect": false,
   "autoMode": {
-    "environment": [
-      "$defaults",
-      "Primary use of Claude Code: general software development across many personal repos, plus a personal life-management repo (tsukasaI/ops: goals, career prep, study notes, decks) that is mostly Markdown/JSONL",
-      "Repository visibility: tsukasaI/dotfiles is public; all other personal repos (including tsukasaI/ops) are private unless stated otherwise",
-      "Source control: personal GitHub account tsukasaI only — no company or org account configured",
-      "Org-specific CLIs: none shared across repos; `deck` (Google Slides sync, k1LoW/deck) is used only in the ops repo — writes (`deck apply`) must never run directly, present for manual run",
-      "Sensitive data locations & audiences (tsukasaI/ops repo, paths relative to repo root): `notes/study-work/go/runtime-secret.md`, `notes/study-work/kubernetes/{helm-commands,helm-vs-kustomize,network-policy-cni-troubleshooting,rbac,cka-imperative-commands-cheatsheet,cka-mock-exam-1}.md`, and anything under `career/` (personal career/job-search data) and `private/` (repo-root dir, gitignored — not the macOS `/private/`) — share only with audiences cleared at the [named+specifics] bar"
-    ],
     "allow": [
       "$defaults",
       "Read-only sqlite3 invocations (`.schema`, `.tables`, `SELECT` queries, or the `-readonly` flag) are allowed without confirmation; writes (`INSERT`/`UPDATE`/`DELETE`/`DROP`/`ALTER`) and `SELECT`s that call side-effecting functions (`writefile()`, `load_extension()`) still go through normal review",
@@ -250,6 +241,16 @@
     "hard_deny": [
       "$defaults",
       "Only `deck cat` and `deck list` (Google Slides read via k1LoW/deck, used only in the ops repo) may run freely; every other `deck` subcommand, `deck apply` above all, must never be executed by the agent under any circumstances, including explicit user instruction to run it directly — always present the command for the user to copy and run manually"
+    ],
+    "environment": [
+      "$defaults",
+      "Primary use of Claude Code: general software development across many personal repos, plus a personal life-management repo (tsukasaI/ops: goals, career prep, study notes, decks) that is mostly Markdown/JSONL",
+      "Repository visibility: tsukasaI/dotfiles is public; all other personal repos (including tsukasaI/ops) are private unless stated otherwise",
+      "Source control: personal GitHub account tsukasaI only — no company or org account configured",
+      "Org-specific CLIs: none shared across repos; `deck` (Google Slides sync, k1LoW/deck) is used only in the ops repo — writes (`deck apply`) must never run directly, present for manual run",
+      "Sensitive data locations & audiences (tsukasaI/ops repo, paths relative to repo root): `notes/study-work/go/runtime-secret.md`, `notes/study-work/kubernetes/{helm-commands,helm-vs-kustomize,network-policy-cni-troubleshooting,rbac,cka-imperative-commands-cheatsheet,cka-mock-exam-1}.md`, and anything under `career/` (personal career/job-search data) and `private/` (repo-root dir, gitignored — not the macOS `/private/`) — share only with audiences cleared at the [named+specifics] bar"
     ]
-  }
+  },
+  "voiceEnabled": true,
+  "copyOnSelect": false
 }
