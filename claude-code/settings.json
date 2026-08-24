@@ -207,8 +207,19 @@
     "type": "command",
     "command": "bun $HOME/dotfiles/claude-code/statusline.ts"
   },
-  "viewMode": "verbose",
+  "enabledPlugins": {
+    "eli5@claude-community": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-community": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-community"
+      }
+    }
+  },
   "outputStyle": "Concise",
+  "viewMode": "verbose",
   "advisorModel": "fable",
   "askUserQuestionTimeout": "never",
   "plansDirectory": ".claude/plans",
@@ -223,6 +234,7 @@
   "theme": "custom:dark-ansi-readable",
   "preferredNotifChannel": "ghostty",
   "switchModelsOnFlag": false,
+  "autoContinueAtUsageLimit": true,
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
