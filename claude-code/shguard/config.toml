@@ -141,14 +141,14 @@ reason = "curl to a non-localhost address can exfiltrate data"
 command = "curl"
 value_flags = ["o", "w", "m", "d", "X", "H", "A", "e", "u", "b", "c", "T", "F"]
 except_targets = [
-  { exact = "http://localhost" }, { prefix = "http://localhost:" }, { prefix = "http://localhost/" },
-  { exact = "https://localhost" }, { prefix = "https://localhost:" }, { prefix = "https://localhost/" },
-  { exact = "http://127.0.0.1" }, { prefix = "http://127.0.0.1:" }, { prefix = "http://127.0.0.1/" },
-  { exact = "https://127.0.0.1" }, { prefix = "https://127.0.0.1:" }, { prefix = "https://127.0.0.1/" },
-  { exact = "http://[::1]" }, { prefix = "http://[::1]:" }, { prefix = "http://[::1]/" },
-  { exact = "https://[::1]" }, { prefix = "https://[::1]:" }, { prefix = "https://[::1]/" },
+  # url_host only — never add exact/prefix entries alongside: except_targets
+  # are OR'd, and a retained prefix entry reopens the userinfo bypass this
+  # fix closes (see #23 in docs/shguard-migration-deltas.md). Scheme-blind
+  # by design (excepts http/https/ws/wss/ftp alike).
+  { url_host = "localhost" },
+  { url_host = "127.0.0.1" },
+  { url_host = "[::1]" },
 ]
-
 [[deny]]
 id = "dotfiles-network-rsync-remote"
 reason = "rsync to/from a remote host can transfer files over the network"
