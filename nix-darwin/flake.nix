@@ -104,7 +104,6 @@
         bun
         nodejs
         pnpm
-        pi-coding-agent
 
         # Go (LSP, formatters, debugger for nvim-dap-go)
         go
