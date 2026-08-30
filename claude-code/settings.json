@@ -162,6 +162,10 @@
           {
             "type": "command",
             "command": "$HOME/dotfiles/claude-code/hooks/block-config-edit.sh"
+          },
+          {
+            "type": "command",
+            "command": "bun $HOME/dotfiles/claude-code/hooks/slop-guard.ts"
           }
         ]
       }
@@ -197,6 +201,11 @@
           {
             "type": "command",
             "command": "$HOME/dotfiles/claude-code/hooks/warn-uncommitted.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bun $HOME/dotfiles/claude-code/hooks/slop-guard.ts",
             "timeout": 10
           }
         ]

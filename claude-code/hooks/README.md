@@ -10,6 +10,7 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 |---|---|---|
 | `block-dangerous.sh` | `Bash` | Block dangerous shell commands defined in `blocklist.conf`; commands matching `allowlist.conf` bypass the blocklist |
 | `block-config-edit.sh` | `Edit\|Write` | Block edits to linter/formatter config files |
+| `slop-guard.ts` | `Edit\|Write` | Deny prose edits (`.md`/`.mdx`/`.txt`) that newly introduce an em dash or a cliché phrase from `slop-phrases.conf`; only the net-new count vs. the pre-edit text is checked, never the whole file. `SLOP_GUARD_DISABLE=1` disables it. |
 
 ### PostToolUse
 
@@ -23,6 +24,7 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 | Script | Matcher | Description |
 |---|---|---|
 | `warn-uncommitted.sh` | `""` | Remind the agent to commit before ending the turn — scoped to files THIS session edited (per its `mark-session-edit.sh` manifest), not the whole working tree, so a concurrent session sharing the repo can't trigger a spurious reminder |
+| `slop-guard.ts` | `""` | Block the turn once if the last assistant reply mixes an unexpected Hangul/Cyrillic run into otherwise Japanese-context text (script-mixing decoding artifact). `SLOP_GUARD_DISABLE=1` disables it. |
 
 ### SessionEnd
 
