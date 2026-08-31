@@ -229,6 +229,14 @@
   },
   "outputStyle": "Concise",
   "viewMode": "verbose",
+  "modelSettings": {
+    "claude-sonnet-5": {
+      "effortLevel": "medium"
+    },
+    "claude-fable-5": {
+      "effortLevel": "high"
+    }
+  },
   "advisorModel": "fable",
   "askUserQuestionTimeout": "never",
   "plansDirectory": ".claude/plans",
