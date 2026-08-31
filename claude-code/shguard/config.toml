@@ -140,6 +140,7 @@ id = "dotfiles-network-curl-remote"
 reason = "curl to a non-localhost address can exfiltrate data"
 command = "curl"
 value_flags = ["o", "w", "m", "d", "X", "H", "A", "e", "u", "b", "c", "T", "F"]
+attached_value_flags = ["x"]
 except_targets = [
   # url_host only — never add exact/prefix entries alongside: except_targets
   # are OR'd, and a retained prefix entry reopens the userinfo bypass this
