@@ -28,7 +28,10 @@ precisely than "the WHY is non-obvious" alone does — based on a real investiga
 `src/*.rs`, 2026-08-07): most of that codebase's dense doc comments turned out to be
 load-bearing, not filler, but ~20-30% was redundant restatement or a development narrative that
 belonged in the commit body instead. Neither "comment everything" nor "comment nothing" was
-right; the split below is.
+right; the split below is. Re-confirmed in a follow-up shguard audit (2026-08-31): ~98
+fable-review narrative comments had accumulated in `src/gate.rs`, `src/rules.rs`,
+`src/decision_log.rs`, and several `tests/*.rs` files, tracked for removal in
+tsukasaI/shguard#394.
 
 ## Keep in code, right above the thing it explains
 - A measured/tuned value (threshold, magic number, timeout) — state the conclusion and what
@@ -44,8 +47,10 @@ right; the split below is.
 
 ## Move out of code
 - The story of how a bug was found, what an earlier version looked like, or who caught it in
-  review → commit body (`decision`/`rejected`/`learned` lines — see Workflow's Contextual
-  Commits format in the global CLAUDE.md), not an inline narrative.
+  review never goes in source, not even as a doc comment. It goes in the commit body
+  (`decision`/`rejected`/`learned` lines, see Workflow's Contextual Commits format in the global
+  CLAUDE.md) or a GitHub PR/issue comment. This includes mentions of a specific review pass by
+  name (e.g. "a fable review found...").
 - Issue/task references stay a bare pointer (`issue #52`) — don't re-explain the issue's content
   inline; the pointer rots less than a paraphrase does.
 
