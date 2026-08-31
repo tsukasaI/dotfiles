@@ -106,7 +106,10 @@
         pnpm
 
         # Go (LSP, formatters, debugger for nvim-dap-go)
-        go
+        # go_latest tracks nixpkgs' newest go_1_XX; plain `go` lags behind on
+        # a slower-moving "stable" alias (confirmed: go=1.26.7, go_latest=1.27.0
+        # on the same nixpkgs pin).
+        go_latest
         gopls
         gofumpt
         gotools # goimports
