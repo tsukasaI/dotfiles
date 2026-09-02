@@ -18,13 +18,13 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | Path | What it is |
 |---|---|
 | `nix-darwin/flake.nix` | Source of truth for packages, Homebrew, and macOS defaults. Single host config; `system.primaryUser` must equal `whoami`. |
-| `claude-code/` | The user's **global** Claude Code config (`~/.claude/*` symlinks point here): `CLAUDE.md`, `settings.json`, `rules/`, `skills/`, `agents/`, `hooks/`, `themes/`, `statusline.ts`. |
+| `claude-code/` | The user's **global** Claude Code config (`~/.claude/*` symlinks point here): `CLAUDE.md`, `settings.json`, `rules/`, `skills/`, `agents/`, `hooks/`, `shguard/config.toml`, `themes/`, `statusline.ts`. |
 | `.claude/` | Project-scoped Claude state for *this repo only* (plans, memory, local settings). Not the same thing as `claude-code/`. |
 | `nvim/` | lazy.nvim config: one file per plugin in `lua/plugins/` with that plugin's keymaps inside its spec; global options/keymaps in `init.lua`; LSP servers in `lsp/<name>.lua`, enabled at the bottom of `init.lua`. |
 | `zsh/zshrc` | Hand-written, no framework. `_cached_eval` caches slow init output (mise/zoxide/fzf). Custom prompt — starship was removed. |
 | `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks — `core.hooksPath` was retired (see Pitfalls); this repo's own pre-commit/pre-push checks live in the root `lefthook.yaml`, installed per-repo via `lefthook install` (see `setup.sh`). |
 | `scripts/` | Utility scripts (currently empty after cooling-period removal). |
-| `setup.sh` | First-time symlink installer. Known-fragile on fresh machines (issue #5). |
+| `setup.sh` | First-time symlink installer; also runs `lefthook install` (warns if lefthook isn't on PATH yet). |
 | `docs/` | Investigation memos specific to this repo's own subject matter (e.g. `turso-investigation.md`); not a knowledge-management store — see the Personal knowledge store bullet in Concepts for the cc-memory/docs boundary. |
 | `ghostty/`, `wezterm/` | Terminals: ghostty primary, wezterm fallback, deliberately identical theme/font. |
 | `karabiner/`, `ssh/`, `mise/` | Small configs. `mise/config.toml` is near-empty on purpose — toolchains come from Nix. |
@@ -46,9 +46,8 @@ There is no staging or deploy step (hooks apply on the next tool call,
 ## Concepts
 
 - **Contextual Commits**: the commit-body format (see global CLAUDE.md) is
-  load-bearing here, not just style — `claude-code/skills/_shared/harvest.ts`
-  machine-parses `intent/decision/rejected/constraint/learned` lines to feed
-  the `article` and `weekly-digest` skills.
+  used by `rules/comments.md` as the home for bug-hunt narrative that must
+  stay out of source.
 - **ewc / fini / herdr**: personal tools installed as flake inputs. `fini` is
   the formatter the PostToolUse hook runs on every Edit/Write. `herdr`
   supplies the SessionStart hook (`~/.claude/hooks/`, outside this repo).
@@ -59,12 +58,9 @@ There is no staging or deploy step (hooks apply on the next tool call,
   deliberately kept out of Claude's process tree.
 - **Personal knowledge store**: cc-memory (MCP) is the sole store for
   personal-life facts, Claude-Code session learnings, and article-idea
-  candidates (`blog_candidate: true`, surfaced via `search_memory` by
-  `article`/`weekly-digest`). The Obsidian vault and the `kb`/`note` skills
-  were retired — their content was migrated into cc-memory. `skills/_shared/
-  kb.json` is gitignored personal config (git-log harvesting paths for
-  `article`/`weekly-digest`) — never commit it (issue #24). A repo's own
-  `docs/` still holds investigations specific to that repo's own subject
+  candidates (`blog_candidate: true`). The Obsidian vault and the `kb`/`note`
+  skills were retired — their content was migrated into cc-memory. A repo's
+  own `docs/` still holds investigations specific to that repo's own subject
   matter (e.g. `docs/turso-investigation.md` here), separate from
   cc-memory's personal-knowledge scope. One store per finding — don't
   duplicate across them.
@@ -84,8 +80,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
   blocklist for listed prefixes.
 - **Skills run live through the `~/.claude/skills` symlink**: an edit is in
   production immediately, committed or not. Check `git status` before assuming
-  committed state equals running state. (`skills/_shared/kb.json` is the one
-  deliberately untracked file — issue #24.)
+  committed state equals running state.
 - **Global git hooks were retired, on purpose.** `core.hooksPath` used to
   chain into each repo's own lefthook config, but lefthook (and Python
   `pre-commit`) refuse to `install` while a global hooksPath is set — a
@@ -95,24 +90,33 @@ There is no staging or deploy step (hooks apply on the next tool call,
   installed via `lefthook install` (see `setup.sh`). Don't reintroduce a
   global `core.hooksPath` — it will silently break `lefthook install` in
   every other repo on this machine again.
-- **Trust files over docs.** The README's package lists and clone URL
-  (issue #13), the flake's "tree-sitter parsers precompiled via Nix" comment
-  (issue #27), and parts of `hooks/README.md` are known-stale. When any doc —
-  including this one — disagrees with reality, reality wins; update the doc.
+- **Trust files over docs.** Parts of `hooks/README.md` are known-stale.
+  When any doc — including this one — disagrees with reality, reality wins;
+  update the doc.
+- **shguard runs in shadow mode.** `hooks/shguard-shadow.sh` evaluates every
+  Bash call against `claude-code/shguard/config.toml` and logs to
+  `~/.local/share/shguard-shadow/shadow.jsonl` without blocking;
+  `block-dangerous.sh` remains the enforcing guard. `shguard-gate.sh` is the
+  enforcing variant, not yet wired in `settings.json`. Accepted deltas
+  between the two are tracked in `docs/shguard-migration-deltas.md`;
+  `config.toml` is Claude-edit-blocked like the other guard files.
 - **flake.nix specifics**: the unfree allowlist contains only `terraform`
   (any other unfree package fails eval until added); Homebrew
   `cleanup = "zap"` uninstalls anything not declared in the flake;
-  `extraFlags = ["--force-cleanup"]` is a temporary workaround pending
-  nix-darwin PR #1789.
+  `extraFlags = ["--force-cleanup"]` was added before nix-darwin PR #1789
+  (merged 2026-06-17) landed; check whether the pinned nix-darwin input
+  already handles the underlying CLI-flag requirement and drop the flag if
+  so.
 - **Homebrew taps can't be content-pinned** — the exception to
   `rules/security.md`'s pin rule. The taps in `nix-darwin/flake.nix`
-  (`bendews/tap`, `tursodatabase/tap`, `libsql/sqld`, `ariga/tap`) have no
-  content-hash mechanism, and `trusted = true` on each is not optional:
-  Homebrew 5.1+ refuses to install third-party-tap formulae without it
-  (confirmed live in commit `ad07cb8`). Renewal mechanism: re-justify each
-  tap's necessity whenever the tap list changes, and at least quarterly
-  regardless (issue #25).
-- **Known debt is catalogued.** The ~29 open GitHub issues (security /
-  architecture / quality / claude-config) already document most structural
+  (`bendews/tap`, `tursodatabase/tap`, `libsql/sqld`, `ariga/tap`,
+  `charmbracelet/tap`) have no content-hash mechanism, and `trusted = true`
+  on each is not optional: Homebrew 5.1+ refuses to install third-party-tap
+  formulae without it (confirmed live in commit `ad07cb8`). Renewal
+  mechanism: re-justify each tap's necessity whenever the tap list changes,
+  and at least quarterly regardless (originally issue #25).
+- **Known debt is catalogued.** 43 closed GitHub issues (security /
+  architecture / quality / claude-config) document past structural
   problems, in Japanese, with a 問題の所在 → 推奨される対応方針 structure. Run
-  `gh issue list` before filing a "new" finding, and follow that format.
+  `gh issue list --state all` before filing a "new" finding, and follow that
+  format.

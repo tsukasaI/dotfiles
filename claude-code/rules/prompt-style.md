@@ -10,8 +10,8 @@ paths:
 
 Loaded when editing a prompt file itself (rule/skill/agent/CLAUDE.md), not on
 every session — this file is about writing these files, not about code. Based
-on a review of all `claude-code/` prompt files against Sonnet 5 / Fable 5 /
-Opus 4.6 (2026-08-07): most files already pass; the failures found were a
+on a review of all `claude-code/` prompt files against Sonnet 5 / Opus 4.6 /
+Fable 5.1 (2026-08-07): most files already pass; the failures found were a
 broken tool reference, a stale worked example, a cross-file contradiction, and
 one unscoped cluster of unreasoned prohibitions — not verbosity in general.
 
@@ -38,7 +38,7 @@ one unscoped cluster of unreasoned prohibitions — not verbosity in general.
 - **Sonnet 5**: state scope explicitly — it won't generalize a rule from one
   case to another on its own. A worked example gets followed literally,
   including a wrong one, so keep examples correct and current.
-- **Fable 5**: state the goal and constraints, not the steps, unless the
+- **Fable 5.1**: state the goal and constraints, not the steps, unless the
   operation is fragile enough to need an exact script.
 
 ## Test

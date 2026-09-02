@@ -54,7 +54,7 @@
   | Main loop (implementation sessions) | `sonnet` | `claude --model sonnet` at launch |
   | Subagents (Explore, code-explorer, web-researcher, Agent/Workflow `agent()`) | Cheapest model that can do the subtask; default `sonnet` | `model:` argument at call time |
   | Review (code-reviewer) | `fable` | `agents/code-reviewer.md` frontmatter |
-  | Advisor | Whatever `/advisor` is configured to use | Advisor config — not this file |
+  | Advisor | `fable` | `settings.json` `advisorModel` |
 
 - When delegating to Agent or Workflow `agent()`, pass `model:` explicitly (default `sonnet`) — don't rely on inheritance from the main loop. Escalate above the default only when the subtask meets ≥2 of: (a) no existing pattern in this codebase to imitate, (b) a security/auth/crypto boundary, (c) multiple valid approaches with a real trade-off, (d) it already failed once at the default tier.
   - Example (escalate): "design a cache-invalidation strategy for this service" — no precedent, real trade-offs.

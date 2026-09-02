@@ -233,7 +233,7 @@
     "claude-sonnet-5": {
       "effortLevel": "medium"
     },
-    "claude-fable-5": {
+    "claude-fable-5-1": {
       "effortLevel": "high"
     }
   },
@@ -281,5 +281,6 @@
     ]
   },
   "voiceEnabled": true,
-  "copyOnSelect": false
+  "copyOnSelect": false,
+  "verbose": true
 }
