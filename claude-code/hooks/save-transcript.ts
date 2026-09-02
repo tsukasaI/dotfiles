@@ -178,8 +178,7 @@ function redactSecrets(text: string): string {
   return out;
 }
 
-// project_dir is later surfaced by harvest.ts (sessionStats) into the
-// /weekly-digest skill, which may post it to a GitHub issue in ops_repo — an
+// project_dir may end up pushed to a shared store (see push-to-turso.sh) — an
 // absolute path embeds the OS username, so redact the HOME prefix at this
 // logging boundary rather than trusting every downstream consumer to do it.
 function redactHome(path: string): string {
@@ -191,7 +190,7 @@ function redactHome(path: string): string {
 
 // ts is an ISO 8601 UTC timestamp; bucket by local calendar day so late-night/
 // early-morning sessions attribute to the day the user experienced, not the
-// UTC day (see _shared/harvest.ts localYMD for the same fix in a sibling file).
+// UTC day.
 function localDay(ts: string): string {
   const d = new Date(ts);
   const pad = (n: number) => String(n).padStart(2, "0");

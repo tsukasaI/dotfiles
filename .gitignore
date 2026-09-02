@@ -14,7 +14,3 @@ karabiner/automatic_backups/
 .claude/memory/
 .claude/plans/
 .claude/settings.local.json
-
-# Claude Code skills: personal harvest config stays local — email, repo paths, private repo slug (issue #24).
-# kb.json.example is the committed template.
-claude-code/skills/_shared/kb.json
