@@ -21,13 +21,13 @@ weakening, documented so it isn't mistaken for a bug later.
 |---|------|--------|----------|
 | 1 | Malformed-input fail-closed mode | regression (minor) | not filed — see below |
 | 2 | curl (localhost-only) / rsync (local-only) | **mostly resolved** — rules live in `config.toml`; residual sub-gaps in #23 | [shguard#48](https://github.com/tsukasaI/shguard/issues/48) fixed |
-| 3 | Pipe-to-interpreter beyond curl\|wget→sh | gap (permanent) | not expressible |
-| 4 | Heredoc-fed interpreters (`python <<EOF`) | gap (permanent) | not expressible |
+| 3 | Pipe-to-interpreter beyond curl\|wget→sh | **resolved, doc was stale**: a generic engine floor now `ask`s for any pipeline sink with no decode stage, not just the hardcoded shell list | confirmed live 2026-09-02 against HEAD `a4fbd14`, no issue needed |
+| 4 | Heredoc-fed interpreters (`python <<EOF`) | gap (permanent), confirmed live 2026-09-02: heredoc body content isn't scanned at all, reaches bare `allow` | [shguard#424](https://github.com/tsukasaI/shguard/issues/424) filed |
 | 5 | ANSI-C `$'...'` raw-string check | gap (permanent) | not expressible |
-| 6 | `/dev/tcp` \| `/dev/udp` (command-agnostic) | gap (permanent, partial) | not expressible |
-| 7 | CREDENTIAL: any-command bare-word match | gap (permanent, partial) | not expressible |
+| 6 | `/dev/tcp` \| `/dev/udp` (command-agnostic) | gap (permanent, partial), confirmed live 2026-09-02: reaches `ask` via unsupported-construct fallback, not an explicit `deny` | [shguard#425](https://github.com/tsukasaI/shguard/issues/425) filed |
+| 7 | CREDENTIAL: any-command bare-word match | gap (permanent, partial), confirmed live 2026-09-02: reaches bare `allow`, no ask/deny at all | [shguard#426](https://github.com/tsukasaI/shguard/issues/426) filed |
 | 8 | `gh api -X DELETE` chained-value form | gap (permanent, partial) | not expressible |
-| 9 | Secret-file readers: extension-suffix / nested paths | gap (permanent, partial) | not expressible |
+| 9 | Secret-file readers: extension-suffix / nested paths | gap (permanent, partial), confirmed live 2026-09-02: `.env` suffix variant under a nested path (`foo/.env.local`) is a real regression (old hook covered it); bare extension-suffix (`id_rsa.bak`) is a pre-existing hole, not a regression | [shguard#427](https://github.com/tsukasaI/shguard/issues/427) filed (`.env` case only) |
 | 10 | `--no-verify` on non-git commands | gap (permanent, minor) | not expressible |
 | 11 | `sudo`/`doas`/`su`/`pkexec`/`run0` privilege escalation | **resolved** — `escalation_floor = "deny"` | [shguard#35](https://github.com/tsukasaI/shguard/issues/35) closed, v0.3.0 |
 | 12 | `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion | design change (net improvement) | n/a |
@@ -39,7 +39,7 @@ weakening, documented so it isn't mistaken for a bug later.
 | 18 | Missing/dangling default config path silently drops all user rules | **resolved** for dangling symlinks; residual gap for a clean absent-file case | [shguard#39](https://github.com/tsukasaI/shguard/issues/39) fixed, v0.3.0 |
 | 19 | `except_targets` treats flag values as candidate targets — 55% over-ask on real local curl usage | **resolved** — `value_flags` field | [shguard#48](https://github.com/tsukasaI/shguard/issues/48) fixed |
 | 20 | Parser can't parse `2>&1`/for/while/until/function-defs/`$?`/subshells — falls back to blanket `ask`, rule engine never runs | **resolved** | [shguard#75](https://github.com/tsukasaI/shguard/issues/75) fixed |
-| 21 | `git grep` bare-command match doesn't cover git subcommand form | gap, partial config fix | fixed via `dotfiles-tool-policy-git-grep`; `git -C <dir> grep` still uncovered |
+| 21 | `git grep` bare-command match doesn't cover git subcommand form | **resolved, doc was stale**: `git_strip_global_flags` now resolves `git -C <dir> grep` to the same `grep` subcommand match as bare `git grep` | confirmed live 2026-09-02 against HEAD `a4fbd14`, no issue needed |
 | 22 | `git commit -m "$(...)"` (heredoc-style commit messages) now `ask`s instead of `allow`s | **resolved** — no longer the cutover blocker (superseded by #23/#24) | [shguard#146](https://github.com/tsukasaI/shguard/issues/146) fixed |
 | 23 | curl userinfo-URL bypass (`localhost:` as userinfo, not port) + rsync bare-relative-path over-block | **userinfo bypass resolved** (`url_host` matcher replaces `exact`/`prefix` in `except_targets`, fable-reviewed 2026-08-24 — pending manual apply, `config.toml` is Claude-edit-blocked); rsync sub-gap still friction only, not fixable from `config.toml` | [shguard#147](https://github.com/tsukasaI/shguard/issues/147) open upstream (P2, real fix path via `url_host` now exists — this repo just needs to apply it); rsync sub-gap not filed |
 | 24 | `if`/background job (`&`)/`[[ ]]`/`!` hit the same parse-failure-bypasses-rule-engine path as #20 — #75's fix didn't cover them | **resolved** — confirmed both by the closed ticket and live: zero "unsupported construct" parse failures in the shadow log (`~/.local/share/shguard-shadow/shadow.jsonl`) since the 2026-08-23 `darwin-rebuild switch` onto shguard 0.6.0, vs. 5+ occurrences of "if clause" alone before that switch | [shguard#191](https://github.com/tsukasaI/shguard/issues/191) closed 2026-08-15 |
