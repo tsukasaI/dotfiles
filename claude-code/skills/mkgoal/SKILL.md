@@ -115,36 +115,59 @@ incomplete — ask how it will be measured.
   confirm it exists; if it does not, say so and ask for the correct command.
   Never execute it.
 
+## Standing implementation pattern
+
+Every statement this skill drafts bakes in the same fixed agent/review
+pattern. This is not a slot, it is never asked about, and it is always
+included:
+
+- Implement using the **sonnet** model.
+- Review with a **fable**-model `code-reviewer` subagent before completion
+  counts.
+- On fable's approval, the PR is pre-authorized to squash-merge via
+  `gh pr merge --squash --delete-branch` without asking again. This is the
+  standing exception to the usual "merge only when I say so" rule, scoped
+  strictly to goals launched through this skill.
+
 ## Assemble
 
 Build the statement on a single line from this template:
 
-    /goal <task summary drawn from the user's stated goal>. Run
-    `<verification command>` and show its full output in the conversation each
-    turn; the goal is met when that output confirms <objective condition>,
-    while <constraints> holds; or stop after <N> turns.
+    /goal <task summary drawn from the user's stated goal>. Implement using
+    the sonnet model, then have a fable-model code-reviewer subagent review
+    the change; run `<verification command>` and show its full output in the
+    conversation each turn; the goal is met when that output confirms
+    <objective condition>, while <constraints> holds; once fable approves the
+    review, squash-merge the PR via `gh pr merge --squash --delete-branch`
+    without asking again; or stop after <N> turns.
 
 In issue mode, list each issue as its own named clause instead of one task
 summary, and join the per-issue completion conditions with "and":
 
     /goal Resolve issue #<N1> (<title1>) and issue #<N2> (<title2>) [...].
-    For #<N1>, run `<verification command 1>`; for #<N2>, run
-    `<verification command 2>` [...]; show full output each turn. The goal is
-    met when every issue's output confirms its own condition, while
-    <batch constraints> holds; or stop after <N> turns.
+    Implement using the sonnet model, then have a fable-model code-reviewer
+    subagent review each change; for #<N1>, run `<verification command 1>`;
+    for #<N2>, run `<verification command 2>` [...]; show full output each
+    turn. The goal is met when every issue's output confirms its own
+    condition, while <batch constraints> holds; once fable approves a PR's
+    review, squash-merge it via `gh pr merge --squash --delete-branch` without
+    asking again; or stop after <N> turns.
 
 Rules:
 - Single line, no line breaks, at most 4,000 characters. If over, tighten
-  wording — never drop a slot.
-- The turn cap MUST appear as the "or stop after <N> turns" clause — `/goal`
+  wording, never drop a slot.
+- The turn cap MUST appear as the "or stop after <N> turns" clause. `/goal`
   has no separate cap setting.
 - Every condition must be judgeable from command output visible in the
   transcript. Multiple conditions: join with "and", each tied to a command.
 - The constraints clause is omitted only when the user explicitly answered
   "none". If a constraint has its own check (e.g. `git diff --stat`), name it
   and instruct showing its output each turn too.
-- The task summary states what to achieve — the statement doubles as Claude's
+- The task summary states what to achieve. The statement doubles as Claude's
   first-turn directive.
+- The sonnet/fable/squash-merge clauses from Standing implementation pattern
+  above are always included verbatim in intent, regardless of repo. Never
+  drop them for brevity.
 
 *Done:* single-line checkable `/goal` statement drafted from template.
 
