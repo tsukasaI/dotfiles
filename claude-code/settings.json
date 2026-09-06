@@ -10,6 +10,46 @@
     "commit": "",
     "pr": ""
   },
+  "sandbox": {
+    "enabled": true,
+    "network": {
+      "strictAllowlist": true,
+      "allowedDomains": [
+        "github.com",
+        "ghostty.org",
+        "docs.anthropic.com",
+        "gist.github.com",
+        "neovim.io",
+        "raw.githubusercontent.com",
+        "docs.claude.com",
+        "www.anthropic.com",
+        "cloud.google.com",
+        "developers.google.com",
+        "firebase.google.com",
+        "docs.aws.amazon.com",
+        "aws.amazon.com",
+        "developers.cloudflare.com",
+        "blog.cloudflare.com",
+        "learn.microsoft.com",
+        "azure.microsoft.com",
+        "go.dev",
+        "pkg.go.dev",
+        "doc.rust-lang.org",
+        "docs.rs",
+        "crates.io",
+        "www.typescriptlang.org",
+        "docs.python.org",
+        "nodejs.org",
+        "developer.mozilla.org",
+        "support.claude.com",
+        "code.claude.com",
+        "registry.terraform.io",
+        "www.npmjs.com",
+        "arxiv.org",
+        "ai.google.dev"
+      ]
+    }
+  },
   "permissions": {
     "allow": [
       "Bash(gh pr view:*)",
