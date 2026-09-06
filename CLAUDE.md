@@ -37,8 +37,8 @@ There is no staging or deploy step (hooks apply on the next tool call,
 - Update flake inputs: `nix flake update` (in `nix-darwin/`), then
   `darwin-rebuild switch` to activate.
 - Test a hook change with a synthetic payload:
-  `echo '{"tool_input":{"command":"grep foo"}}' | claude-code/hooks/block-dangerous.sh; echo $?`
-  — exit 0 = allow, exit 2 = block.
+  `echo '{"tool_input":{"command":"grep foo"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard`
+  and check `.hookSpecificOutput.permissionDecision` (`allow`/`ask`/`deny`).
 - CI: see `.github/workflows/ci.yaml` and `flake-check.yaml`. CI is a
   backstop, not the only loop — re-run `lefthook install` after pulling
   changes to hooks or lefthook config. No linter config for other file types.
@@ -68,16 +68,11 @@ There is no staging or deploy step (hooks apply on the next tool call,
 ## Pitfalls
 
 - **The hooks police this session too.** `grep`/`find`/`ssh`/`scp`, `curl` to
-  non-localhost hosts, and more are blocked for you by `block-dangerous.sh`.
-  A `[BLOCKED: ...]` result is policy, not a flaky tool — surface the command
-  to the user instead of routing around it. `block-config-edit.sh` likewise
-  hard-blocks Edit/Write on linter/formatter configs in any project.
-- **The blocklist regexes encode false-positive history.** Quote-stripping,
-  heredoc handling, and the CB/TB/STRICT_CB boundary classes each fix a past
-  regression (see `git log claude-code/hooks/`). Don't simplify them; test
-  every change with the synthetic-payload one-liner above. Rule format:
-  `CATEGORY | pattern | reason | alternative`; `allowlist.conf` bypasses the
-  blocklist for listed prefixes.
+  non-localhost hosts, and more are denied for you by `shguard`. A "matches
+  blocklist rule ..." result is policy, not a flaky tool; surface the
+  command to the user instead of routing around it. `block-config-edit.sh`
+  likewise hard-blocks Edit/Write on linter/formatter configs in any
+  project.
 - **Skills run live through the `~/.claude/skills` symlink**: an edit is in
   production immediately, committed or not. Check `git status` before assuming
   committed state equals running state.
@@ -93,13 +88,16 @@ There is no staging or deploy step (hooks apply on the next tool call,
 - **Trust files over docs.** Parts of `hooks/README.md` are known-stale.
   When any doc — including this one — disagrees with reality, reality wins;
   update the doc.
-- **shguard runs in shadow mode.** `hooks/shguard-shadow.sh` evaluates every
-  Bash call against `claude-code/shguard/config.toml` and logs to
-  `~/.local/share/shguard-shadow/shadow.jsonl` without blocking;
-  `block-dangerous.sh` remains the enforcing guard. `shguard-gate.sh` is the
-  enforcing variant, not yet wired in `settings.json`. Accepted deltas
-  between the two are tracked in `docs/shguard-migration-deltas.md`;
-  `config.toml` is Claude-edit-blocked like the other guard files.
+- **shguard is the PreToolUse Bash enforcer.** `claude-code/settings.json`
+  calls the `shguard` binary directly (inline command, with
+  `SHGUARD_STRICT_CONFIG=1` so a missing/malformed config denies instead of
+  asking) against `claude-code/shguard/config.toml`, with no separate
+  wrapper script. `block-dangerous.sh`, `shguard-gate.sh`, and
+  `shguard-shadow.sh` are deleted; historical gaps found during the
+  migration are tracked in `docs/shguard-migration-deltas.md`. `config.toml`
+  is Claude-edit-blocked like the other guard files. `ask` verdicts are not
+  a reliable control once a session runs under `bypassPermissions` mode
+  (see that doc's "Cutover caveat" section); re-audit before switching.
 - **flake.nix specifics**: the unfree allowlist contains only `terraform`
   (any other unfree package fails eval until added); Homebrew
   `cleanup = "zap"` uninstalls anything not declared in the flake;

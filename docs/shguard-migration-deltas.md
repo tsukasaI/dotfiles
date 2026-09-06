@@ -1,12 +1,23 @@
 # shguard migration: accepted behavior deltas
 
-Tracks every place where `claude-code/shguard/config.toml` (+ shguard's
-built-in blocklist) does **not** reproduce `block-dangerous.sh` +
-`blocklist.conf` + `allowlist.conf`'s behavior exactly, per
+**Cutover complete (2026-09-06).** `block-dangerous.sh` (plus
+`blocklist.conf`/`allowlist.conf`) is deleted. `shguard`, invoked directly
+from `claude-code/settings.json`'s PreToolUse/Bash hook (inline command,
+`SHGUARD_STRICT_CONFIG=1`, no wrapper script), is now the sole enforcer.
+This file stays as the historical record of every place shguard's behavior
+was found not to reproduce `block-dangerous.sh` exactly, per
 `claude-code/rules/security.md`'s "a weakened control must be visible, not
-silent" requirement. Written during the migration plan at
+silent" requirement, and of how each was resolved or accepted. Written
+during the migration plan at
 `.claude/plans/https-github-com-tsukasai-shguard-hook-b-stateless-sloth.md`
-(step 4); update it whenever a new gap is found or an upstream fix lands.
+(step 4); the numbered gaps below are historical now, not a pending
+decision, but keep updating this file if a new gap in shguard's behavior
+is found later.
+
+See the "Cutover caveat" section below for a still-open, separate
+question: several rows here resolve to shguard's `ask` verdict, which is
+not a reliable control once this session runs under `bypassPermissions`
+mode. Re-audit that section before making that switch.
 
 Status legend: **gap (permanent)** — not expressible in shguard's current
 rule schema, no upstream ask filed; **gap (pending upstream)** — tracked as
@@ -27,7 +38,7 @@ weakening, documented so it isn't mistaken for a bug later.
 | 6 | `/dev/tcp` \| `/dev/udp` (command-agnostic) | gap (permanent, partial), confirmed live 2026-09-02: reaches `ask` via unsupported-construct fallback, not an explicit `deny` | [shguard#425](https://github.com/tsukasaI/shguard/issues/425) filed |
 | 7 | CREDENTIAL: any-command bare-word match | gap (permanent, partial), confirmed live 2026-09-02: reaches bare `allow`, no ask/deny at all | [shguard#426](https://github.com/tsukasaI/shguard/issues/426) filed |
 | 8 | `gh api -X DELETE` chained-value form | gap (permanent, partial) | not expressible |
-| 9 | Secret-file readers: extension-suffix / nested paths | gap (permanent, partial), confirmed live 2026-09-02: `.env` suffix variant under a nested path (`foo/.env.local`) is a real regression (old hook covered it); bare extension-suffix (`id_rsa.bak`) is a pre-existing hole, not a regression | [shguard#427](https://github.com/tsukasaI/shguard/issues/427) filed (`.env` case only) |
+| 9 | Secret-file readers: extension-suffix / nested paths | **`.env` case resolved**: shguard added a `normalized_basename` target matcher; this repo's 9 secret-read rules now use `{ normalized_basename = ".env" }` instead of `{ prefix = ".env" }, { prefix = "~/.env" }`, confirmed live 2026-09-06 (`cat foo/.env.local` now denies). Bare extension-suffix (`id_rsa.bak`) remains a pre-existing hole, not a regression, and this change doesn't touch it | [shguard#427](https://github.com/tsukasaI/shguard/issues/427) closed |
 | 10 | `--no-verify` on non-git commands | gap (permanent, minor) | not expressible |
 | 11 | `sudo`/`doas`/`su`/`pkexec`/`run0` privilege escalation | **resolved** — `escalation_floor = "deny"` | [shguard#35](https://github.com/tsukasaI/shguard/issues/35) closed, v0.3.0 |
 | 12 | `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion | design change (net improvement) | n/a |
@@ -44,6 +55,40 @@ weakening, documented so it isn't mistaken for a bug later.
 | 23 | curl userinfo-URL bypass (`localhost:` as userinfo, not port) + rsync bare-relative-path over-block | **userinfo bypass resolved** (`url_host` matcher replaces `exact`/`prefix` in `except_targets`, fable-reviewed 2026-08-24 — pending manual apply, `config.toml` is Claude-edit-blocked); rsync sub-gap still friction only, not fixable from `config.toml` | [shguard#147](https://github.com/tsukasaI/shguard/issues/147) open upstream (P2, real fix path via `url_host` now exists — this repo just needs to apply it); rsync sub-gap not filed |
 | 24 | `if`/background job (`&`)/`[[ ]]`/`!` hit the same parse-failure-bypasses-rule-engine path as #20 — #75's fix didn't cover them | **resolved** — confirmed both by the closed ticket and live: zero "unsupported construct" parse failures in the shadow log (`~/.local/share/shguard-shadow/shadow.jsonl`) since the 2026-08-23 `darwin-rebuild switch` onto shguard 0.6.0, vs. 5+ occurrences of "if clause" alone before that switch | [shguard#191](https://github.com/tsukasaI/shguard/issues/191) closed 2026-08-15 |
 | 25 | curl glued proxy flag (`-xhttp://evil.com`) bypasses the localhost-only rule entirely | **resolved** — `attached_value_flags = ["x"]` applied | [dotfiles#49](https://github.com/tsukasaI/dotfiles/issues/49) fixed, pending manual close |
+| 26 | Caller must wrap the binary to fail closed: PATH-miss/crash yields empty stdout (read as allow); missing/malformed config yielded `ask` not `deny` | **config-load half resolved**: opt-in `SHGUARD_STRICT_CONFIG` env var makes config-load failure `deny`, confirmed live 2026-09-05 on v0.6.4. **PATH-miss/crash half stays unfixable inside shguard** per upstream's own words: "the caller-side wrapper every hook registration needs regardless of this new variable." The PreToolUse `command` in `settings.json` inlines this wrapper logic (checks exit code and non-empty stdout, denies otherwise) instead of a separate `shguard-gate.sh` file | [shguard#440](https://github.com/tsukasaI/shguard/issues/440) closed via [shguard#441](https://github.com/tsukasaI/shguard/pull/441) |
+
+## Cutover caveat: `ask` is not a real control under `bypassPermissions`
+
+This doc's "resolved via `ask`" and "gap, reaches `ask`" verdicts assume a
+normally-prompting session, where `ask` shows the user a confirmation
+dialog. The end goal for this hook is eventually running Claude Code in
+`bypassPermissions` mode, and under that mode `ask` cannot be relied on as
+a control:
+
+- Confirmed via Claude Code's own docs: `deny` (and hook exit code 2)
+  hard-blocks in every permission mode, including `bypassPermissions`.
+  `ask` is no longer even a documented `PreToolUse` value in the current
+  CLI hooks reference (only `allow`/`deny` are listed there).
+- Two real upstream bugs document the ambiguity directly: a `PreToolUse`
+  hook returning `ask` once silently caused a matching `permissions.deny`
+  rule to be skipped entirely (fixed in Claude Code v2.1.101,
+  [anthropics/claude-code#39344](https://github.com/anthropics/claude-code/issues/39344)),
+  and separately, an `ask` verdict inside a `bypassPermissions` session did
+  show a real prompt but as a side effect permanently disabled bypass mode
+  for the rest of that session
+  ([anthropics/claude-code#37420](https://github.com/anthropics/claude-code/issues/37420),
+  unresolved as of this writing).
+
+Practical effect: every row above whose current status bottoms out at
+`ask` (not `deny`) should be treated as **no protection at all** once this
+session flips to `bypassPermissions`, not as "downgraded but still
+somewhat safe." That currently includes #4 (heredoc), #5 (ANSI-C
+raw-string), #7 (CREDENTIAL bare-word), #10 (`--no-verify` on non-git),
+and the residual unsupported-construct parser gaps noted under #24
+(`${PIPESTATUS[0]}`-style parameter expansion, here-strings `<<<`, some
+compound-command nesting). Re-audit this list, and re-verify every `ask`
+row still reaches `deny` where it matters, before switching this session's
+permission mode to `bypassPermissions`.
 
 ## 1. Malformed-input fail-closed mode
 

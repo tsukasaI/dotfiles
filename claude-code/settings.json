@@ -148,11 +148,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/dotfiles/claude-code/hooks/block-dangerous.sh"
-          },
-          {
-            "type": "command",
-            "command": "$HOME/dotfiles/claude-code/hooks/shguard-shadow.sh"
+            "command": "OUT=$(SHGUARD_CONFIG=\"$HOME/.claude/shguard/config.toml\" SHGUARD_STRICT_CONFIG=1 shguard 2>/dev/null); if [ $? -eq 0 ] && [ -n \"$OUT\" ]; then printf '%s\\n' \"$OUT\"; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"shguard failed to run (PATH miss, crash, or empty output) - failing closed\"}}'; fi"
           }
         ]
       },
@@ -249,6 +245,7 @@
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "custom:dark-ansi-readable",
+  "verbose": true,
   "preferredNotifChannel": "ghostty",
   "switchModelsOnFlag": false,
   "autoContinueAtUsageLimit": true,
@@ -281,6 +278,5 @@
     ]
   },
   "voiceEnabled": true,
-  "copyOnSelect": false,
-  "verbose": true
+  "copyOnSelect": false
 }

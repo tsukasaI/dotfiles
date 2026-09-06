@@ -34,18 +34,10 @@ BASENAME=$(basename "$FILE_PATH")
 # (.claude/hooks/). Changing these files is a manual, human action — see
 # the hooks-guardrails skill for the procedure.
 case "$FILE_PATH" in
-  */claude-code/hooks/block-dangerous.sh | \
   */claude-code/hooks/block-config-edit.sh | \
-  */claude-code/hooks/blocklist.conf | \
-  */claude-code/hooks/allowlist.conf | \
-  */.claude/hooks/block-dangerous.sh | \
   */.claude/hooks/block-config-edit.sh | \
-  */.claude/hooks/blocklist.conf | \
-  */.claude/hooks/allowlist.conf | \
   */claude-code/shguard/config.toml | \
-  */.config/shguard/config.toml | \
-  */claude-code/hooks/shguard-shadow.sh | \
-  */.claude/hooks/shguard-shadow.sh)
+  */.claude/shguard/config.toml)
     printf '[BLOCKED: GUARDRAIL_PROTECTION] "%s" defines the PreToolUse guardrails and must not be edited by Claude.\nAsk the user to change it manually (procedure: hooks-guardrails skill).\n' "$BASENAME" >&2
     exit 2
     ;;

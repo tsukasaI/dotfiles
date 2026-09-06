@@ -34,8 +34,6 @@ link_with_backup "$DOTFILES/ghostty" ~/.config/ghostty
 link_with_backup "$DOTFILES/wezterm" ~/.config/wezterm
 mkdir -p ~/.config/karabiner
 link_with_backup "$DOTFILES/karabiner/karabiner.json" ~/.config/karabiner/karabiner.json
-mkdir -p ~/.config/shguard
-link_with_backup "$DOTFILES/claude-code/shguard/config.toml" ~/.config/shguard/config.toml
 
 
 # Home directory symlinks
@@ -50,6 +48,11 @@ link_with_backup "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
 if [[ -L ~/.config/git/hooks && "$(readlink ~/.config/git/hooks)" == "$DOTFILES/git/hooks" ]]; then
   rm ~/.config/git/hooks
 fi
+# Clean up the retired ~/.config/shguard symlink (moved to ~/.claude/shguard
+# so it deploys alongside the rest of the Claude Code config).
+if [[ -L ~/.config/shguard/config.toml && "$(readlink ~/.config/shguard/config.toml)" == "$DOTFILES/claude-code/shguard/config.toml" ]]; then
+  rm ~/.config/shguard/config.toml
+fi
 
 # SSH (UseKeychain integration)
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
@@ -63,6 +66,8 @@ link_with_backup "$DOTFILES/claude-code/agents" ~/.claude/agents
 link_with_backup "$DOTFILES/claude-code/themes" ~/.claude/themes
 link_with_backup "$DOTFILES/claude-code/settings.json" ~/.claude/settings.json
 link_with_backup "$DOTFILES/claude-code/CLAUDE.md" ~/.claude/CLAUDE.md
+mkdir -p ~/.claude/shguard
+link_with_backup "$DOTFILES/claude-code/shguard/config.toml" ~/.claude/shguard/config.toml
 chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
 
 # Per-repo git hooks (lefthook): this repo's own pre-commit gitleaks check.

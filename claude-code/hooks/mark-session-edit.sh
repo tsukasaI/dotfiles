@@ -7,7 +7,7 @@
 # Always exits 0 — advisory only, must never block a tool call. Every step
 # is individually guarded so a missing jq/TMPDIR/etc. degrades to "no
 # record," never a stuck or blocked tool call (same fail-open contract as
-# warn-uncommitted.sh and shguard-shadow.sh).
+# warn-uncommitted.sh).
 
 SESSION_DIR="${TMPDIR:-/tmp}/claude-session-edits"
 

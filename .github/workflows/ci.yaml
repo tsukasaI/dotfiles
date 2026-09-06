@@ -27,12 +27,22 @@ jobs:
       - name: every tracked *.json must parse
         run: git ls-files '*.json' | xargs -n1 jq empty
 
-  hooks-regression:
+  shguard-parity-check:
+    # shguard is the PreToolUse Bash enforcer (claude-code/settings.json calls
+    # it directly, see docs/shguard-migration-deltas.md). Build it pinned to
+    # the committed flake.lock rev so this job tracks whatever `nix flake
+    # update` last pulled, with no separate version to bump by hand.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - name: guardrail hook regression suite
-        run: bash tests/hooks-regression.sh
+      - uses: cachix/install-nix-action@a49548c11d9846ad46ecc0115273879b045f001c # v31.10.7
+      - name: build shguard pinned to flake.lock
+        run: |
+          rev=$(jq -r '.nodes.shguard.locked.rev' nix-darwin/flake.lock)
+          out=$(nix build "github:tsukasaI/shguard/$rev" --no-link --print-out-paths)
+          echo "$out/bin" >> "$GITHUB_PATH"
+      - name: shguard parity check
+        run: bash tests/shguard-parity-check.sh
 
   rules-paths-sync:
     # #43: the paths: frontmatter in atomicity/code-review/data-handling/

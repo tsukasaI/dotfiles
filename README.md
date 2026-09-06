@@ -84,45 +84,36 @@ Configuration lives in `claude-code/`.
 claude-code/
 ├── settings.json        # Permissions, hooks, model, status line
 ├── statusline.ts        # Powerline status line (Bun/TypeScript)
-└── hooks/
-    ├── block-dangerous.sh   # PreToolUse hook — reads blocklist and blocks matching commands
-    └── blocklist.conf       # Plain-text list of blocked command patterns
+└── shguard/
+    └── config.toml       # Rules for the shguard binary (PreToolUse Bash guardrail)
 ```
 
 ### How the hook works
 
-`block-dangerous.sh` is registered as a `PreToolUse` hook in `settings.json`. Claude Code
-runs it before every Bash tool call. If a command matches a rule in `blocklist.conf`, the
-hook exits with code 2 and shows a block reason. Otherwise it exits 0 and the normal
-permission check proceeds.
+`claude-code/settings.json`'s `PreToolUse`/`Bash` hook calls the `shguard` binary directly
+(inline command, no wrapper script), with `SHGUARD_STRICT_CONFIG=1` set so a missing or
+malformed config denies instead of asking. `shguard` evaluates the command against
+`claude-code/shguard/config.toml` and its own built-in rules, and returns `allow`, `ask`,
+or `deny`. The inline command also fails closed if `shguard` itself can't be found or
+crashes (empty output would otherwise read as an implicit allow).
 
-### Managing the blocklist
+### Managing the ruleset
 
-Edit `claude-code/hooks/blocklist.conf`. Each non-comment line has three pipe-separated fields:
+`claude-code/shguard/config.toml` is Claude-edit-blocked (see `block-config-edit.sh`); changes
+need to be applied manually. See the `hooks-guardrails` skill for the safe-change procedure
+and `docs/shguard-migration-deltas.md` for the history of behavior differences found and
+resolved during the migration from the old hand-written hook.
+
+Each rule is a `[[deny]]`/`[[ask]]`/`[[allow]]` block with `id`, `reason`, `command`, and
+`targets` (matcher shapes: `exact`, `prefix`, `normalized`, `normalized_prefix`,
+`normalized_basename`). Test a change with:
 
 ```
-CATEGORY | pattern | Block reason shown to the user
+echo '{"tool_input":{"command":"<CMD>"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard
 ```
 
-Three pattern types:
-
-| Syntax | Behaviour | Example |
-|--------|-----------|---------|
-| `prefix` | Blocked at a word boundary — won't match a longer command name | `rm` blocks `rm foo` but not `remove-items` |
-| `prefix*` | Starts-with match, no end boundary — use when subcommand follows a dot or similar | `mkfs*` blocks `mkfs.ext4`, `mkfs.vfat` |
-| `*keyword*` | Matches anywhere in the command | `*secret*` blocks any command containing "secret" |
-
-**To block a new command** — add a line:
-```
-GIT | git switch -d | git switch -d detaches HEAD
-```
-
-**To unblock a command** — delete or comment out (`#`) its line.
-
-**Special cases hardcoded in `block-dangerous.sh`** (require conditional logic):
-- `curl` — external hosts blocked, localhost/127.0.0.1/[::1] allowed
-- `| bash/sh/zsh/...` — pipe-to-shell injection
-- `/dev/tcp`, `/dev/udp` — bash network pseudo-devices
+and run `tests/shguard-parity-check.sh` to check the full regression suite before treating
+a change as done.
 
 ### Read tool restrictions
 

@@ -1,8 +1,8 @@
 # Split by speed so the tight commit loop stays fast, while the CI-equivalent
 # checks still run locally, synchronously, before code leaves the machine —
-# a stale-test regression (tests/hooks-regression.sh vs block-config-edit.sh
-# drifting apart) previously went unnoticed on main for a week because CI was
-# the only loop checking it and a red remote check is easy to ignore.
+# a stale-test regression previously went unnoticed on main for a week
+# because CI was the only loop checking it and a red remote check is easy
+# to ignore.
 pre-commit:
   commands:
     gitleaks:
@@ -20,5 +20,5 @@ pre-push:
   commands:
     shellcheck:
       run: bash tests/shellcheck.sh
-    hooks-regression:
-      run: bash tests/hooks-regression.sh
+    shguard-parity-check:
+      run: bash tests/shguard-parity-check.sh

@@ -8,7 +8,7 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 
 | Script | Matcher | Description |
 |---|---|---|
-| `block-dangerous.sh` | `Bash` | Block dangerous shell commands defined in `blocklist.conf`; commands matching `allowlist.conf` bypass the blocklist |
+| (inline) `shguard` | `Bash` | Deny dangerous shell commands per `claude-code/shguard/config.toml`, with `SHGUARD_STRICT_CONFIG=1` so a missing/malformed config denies instead of asking; see `docs/shguard-migration-deltas.md` |
 | `block-config-edit.sh` | `Edit\|Write` | Block edits to linter/formatter config files |
 | `slop-guard.ts` | `Edit\|Write` | Deny prose edits (`.md`/`.mdx`/`.txt`) that newly introduce an em dash or a cliché phrase from `slop-phrases.conf`; only the net-new count vs. the pre-edit text is checked, never the whole file. `SLOP_GUARD_DISABLE=1` disables it. |
 

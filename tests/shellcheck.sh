@@ -10,5 +10,5 @@ shellcheck -x --severity=warning \
   setup.sh \
   claude-code/hooks/*.sh \
   claude-code/scripts/*.sh \
-  tests/hooks-regression.sh \
+  tests/shguard-parity-check.sh \
   tests/rules-paths-sync.sh
