@@ -32,14 +32,9 @@
 #
 # curl (localhost-only) / rsync (local-only) rules ARE included below
 # (dotfiles-network-curl-remote / dotfiles-network-rsync-remote), using the
-# value_flags field: except_targets (issue #30) initially over-asked on
-# ordinary flag values like -o/-X/-H (issue #48, causing a 55% over-ask
-# rate on real local curl usage); #48 landed upstream and is verified live
-# against this file's rules — see docs/shguard-migration-deltas.md #2/#19.
+# value_flags field — see docs/shguard-migration-deltas.md #2/#19 for history.
 
-# Privilege escalation floor (issue #35, closed in v0.3.0; also fixes
-# #36's doas/su/pkexec gap, though that ticket itself is still open due
-# to a multi-issue auto-close quirk): denies sudo/doas/su/pkexec/run0
+# Privilege escalation floor (issue #35): denies sudo/doas/su/pkexec/run0
 # outright regardless of whether the wrapped command independently trips
 # a rule. "allow" is rejected at config load (fail-closed, no way to
 # disable this). See docs/shguard-migration-deltas.md #11.
@@ -50,14 +45,9 @@ escalation_floor = "deny"
 # =====================================================================
 
 # NOTE: these three rules are now REDUNDANT (not deactivated) given the
-# escalation_floor above (issue #35, closed in v0.3.0): the floor
-# denies sudo/doas/su outright via its own mechanism, independent of
-# argv[0] rule matching. In practice these rules still "win" the
-# reported reason string since they match unconditionally alongside the
-# floor (verified live: pkexec, which has no rule here, shows the
-# floor's own message; sudo/doas/su show the rule's message instead) —
-# net effect is identical (deny) either way. Kept in place anyway as
-# documentation of intent — see docs/shguard-migration-deltas.md #11.
+# escalation_floor above: the floor denies sudo/doas/su outright via its
+# own mechanism, independent of argv[0] rule matching. Kept in place
+# anyway as documentation of intent — see docs/shguard-migration-deltas.md #11.
 [[deny]]
 id = "dotfiles-privilege-sudo"
 reason = "sudo grants root-level access"
@@ -140,6 +130,8 @@ required_tokens = ["erase"]
 id = "dotfiles-network-curl-remote"
 reason = "curl to a non-localhost address can exfiltrate data"
 command = "curl"
+# Never add K/--config here: its file can carry `url =` targets, so the
+# flag's value is itself a network destination (deltas #23).
 value_flags = ["o", "w", "m", "d", "X", "H", "A", "e", "u", "b", "c", "T", "F"]
 attached_value_flags = ["x"]
 except_targets = [
@@ -318,24 +310,13 @@ command = "printenv"
 # =====================================================================
 # Shell escape / code injection
 #
-# bash/sh/zsh/dash get a BLANKET rule below (no required_flags), not a
-# `-c`-scoped one: shguard unwraps `command -c '<string>'` for these four
-# and recurses into the inner command's own safety (confirmed: `bash -c
-# 'rm -rf /'` -> deny via the built-in rm-rf rule; `bash -c 'grep foo bar'`
-# -> deny via dotfiles-tool-policy-grep below; `bash -c 'echo hi'` ->
-# allow), so a `required_flags = ["c"]` rule would be unreachable dead code
-# for the -c case specifically. But bare `bash script.sh` (no -c, a script
-# FILE reference) is NOT recursed into — shguard doesn't read the file —
-# and was uncovered entirely until this blanket rule was added (found via
-# the migration's parity check: `ba'sh' script.sh` was silently allowed).
-# Verified the blanket form coexists correctly with -c recursion (doesn't
-# make `bash -c 'echo hi'` start denying) and, as a bonus, closes the
-# newline-as-separator gap in the old hook's STRICT_CB check (issue #44):
-# `echo setup` + newline + `bash script.sh` now denies, because shguard's
-# real parser (unlike regex boundary classes) treats the newline as an
-# actual command separator and evaluates `bash script.sh` on its own.
-# ksh/fish -c are NOT unwrapped (brush-parser doesn't parse their
-# dialects), so they keep the narrower `-c`-scoped rules below instead.
+# Shell interpreters get BLANKET rules (no required_flags): shguard
+# unwraps `<shell> -c '<string>'` for every interpreter it knows
+# (bash/sh/zsh/dash/ash/ksh/fish/tcsh/csh) and judges the inner command
+# itself, so a `required_flags = ["c"]` rule can never fire. Bare
+# `<shell> script.sh` is NOT recursed into (shguard doesn't read the
+# file), so the blanket rule is what covers it. See
+# docs/shguard-migration-deltas.md #12/#16.
 # =====================================================================
 
 [[deny]]
@@ -364,16 +345,14 @@ reason = "dash script.sh executes an unreviewed script file; dash -c is handled 
 command = "dash"
 
 [[deny]]
-id = "dotfiles-code-ksh-c"
-reason = "ksh -c executes an arbitrary script string"
+id = "dotfiles-code-ksh"
+reason = "ksh script.sh executes an unreviewed script file; ksh -c is handled by shguard's own recursion into the inner command"
 command = "ksh"
-required_flags = ["c"]
 
 [[deny]]
-id = "dotfiles-code-fish-c"
-reason = "fish -c executes an arbitrary script string"
+id = "dotfiles-code-fish"
+reason = "fish script.fish executes an unreviewed script file; fish -c/-C is handled by shguard's own recursion into the inner command"
 command = "fish"
-required_flags = ["c"]
 
 [[deny]]
 id = "dotfiles-code-xargs"
@@ -617,15 +596,11 @@ id = "dotfiles-tool-policy-fgrep"
 reason = "fgrep is deprecated grep -F and ignores .gitignore — use rg -F"
 command = "fgrep"
 
-# `command = "grep"` above only matches grep as argv[0] — it doesn't fire
-# when grep is invoked as a git subcommand (`git grep`, `git -C dir grep`).
-# The old hook's bare-word match caught this via substring scanning; this
-# rule ports that specific case. `required_tokens` is positional, so it
-# still misses `git -C dir grep` (a non-flag token before the subcommand) —
-# see docs/shguard-migration-deltas.md #21.
+# `command = "grep"` only matches argv[0]; this covers grep as a git
+# subcommand (deltas #21).
 [[deny]]
 id = "dotfiles-tool-policy-git-grep"
-reason = "git grep — parity with the old hook's bare-word \"grep\" match; prefer rg or the built-in Grep tool"
+reason = "git grep ignores nothing but is still grep — prefer rg or the built-in Grep tool"
 command = "git"
 required_tokens = ["grep"]
 
