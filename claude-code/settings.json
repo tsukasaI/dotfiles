@@ -16,6 +16,7 @@
       "strictAllowlist": true,
       "allowedDomains": [
         "github.com",
+        "api.github.com",
         "ghostty.org",
         "docs.anthropic.com",
         "gist.github.com",
