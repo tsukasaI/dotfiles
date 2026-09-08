@@ -235,11 +235,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1788594121,
-        "narHash": "sha256-hbdkigm2RqVbv9fxNJ9ySUMfTFCxAOopTZRDHR9BHYc=",
+        "lastModified": 1788869049,
+        "narHash": "sha256-tXMKap+EjFkAd8Ijs9ge6tulPLxyOynryYwsGnvpkVs=",
         "owner": "tsukasaI",
         "repo": "shguard",
-        "rev": "5bfe45937fe1017df7528df431e1dc0f0107b216",
+        "rev": "76cd71a66ae6c9b8995fa7f23d88c968ef66eae3",
         "type": "github"
       },
       "original": {

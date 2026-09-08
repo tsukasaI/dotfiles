@@ -1,3 +1,15 @@
+# ask_outcome: floor every terminal Ask (structural fallback and rule-authored
+# alike) to a deny, in every permission_mode including default/plan/acceptEdits.
+# Using the bare-string form (not the [ask_outcome] table) deliberately: the
+# table leaves an absent/unrecognized permission_mode resolved to "ask", which
+# is a silent no-op if Claude Code ever renames/drops that hook field - a
+# fail-open gap the bare form doesn't have. An unresolved Ask can't be acted
+# on by an autonomous/auto-mode session anyway, and Ask is not a reliable
+# control under bypassPermissions (see docs/shguard-migration-deltas.md's
+# "Cutover caveat"), so flooring unconditionally is the correct fail-closed
+# read of this file's own security posture, not a weakening of it.
+ask_outcome = "deny"
+
 # shguard user policy for this machine.
 #
 # Deployed to ~/.claude/shguard/config.toml via a setup.sh symlink so it
@@ -491,20 +503,24 @@ reason = "gh release create publishes an outward-facing release (tag/notificatio
 command = "gh"
 required_tokens = ["release", "create"]
 
-# Best-effort: catches the separate-token forms (-X DELETE, --method DELETE).
+# Best-effort: catches DELETE/delete as a standalone token anywhere in argv
+# (position-independent via `targets`, so `-X DELETE`, `--method DELETE`, and
+# path-first orderings like `gh api repos/x/y -X DELETE` all match).
 # Does NOT catch --method=DELETE or -XDELETE (chained value) — see
 # docs/shguard-migration-deltas.md.
 [[deny]]
 id = "dotfiles-github-api-delete-upper"
 reason = "gh api -X DELETE / --method DELETE issues a destructive HTTP DELETE request"
 command = "gh"
-required_tokens = ["api", "DELETE"]
+required_tokens = ["api"]
+targets = [{ exact = "DELETE" }]
 
 [[deny]]
 id = "dotfiles-github-api-delete-lower"
 reason = "gh api -X delete / --method delete issues a destructive HTTP DELETE request"
 command = "gh"
-required_tokens = ["api", "delete"]
+required_tokens = ["api"]
+targets = [{ exact = "delete" }]
 
 # =====================================================================
 # History manipulation

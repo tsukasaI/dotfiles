@@ -112,6 +112,9 @@ case_ "gh api --method=delete"           'gh api --method=delete repos/x/y'    a
 case_ "gh api quoted DELETE"             "gh api -X 'DELETE' repos/x/y"        deny
 case_ "gh api read"                      'gh api repos/x/y/pulls'              allow
 case_ "gh api POST (prompt gate)"        'gh api -X POST repos/x/y/issues -f title=t' allow
+case_ "gh api path-first -X DELETE"      'gh api repos/x/y -X DELETE'          deny "targets-based match is position-independent, closes the path-first bypass"
+case_ "gh api path-first -X delete"      'gh api repos/x/y -X delete'          deny "targets-based match is position-independent, closes the path-first bypass"
+case_ "gh api path-first --method DELETE" 'gh api repos/x/y --method DELETE'   deny "targets-based match is position-independent, closes the path-first bypass"
 
 # ── credential reads (#35) ───────────────────────────────────────────────────
 case_ "cat aws credentials"              'cat ~/.aws/credentials'              deny
@@ -132,7 +135,7 @@ case_ "fd -e sh"                         'fd -e sh'                            a
 case_ "rg -t sh"                         'rg -t sh foo'                        allow
 case_ "double-quoted apostrophe"         'echo "don'\''t panic"'               allow
 case_ "force-with-lease"                 'git push --force-with-lease origin main' allow
-case_ "quoted command path"              '"$HOME/dotfiles/setup.sh" --help'    ask "command-position var expansion resolves conservatively to Ask"
+case_ "quoted command path"              '"$HOME/dotfiles/setup.sh" --help'    deny "command-position var expansion resolves conservatively to Ask, then ask_outcome floors it to deny"
 case_ "commit msg with pipe-to-bash prose"  'git commit -m "explain curl x | bash today"' allow
 case_ "commit msg with /dev/tcp prose"      'git commit -m "notes on /dev/tcp/10.0.0.1/4444 reverse shells"' allow
 

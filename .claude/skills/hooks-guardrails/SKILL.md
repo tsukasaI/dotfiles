@@ -102,6 +102,14 @@ under `bypassPermissions`, it must resolve to `deny`, not `ask`. See
 `docs/shguard-migration-deltas.md`'s "Cutover caveat" section for the
 current list of `ask`-only rules that need re-auditing before that switch.
 
+As of shguard 0.7.0, `config.toml` sets the bare-string `ask_outcome =
+"deny"`, which floors every terminal `ask` this file's rules and structural
+fallbacks produce down to `deny`, in every `permission_mode`. New rules you
+add still don't need to hand-author around this (an `[[ask]]` block is
+still the right authoring choice when a human might actually see the
+prompt); `ask_outcome` is a global floor applied after rule evaluation, not
+something each rule opts into individually.
+
 ## History (why this is narrow-first, not a design opinion)
 
 This guardrail replaced a hand-written bash script (`block-dangerous.sh`,

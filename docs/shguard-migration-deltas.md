@@ -90,6 +90,15 @@ compound-command nesting). Re-audit this list, and re-verify every `ask`
 row still reaches `deny` where it matters, before switching this session's
 permission mode to `bypassPermissions`.
 
+**Mitigated as of shguard 0.7.0**: `config.toml` now sets the bare-string
+`ask_outcome = "deny"`, which floors every terminal `ask` verdict from this
+file's own rules and structural fallbacks to `deny` in every
+`permission_mode`, closing the gap above for rows sourced from this
+config. It does not close the parser-level gaps themselves (heredoc body
+content, ANSI-C raw strings, etc. still reach the fallback path, they just
+land on `deny` instead of `ask` once there); those rows above stay real
+gaps, just no longer silent ones under `bypassPermissions`.
+
 ## 1. Malformed-input fail-closed mode
 
 `block-dangerous.sh` hard-blocks (exit 2, no override) on malformed JSON,
