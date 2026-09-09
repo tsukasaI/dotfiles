@@ -189,7 +189,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "OUT=$(SHGUARD_CONFIG=\"$HOME/.claude/shguard/config.toml\" SHGUARD_STRICT_CONFIG=1 shguard 2>/dev/null); if [ $? -eq 0 ] && [ -n \"$OUT\" ]; then printf '%s\\n' \"$OUT\"; else printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"shguard failed to run (PATH miss, crash, or empty output) - failing closed\"}}'; fi"
+            "command": "shguard"
           }
         ]
       },

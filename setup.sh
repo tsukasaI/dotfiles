@@ -48,11 +48,12 @@ link_with_backup "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
 if [[ -L ~/.config/git/hooks && "$(readlink ~/.config/git/hooks)" == "$DOTFILES/git/hooks" ]]; then
   rm ~/.config/git/hooks
 fi
-# Clean up the retired ~/.config/shguard symlink (moved to ~/.claude/shguard
-# so it deploys alongside the rest of the Claude Code config).
-if [[ -L ~/.config/shguard/config.toml && "$(readlink ~/.config/shguard/config.toml)" == "$DOTFILES/claude-code/shguard/config.toml" ]]; then
-  rm ~/.config/shguard/config.toml
-fi
+# shguard's own default config lookup path. The settings.json PreToolUse
+# hook runs bare `shguard` (no SHGUARD_CONFIG env - settings.json env values
+# aren't shell-expanded, so a $HOME-based path there is passed to shguard
+# literally unexpanded), relying on this symlink instead.
+mkdir -p ~/.config/shguard
+link_with_backup "$DOTFILES/claude-code/shguard/config.toml" ~/.config/shguard/config.toml
 
 # SSH (UseKeychain integration)
 mkdir -p ~/.ssh && chmod 700 ~/.ssh
