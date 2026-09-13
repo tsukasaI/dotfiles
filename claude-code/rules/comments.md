@@ -23,15 +23,8 @@ paths:
 
 # Comments
 
-Default is still "no comment" (top-level system rule). This file exists to draw the line more
-precisely than "the WHY is non-obvious" alone does — based on a real investigation (shguard's
-`src/*.rs`, 2026-08-07): most of that codebase's dense doc comments turned out to be
-load-bearing, not filler, but ~20-30% was redundant restatement or a development narrative that
-belonged in the commit body instead. Neither "comment everything" nor "comment nothing" was
-right; the split below is. Re-confirmed in a follow-up shguard audit (2026-08-31): ~98
-fable-review narrative comments had accumulated in `src/gate.rs`, `src/rules.rs`,
-`src/decision_log.rs`, and several `tests/*.rs` files, tracked for removal in
-tsukasaI/shguard#394.
+Default is still "no comment" (top-level system rule). This file draws the line more
+precisely than "the WHY is non-obvious" alone does.
 
 ## Keep in code, right above the thing it explains
 - A measured/tuned value (threshold, magic number, timeout) — state the conclusion and what

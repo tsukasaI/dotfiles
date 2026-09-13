@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# Sync check for the language-agnostic code rules (issue #43): atomicity.md,
-# code-review.md, comments.md, data-handling.md, encoding.md, and
-# error-handling.md each carry their own copy of the `paths:` frontmatter
+# Sync check for the language-agnostic code rules (issue #43): code-review.md
+# and comments.md each carry their own copy of the `paths:` frontmatter
 # list (17 code-file extensions) because it must be readable per-file —
 # there is no include mechanism. That leaves no single source of truth:
-# adding/removing a language means editing 6 files identically, and a missed
-# file silently narrows or widens just that one rule's scope with no signal.
+# adding/removing a language means editing both files identically, and a
+# missed file silently narrows or widens just that one rule's scope with no
+# signal.
 #
-# This extracts the `paths:` block from each file and fails if any of the
-# 6 copies has drifted from the first. Run locally: bash tests/rules-paths-sync.sh
+# This extracts the `paths:` block from each file and fails if any copy has
+# drifted from the first. Run locally: bash tests/rules-paths-sync.sh
 # Exit: 0 all match, 1 a mismatch was found.
 
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
 DIR=claude-code/rules
-FILES=(atomicity code-review comments data-handling encoding error-handling)
+FILES=(code-review comments)
 
 # extract <file>: the `paths:` line through (not including) the closing `---`.
 extract() {

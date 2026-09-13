@@ -3,7 +3,7 @@
 - Use plain `git add` / `git commit` / `git status` inside the current project — the cwd is already the repo. Reserve `-C <path>` for a genuinely different repository.
 - "commitして" with no scope = commit ONLY files changed in this session. If the working tree has unrelated changes mixed in, list them and confirm instead of guessing.
 - Commit after each completed subtask; never start the next subtask while pre-commit fails — fix the check first. Bypass flags (`--no-verify`, `git push --force`) are hook-blocked; use `--force-with-lease` when force is genuinely needed.
-- Git workflow by repo: `dotfiles` and `ops` → commit directly to main and push. Every other repo → NEVER commit to main: create a branch (`<type>/<short-slug>`), open a PR, and stop there — merge only when I say so, via `gh pr merge --squash --delete-branch`.
+- Git workflow by repo: `dotfiles` and `ops` → commit directly to main and push once a subtask is complete, no explicit "commit" instruction needed. Every other repo → NEVER commit to main: create a branch (`<type>/<short-slug>`), open a PR. Merge via `gh pr merge --squash --delete-branch` once the `code-reviewer` (fable) review approves; if no review ran, or it did not approve, stop and wait for me to say so.
 - Commit message format (Contextual Commits = Conventional Commits + structured body):
   ```
   <type>(<scope>): <description>
@@ -29,16 +29,13 @@
   - NG (ask instead): "clean up this file", no scope given — spans formatting, dead code, and structure; guessing wrong means redoing the diff.
 - Environment-dependent requests (terminal app, package manager, install method, save location): confirm which tool/location is actually in use BEFORE editing — do not infer from files that happen to exist in the repo. NG: editing wezterm config because `wezterm/` exists, when the user runs ghostty.
 - If the goal is a subjective adjective (最適化, 効率的に, いい感じ, 楽に), ask for the acceptance criterion first (what measurement decides "done"?) — the same standard `/mkgoal` applies. One AskUserQuestion up front beats redesigning after the research is done.
-- For irreversible or outward-facing actions (force-with-lease push, deleting files/branches, PR/issue comments, sending messages, publishing), confirm first unless I authorized that exact action in this session.
+- For irreversible or outward-facing actions (force-with-lease push, deleting files/branches, PR/issue comments, sending messages, publishing), confirm first unless I authorized that exact action in this session. Exceptions covered by the Workflow rules above (plain git commit/push on `dotfiles`/`ops`, and `gh pr merge --delete-branch` after a fable review approves) don't need separate confirmation.
 - Read scope literally: if a request says "this file", keep the change to that file; if it says "all", apply it everywhere. When the scope is unclear, ask rather than generalize.
 
 # Context & Session Management
 - Use subagents to keep the main context window clean. Test: "Do I need the tool output again, or just the conclusion?" If just the conclusion → subagent. Good for: verifying results against a spec, exploring other codebases, writing docs from a git diff.
 - Delegation triggers: exploration likely to exceed ~10 tool calls, or 3+ independent subtasks (e.g. multiple unrelated issues) → fan out to subagents instead of serial main-loop work. Once delegated, do NOT duplicate the same reads in the main loop — wait, then verify the conclusions.
 - Verify one load-bearing claim from every subagent report before acting on it — this habit has caught real false positives; keep it.
-
-# Coding Style
-- Validate at boundaries only (user input, external APIs). Trust internal code.
 
 # Truthfulness
 - Ground every factual claim about my content (career, history, prior work, file contents) in something you just read — read the source first. When you can't ground a claim, ask (see *Clarify before acting*) or mark it "推測" / "unverified" so I can confirm before it lands in a file.
@@ -59,7 +56,7 @@
 - When delegating to Agent or Workflow `agent()`, pass `model:` explicitly (default `sonnet`) — don't rely on inheritance from the main loop. Escalate above the default only when the subtask meets ≥2 of: (a) no existing pattern in this codebase to imitate, (b) a security/auth/crypto boundary, (c) multiple valid approaches with a real trade-off, (d) it already failed once at the default tier.
   - Example (escalate): "design a cache-invalidation strategy for this service" — no precedent, real trade-offs.
   - NG (stay at default): "write a table-driven test for this function" — a pattern to imitate exists.
-- Fable review gate: applies only to branch+PR repos (not `dotfiles`/`ops`, which never get a `code-reviewer` pass). For non-trivial implementation (multiple files/subsystems, a security boundary, or an architectural decision — same bar as plan mode), run the `code-reviewer` subagent once, automatically, right after `gh pr create` opens the PR — review the PR diff, incorporate findings (push fixups), then stop and report per the branch+PR rule above. NOT for mechanical changes — config edits, dependency/SHA bumps, docs, formatting; those never warrant a fable pass.
+- Fable review gate: applies only to branch+PR repos (not `dotfiles`/`ops`, which never get a `code-reviewer` pass). For non-trivial implementation (multiple files/subsystems, a security boundary, or an architectural decision — same bar as plan mode), run the `code-reviewer` subagent once, automatically, right after `gh pr create` opens the PR — review the PR diff, incorporate findings (push fixups), then merge per the branch+PR rule above if the review approves, or stop and report if it doesn't. NOT for mechanical changes — config edits, dependency/SHA bumps, docs, formatting; those never warrant a fable pass.
 - When you invoke the `code-review` skill on your own initiative (not me typing `/code-review <level>` myself) and I haven't named a level, default to `high`.
 
 # Advisor usage
