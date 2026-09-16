@@ -99,12 +99,12 @@ There is no staging or deploy step (hooks apply on the next tool call,
   a reliable control once a session runs under `bypassPermissions` mode
   (see that doc's "Cutover caveat" section); re-audit before switching.
 - **flake.nix specifics**: the unfree allowlist contains only `terraform`
-  (any other unfree package fails eval until added); Homebrew
-  `cleanup = "zap"` uninstalls anything not declared in the flake;
-  `extraFlags = ["--force-cleanup"]` was added before nix-darwin PR #1789
-  (merged 2026-06-17) landed; check whether the pinned nix-darwin input
-  already handles the underlying CLI-flag requirement and drop the flag if
-  so.
+  (any other unfree package fails eval until added). Homebrew
+  `cleanup = "zap"` uninstalls anything not declared in the flake, and
+  nix-darwin's own homebrew module already emits `--zap --force-cleanup`
+  for that setting (PR #1789, merged 2026-06-17, landed in the pinned
+  input), so no `extraFlags` workaround is needed; don't re-add one
+  without confirming the pinned nix-darwin input actually regressed.
 - **Homebrew taps can't be content-pinned** — the exception to
   `rules/security.md`'s pin rule. The taps in `nix-darwin/flake.nix`
   (`bendews/tap`, `tursodatabase/tap`, `libsql/sqld`, `ariga/tap`,
