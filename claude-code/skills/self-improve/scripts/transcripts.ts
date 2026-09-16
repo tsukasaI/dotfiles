@@ -45,7 +45,13 @@ export function oldestSessionMs(dbPath: string): number | null {
   try {
     const db = new Database(dbPath, { readonly: true });
     try {
-      const row = db.query<{ oldest: string | null }, []>(`SELECT MIN(started_at) AS oldest FROM sessions`).get();
+      // NULLIF: an empty-string started_at (written when a transcript has no
+      // timestamped lines, save-transcript.ts's meta.startedAt default)
+      // sorts before every real ISO date, so a bare MIN() would silently
+      // pin oldest to "" and collapse data_sufficient to false forever.
+      const row = db
+        .query<{ oldest: string | null }, []>(`SELECT MIN(NULLIF(started_at, '')) AS oldest FROM sessions`)
+        .get();
       const ms = row?.oldest ? Date.parse(row.oldest) : NaN;
       return isNaN(ms) ? null : ms;
     } finally {
