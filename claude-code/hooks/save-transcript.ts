@@ -155,7 +155,18 @@ function openDb(): Database {
 
 const REDACTIONS: Array<[RegExp, string]> = [
   [
-    /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+    // Bounded on purpose: this runs over the whole concatenated transcript,
+    // not per JSONL record. `[\s\S]*?` matched raw newlines, so an
+    // unterminated BEGIN could lazily expand across many records to find an
+    // END anywhere later in the file, splicing unrelated records into one
+    // redacted token (and, for unterminated markers, degrading to O(n*k)).
+    // A real pasted key has its newlines as literal `\n` JSON escapes inside
+    // one record, never a raw newline, so restricting to `[^\n]` still
+    // matches genuine keys while making a cross-record match impossible.
+    // The `{0,16384}` cap bounds worst-case work per start position; it is
+    // comfortably larger than an escaped RSA-8192 PEM body (~13KB) but is a
+    // fail-open bound in principle — re-measure if key sizes grow.
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----[^\n]{0,16384}?-----END [A-Z ]*PRIVATE KEY-----/g,
     "[REDACTED:private-key]",
   ],
   [/\bsk-ant-[A-Za-z0-9_-]{20,}/g, "[REDACTED:anthropic-key]"],
