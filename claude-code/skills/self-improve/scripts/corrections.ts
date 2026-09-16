@@ -3,7 +3,11 @@
 import { Database } from "bun:sqlite";
 import { join, extname, relative } from "path";
 
-const HOME = Bun.env.HOME!;
+const HOME = Bun.env.HOME;
+if (!HOME) {
+  console.error("[corrections.ts] HOME is not set; cannot locate claude-logs. Set HOME or CLAUDE_LOGS_DB.");
+  process.exit(2);
+}
 // Overridable for tests (e.g. pointing at a nonexistent path to exercise the
 // DB-missing error path) — defaults to the standard claude-logs location.
 const LOGS_DB_PATH = Bun.env.CLAUDE_LOGS_DB || join(HOME, ".local", "share", "claude-logs", "logs.db");
