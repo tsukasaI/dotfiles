@@ -23,10 +23,18 @@ extract() {
 }
 
 reference=$(extract "${FILES[0]}")
+if [[ -z "$reference" ]]; then
+  echo "FAIL no 'paths:' block found in $DIR/${FILES[0]}.md - the sync check would pass vacuously" >&2
+  exit 1
+fi
 fails=0
 
 for f in "${FILES[@]:1}"; do
   current=$(extract "$f")
+  if [[ -z "$current" ]]; then
+    echo "FAIL no 'paths:' block found in $DIR/$f.md - the sync check would pass vacuously" >&2
+    exit 1
+  fi
   if [[ "$current" != "$reference" ]]; then
     echo "FAIL paths: frontmatter drift: ${FILES[0]}.md vs $f.md"
     diff <(echo "$reference") <(echo "$current")
