@@ -3,6 +3,7 @@
 import { Database } from "bun:sqlite";
 import { readFileSync, mkdirSync, realpathSync, chmodSync, statSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
+import { abbreviateHome } from "../lib/home-path";
 
 // --- Types ---
 
@@ -193,8 +194,7 @@ function redactSecrets(text: string): string {
 // absolute path embeds the OS username, so redact the HOME prefix at this
 // logging boundary rather than trusting every downstream consumer to do it.
 function redactHome(path: string): string {
-  const home = Bun.env.HOME;
-  return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+  return abbreviateHome(path, Bun.env.HOME ?? "");
 }
 
 // --- Transcript parsing ---
