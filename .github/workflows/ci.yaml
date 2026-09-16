@@ -45,10 +45,11 @@ jobs:
         run: bash tests/shguard-parity-check.sh
 
   rules-paths-sync:
-    # #43: the paths: frontmatter in atomicity/code-review/data-handling/
-    # encoding/error-handling.md is byte-identical by necessity (no include
-    # mechanism for per-file frontmatter); catch drift mechanically instead
-    # of relying on 5 identical hand-edits staying in sync.
+    # #43: the paths: frontmatter in code-review.md and comments.md is
+    # byte-identical by necessity (no include mechanism for per-file
+    # frontmatter); catch drift mechanically instead of relying on 2
+    # identical hand-edits staying in sync. FILES in
+    # tests/rules-paths-sync.sh is the source of truth for which files.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
