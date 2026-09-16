@@ -113,7 +113,9 @@ try {
   const ctx = input.context_window?.used_percentage;
   if (ctx != null) {
     const [fg, bg] = rlColor(ctx);
-    const filled = Math.round(ctx / 10);
+    // used_percentage can exceed 100 in the harness's own schema; clamp so
+    // repeat() below never gets a negative or absurdly large count.
+    const filled = Math.max(0, Math.min(10, Math.round(ctx / 10)));
     const bar = "█".repeat(filled) + "░".repeat(10 - filled);
     const size = input.context_window?.context_window_size;
     const sizeLabel = size ? ` /${size >= 1_000_000 ? `${size / 1_000_000}M` : `${size / 1000}k`}` : "";
