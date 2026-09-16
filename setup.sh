@@ -42,12 +42,6 @@ link_with_backup "$DOTFILES/git/gitconfig" ~/.gitconfig
 mkdir -p ~/.config/git
 link_with_backup "$DOTFILES/git/ignore" ~/.config/git/ignore
 link_with_backup "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
-# Clean up the retired global-hooks symlink (dangling since git/hooks/ was
-# removed in favor of per-repo lefthook.yaml; core.hooksPath is unset so this
-# is inert either way, but leaving stale cruft around is confusing).
-if [[ -L ~/.config/git/hooks && "$(readlink ~/.config/git/hooks)" == "$DOTFILES/git/hooks" ]]; then
-  rm ~/.config/git/hooks
-fi
 # shguard's own default config lookup path. The settings.json PreToolUse
 # hook runs bare `shguard` (no SHGUARD_CONFIG env - settings.json env values
 # aren't shell-expanded, so a $HOME-based path there is passed to shguard
