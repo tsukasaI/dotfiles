@@ -22,7 +22,7 @@ function powerline(segments: [number, number, string][]): string {
     if (i < segments.length - 1) {
       out += `${fgc(bgCode)}${bgc(segments[i + 1][1])}${ARROW}`;
     } else {
-      out += `${fgc(bgCode)}${RST}${ARROW}${RST}`;
+      out += `${RST}${fgc(bgCode)}${ARROW}${RST}`;
     }
   }
   return out;
