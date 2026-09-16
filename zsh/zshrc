@@ -8,14 +8,22 @@ _cached_eval() {
   local name=$1 cmd=$2
   local cache_dir="$HOME/.cache/zsh"
   local cache="$cache_dir/$name.zsh"
+  local src="$cache_dir/$name.src"
   local bin=$(command -v ${cmd%% *} 2>/dev/null)
   if [[ -z "$bin" ]]; then
-    rm -f "$cache" # tool gone: drop stale cache, don't source it
+    rm -f "$cache" "$src" # tool gone: drop stale cache, don't source it
     return
   fi
-  if [[ ! -f "$cache" || "$bin" -nt "$cache" ]]; then
+  # Resolve through symlinks: every Nix-installed binary carries the fixed
+  # epoch mtime (1970-01-01) by design, so the raw `-nt` check below can
+  # never see a Nix-installed tool's upgrade even though the resolved store
+  # path changes on every rebuild. Recording and comparing that path covers
+  # Nix upgrades; `-nt` still covers non-Nix tools with real mtimes.
+  local resolved=${bin:A}
+  if [[ ! -f "$cache" || "$bin" -nt "$cache" || "$(cat "$src" 2>/dev/null)" != "$resolved" ]]; then
     mkdir -p "$cache_dir"
     eval "$cmd" > "$cache.tmp" && mv -f "$cache.tmp" "$cache" # atomic write
+    print -r -- "$resolved" > "$src"
   fi
   [[ -f "$cache" ]] && source "$cache"
 }
