@@ -231,7 +231,11 @@
       nix.optimise.automatic = true;
       nix.gc = {
         automatic = true;
-        interval = { Weekday = 0; };
+        # An option definition replaces the launchd StartCalendarInterval
+        # default wholesale, not per-field — omitting Hour/Minute here does
+        # NOT default them to 0, it leaves them as launchd's own wildcard,
+        # so the job fires every minute all day on Weekday 0 instead of once.
+        interval = { Weekday = 0; Hour = 3; Minute = 15; };
         options = "--delete-older-than 30d";
       };
       system.primaryUser = primaryUser;
