@@ -1,16 +1,14 @@
 #!/usr/bin/env bun
 
-import { Database } from "bun:sqlite";
 import { join, extname, relative } from "path";
+import { logsDbPath, expandHome as expandHomeShared, isNonPromptText, scanSessions } from "./transcripts";
 
 const HOME = Bun.env.HOME;
 if (!HOME) {
   console.error("[corrections.ts] HOME is not set; cannot locate claude-logs. Set HOME or CLAUDE_LOGS_DB.");
   process.exit(2);
 }
-// Overridable for tests (e.g. pointing at a nonexistent path to exercise the
-// DB-missing error path) — defaults to the standard claude-logs location.
-const LOGS_DB_PATH = Bun.env.CLAUDE_LOGS_DB || join(HOME, ".local", "share", "claude-logs", "logs.db");
+const LOGS_DB_PATH = logsDbPath(HOME);
 
 const WINDOW_DAYS = 30;
 const NOW = Date.now();
@@ -131,7 +129,7 @@ function excerptForTool(name: string, input: Record<string, unknown> | undefined
   if (name === "Edit" || name === "Write" || name === "Read") {
     const fp = typeof input.file_path === "string" ? input.file_path : "";
     let rel = fp;
-    if (fp.startsWith(cwd + "/")) rel = relative(cwd, fp);
+    if (cwd && fp.startsWith(cwd + "/")) rel = relative(cwd, fp);
     return { excerpt: rel.slice(0, 80), file_path: fp || null };
   }
   if (name === "Skill") {
@@ -163,19 +161,6 @@ function isCorrectionPhrase(text: string): boolean {
   return false;
 }
 
-function shouldSkipUserText(trimmed: string): boolean {
-  if (!trimmed) return true;
-  if (trimmed.startsWith("<system-reminder>")) return true;
-  if (trimmed.startsWith("<local-command-caveat>")) return true;
-  if (trimmed.startsWith("<local-command-stdout>")) return true;
-  if (trimmed.startsWith("<local-command-stderr>")) return true;
-  if (trimmed.startsWith("<command-")) return true;
-  if (trimmed.startsWith("<bash-")) return true;
-  if (trimmed.startsWith("<user-prompt-submit-hook>")) return true;
-  if (/^\[image #\d+]/i.test(trimmed)) return true;
-  return false;
-}
-
 interface ScanResult {
   pairs: Pair[];
   sessions_scanned: number;
@@ -189,87 +174,32 @@ interface SessionExtract {
   sessionStartMs: number | null;
 }
 
-// project_dir may have HOME redacted to "~" by the SessionEnd hook
-// (save-transcript.ts's redactHome) before it was written to logs.db; this
-// machine only ever has one HOME, so expanding it back is unambiguous.
 function expandHome(p: string | null | undefined): string {
-  if (!p) return "";
-  if (p === "~") return HOME;
-  if (p.startsWith("~/")) return HOME + p.slice(1);
-  return p;
+  return expandHomeShared(p, HOME);
 }
 
-// Reads sessions from the claude-logs SQLite DB (written by the SessionEnd
-// hook, claude-code/hooks/save-transcript.ts) instead of walking
-// ~/.claude/projects/<encoded-cwd>/*.jsonl directly. transcript_raw stores
-// the same JSONL text the old per-file walk read, so per-line parsing below
-// is unchanged. Sessions are fetched one at a time (not joined/batched) so
-// peak memory stays proportional to one transcript, not the whole ~149MB
-// table.
+// entry.cwd comes verbatim from parsed transcript JSON, so its declared
+// `string` type isn't enforced at runtime; coerce here so every downstream
+// consumer (path.join, path.relative, etc.) can trust the result.
+function entryCwd(cwd: unknown, fallback: string): string {
+  return typeof cwd === "string" && cwd ? cwd : fallback;
+}
+
 function scan(): ScanResult {
+  const s = scanSessions(LOGS_DB_PATH, CUTOFF_MS, (jsonl, projectDir) => {
+    const extract = extractSession(jsonl, projectDir);
+    return { extract, sessionStartMs: extract.sessionStartMs };
+  });
   const result: ScanResult = {
     pairs: [],
-    sessions_scanned: 0,
-    oldest_session_ms: null,
-    errors: [],
-    db_unavailable: false,
+    sessions_scanned: s.sessions_scanned,
+    oldest_session_ms: s.oldest_session_ms,
+    errors: s.errors,
+    db_unavailable: s.db_unavailable,
   };
-
-  let db: Database;
-  try {
-    db = new Database(LOGS_DB_PATH, { readonly: true });
-  } catch (e) {
-    result.errors.push(`could not open logs.db at ${LOGS_DB_PATH}: ${e instanceof Error ? e.message : e}`);
-    result.db_unavailable = true;
-    return result;
+  for (const extract of s.extracts) {
+    result.pairs.push(...extract.pairs);
   }
-
-  try {
-    const sessionRows = db
-      .query<{ session_id: string; project_dir: string | null; started_at: string | null }, []>(
-        `SELECT session_id, project_dir, started_at FROM sessions ORDER BY started_at ASC`,
-      )
-      .all();
-    const transcriptStmt = db.query<{ transcript_jsonl: string }, [string]>(
-      `SELECT transcript_jsonl FROM transcript_raw WHERE session_id = ?`,
-    );
-
-    let missingTranscripts = 0;
-    for (const row of sessionRows) {
-      const startMs = row.started_at ? Date.parse(row.started_at) : NaN;
-      if (!isNaN(startMs) && startMs < CUTOFF_MS) continue;
-
-      const trow = transcriptStmt.get(row.session_id);
-      if (!trow || !trow.transcript_jsonl) {
-        missingTranscripts++;
-        continue;
-      }
-
-      // Contained per-session: a malformed transcript entry (e.g. a
-      // truncated/spliced record) must not abort every session queued
-      // behind it in sessionRows.
-      try {
-        const extract = extractSession(trow.transcript_jsonl, row.project_dir);
-        result.pairs.push(...extract.pairs);
-        result.sessions_scanned++;
-        if (extract.sessionStartMs !== null) {
-          if (result.oldest_session_ms === null || extract.sessionStartMs < result.oldest_session_ms) {
-            result.oldest_session_ms = extract.sessionStartMs;
-          }
-        }
-      } catch (e) {
-        result.errors.push(`session ${row.session_id} skipped: ${e instanceof Error ? e.message : e}`);
-      }
-    }
-    if (missingTranscripts > 0) {
-      result.errors.push(`${missingTranscripts} session(s) had no transcript_raw row and were skipped`);
-    }
-  } catch (e) {
-    result.errors.push(`logs.db query failed: ${e instanceof Error ? e.message : e}`);
-  } finally {
-    db.close();
-  }
-
   return result;
 }
 
@@ -290,7 +220,7 @@ function extractSession(transcriptJsonl: string, projectDir: string | null): Ses
   let sessionCwd = expandHome(projectDir);
   let sessionStartMs: number | null = null;
   for (const e of entries) {
-    if (e.cwd && !sessionCwd) sessionCwd = e.cwd;
+    if (!sessionCwd) sessionCwd = entryCwd(e.cwd, sessionCwd);
     const ts = e.timestamp ? Date.parse(e.timestamp) : NaN;
     if (!isNaN(ts) && sessionStartMs === null) sessionStartMs = ts;
   }
@@ -303,7 +233,7 @@ function extractSession(transcriptJsonl: string, projectDir: string | null): Ses
     if (e.isSidechain === true) continue;
     const content = e.message?.content;
     if (!content || typeof content === "string") continue;
-    const cwd = e.cwd ?? sessionCwd;
+    const cwd = entryCwd(e.cwd, sessionCwd);
     const ts = e.timestamp ?? "";
     if (e.type === "assistant") {
       for (const b of content) {
@@ -352,7 +282,7 @@ function extractSession(transcriptJsonl: string, projectDir: string | null): Ses
 
     for (const t of texts) {
       const trimmed = t.trim();
-      if (shouldSkipUserText(trimmed)) continue;
+      if (isNonPromptText(trimmed)) continue;
 
       let kind: "interrupt" | "correction" | null = null;
       if (trimmed.startsWith("[Request interrupted")) {
@@ -369,7 +299,7 @@ function extractSession(transcriptJsonl: string, projectDir: string | null): Ses
       extract.pairs.push({
         kind,
         ts: e.timestamp ?? "",
-        cwd: e.cwd ?? sessionCwd,
+        cwd: entryCwd(e.cwd, sessionCwd),
         tool_name: action.tool_name,
         excerpt: action.excerpt,
         file_path: action.file_path,
@@ -440,7 +370,7 @@ function resolveAssistantAction(
     }
   }
   if (!parent || parent.type !== "assistant") return null;
-  const cwd = parent.cwd ?? sessionCwd;
+  const cwd = entryCwd(parent.cwd, sessionCwd);
   const content = parent.message?.content;
   if (!content || typeof content === "string") {
     return null;
@@ -514,7 +444,7 @@ function buildClusters(pairs: Pair[]) {
     const cwds = [...v.cwds];
     const scope: "project" | "user" = cwds.length <= 1 ? "project" : "user";
     const scope_target =
-      scope === "project" && cwds[0]
+      scope === "project" && typeof cwds[0] === "string" && cwds[0]
         ? join(cwds[0], ".claude", "CLAUDE.md")
         : join(HOME, ".claude", "CLAUDE.md");
     const path_hint = v.exts.size === 1 ? [...v.exts][0] : null;
@@ -546,26 +476,35 @@ function buildClusters(pairs: Pair[]) {
 }
 
 const scanResult = scan();
-const oldestIso = scanResult.oldest_session_ms ? new Date(scanResult.oldest_session_ms).toISOString() : null;
-const pairsByKind = scanResult.pairs.reduce((acc, p) => {
-  acc[p.kind] = (acc[p.kind] ?? 0) + 1;
-  return acc;
-}, {} as Record<string, number>);
 
-const out = {
-  generated_at: new Date(NOW).toISOString(),
-  meta: {
-    source: "claude-logs",
-    data_window_days: WINDOW_DAYS,
-    sessions_scanned: scanResult.sessions_scanned,
-    oldest_session: oldestIso,
-    total_pairs_collected: scanResult.pairs.length,
-    pairs_by_kind: pairsByKind,
-    errors: scanResult.errors,
-  },
-  correction_pairs: buildClusters(scanResult.pairs),
-};
+// Aggregation trusts fields copied verbatim out of transcript JSON (e.g.
+// cwd); a future field slip should be diagnosable, not a bare Bun stack
+// dump with no output at all.
+try {
+  const oldestIso = scanResult.oldest_session_ms ? new Date(scanResult.oldest_session_ms).toISOString() : null;
+  const pairsByKind = scanResult.pairs.reduce((acc, p) => {
+    acc[p.kind] = (acc[p.kind] ?? 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
-for (const err of scanResult.errors) console.error(`[corrections.ts] ${err}`);
-console.log(JSON.stringify(out, null, 2));
-if (scanResult.db_unavailable) process.exit(2);
+  const out = {
+    generated_at: new Date(NOW).toISOString(),
+    meta: {
+      source: "claude-logs",
+      data_window_days: WINDOW_DAYS,
+      sessions_scanned: scanResult.sessions_scanned,
+      oldest_session: oldestIso,
+      total_pairs_collected: scanResult.pairs.length,
+      pairs_by_kind: pairsByKind,
+      errors: scanResult.errors,
+    },
+    correction_pairs: buildClusters(scanResult.pairs),
+  };
+
+  for (const err of scanResult.errors) console.error(`[corrections.ts] ${err}`);
+  console.log(JSON.stringify(out, null, 2));
+  if (scanResult.db_unavailable) process.exit(2);
+} catch (e) {
+  console.error(`[corrections.ts] aggregation failed: ${e instanceof Error ? e.message : e}`);
+  process.exit(1);
+}

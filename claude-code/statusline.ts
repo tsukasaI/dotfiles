@@ -2,6 +2,7 @@
 
 import { statSync, readFileSync } from "fs";
 import { dirname } from "path";
+import { abbreviateHome } from "./lib/home-path";
 
 // ANSI helpers
 const RST = "\x1b[0m";
@@ -77,8 +78,7 @@ try {
 
   const dir = input.workspace?.current_dir;
   if (dir) {
-    const home = Bun.env.HOME ?? "";
-    const display = dir.startsWith(home) ? `~${dir.slice(home.length)}` : dir;
+    const display = abbreviateHome(dir, Bun.env.HOME ?? "");
     row1.push([153, 24, `» ${display}`]);
 
     const git = readGitBranch(dir);
