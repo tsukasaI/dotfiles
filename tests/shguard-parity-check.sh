@@ -194,17 +194,25 @@ case_ "multi-line bash (issue #44)"      "$(printf 'echo setup\nbash script.sh')
 # shguard binary itself — that's covered by the inline wrapper logic in
 # settings.json, not by this script.
 total=$((total + 1))
-bad_config=$(mktemp)
-trap '[[ -n "${bad_config:-}" ]] && : > "$bad_config"' EXIT
+bad_config=$(mktemp "${TMPDIR:-/tmp}/shguard-parity.XXXXXX") || {
+  echo "FAIL could not create temp config for SHGUARD_STRICT_CONFIG case" >&2
+  exit 1
+}
+trap '[[ -n "${bad_config:-}" ]] && rm -f -- "$bad_config"; true' EXIT
 printf 'not valid toml [[[' > "$bad_config"
 strict_out=$(jq -cn '{tool_name:"Bash",tool_input:{command:"echo hi"},hook_event_name:"PreToolUse"}' \
   | SHGUARD_CONFIG="$bad_config" SHGUARD_STRICT_CONFIG=1 "$SHGUARD_BIN" 2>/dev/null)
 strict_decision=$(printf '%s' "$strict_out" | jq -r '.hookSpecificOutput.permissionDecision // "PARSE_ERROR"')
-if [[ "$strict_decision" == "deny" ]]; then
+strict_reason=$(printf '%s' "$strict_out" | jq -r '.hookSpecificOutput.permissionDecisionReason // ""')
+# Assert on the reason too, not just the decision: an empty/missing config
+# (e.g. from a silently-failed mktemp above) also denies, which would let
+# this case pass green while testing "missing config" instead of the
+# malformed-TOML path it claims to cover.
+if [[ "$strict_decision" == "deny" && "$strict_reason" == *"invalid TOML"* ]]; then
   :
 else
   fails=$((fails + 1))
-  printf 'FAIL  %-45s expected=deny got=%s\n' "SHGUARD_STRICT_CONFIG malformed config" "$strict_decision"
+  printf 'FAIL  %-45s expected=deny/invalid-TOML got=%s/%s\n' "SHGUARD_STRICT_CONFIG malformed config" "$strict_decision" "$strict_reason"
 fi
 
 echo "---"
