@@ -19,7 +19,7 @@
     shguard.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs@{ self, nix-darwin, nixpkgs, ewc, fini, herdr, shguard }:
+  outputs = { nix-darwin, ewc, fini, herdr, shguard, ... }:
   let
     # One function per host (#14): adding a second machine is one more mkHost
     # call under darwinConfigurations, not a copy of the configuration block.
