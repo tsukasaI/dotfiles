@@ -1,4 +1,6 @@
--- Parsers are managed by Nix (see nix-darwin/flake.nix).
+-- Parsers are compiled on first use by nvim-treesitter itself, using the
+-- Xcode CLT C toolchain (issue #27) — the treesitterParsers derivation in
+-- nix-darwin/flake.nix has no effect on what's actually loaded.
 -- treesitter-context / textobjects 自体は lazy で管理。
 return {
   {
