@@ -4,7 +4,8 @@
   "env": {
     "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
     "EDITOR": "nvim",
-    "ENABLE_TOOL_SEARCH": "1"
+    "ENABLE_TOOL_SEARCH": "1",
+    "SHGUARD_STRICT_CONFIG": "1"
   },
   "attribution": {
     "commit": "",
