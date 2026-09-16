@@ -479,30 +479,20 @@ function computeCodeReviewOverlap(skills: SkillRecord[]): OverlapHint[] {
   return rankByKeywordOverlap(CODE_REVIEW_TOPIC_WORDS, CODE_REVIEW_MIN_MATCHES, skills);
 }
 
+// Ordered: the first language whose patterns match wins, so e.g. python's
+// `^class \w+` claims a line that js/ts would also accept.
+const LANGUAGE_PATTERNS: Array<[string, RegExp[]]> = [
+  ["go", [/^func\s+/, /^package\s+\w/, /^import\s+"/, /^type\s+\w+\s+(struct|interface|\[\]|\*)/]],
+  ["python", [/^def\s+/, /^class\s+\w+/, /^from\s+[\w.]+\s+import/]],
+  ["js/ts", [/^function\s+/, /^(const|let|var)\s+\w/, /^export\s+(default\s+)?/, /^import\s+\{/]],
+  ["rust", [/^fn\s+/, /^pub\s+fn\s+/, /^impl\s+/]],
+];
+
 function detectLanguage(firstSample: string): string {
   const firstLine = firstSample.split(/\r?\n/)[0].trim();
-  if (
-    /^func\s+/.test(firstLine) ||
-    /^package\s+\w/.test(firstLine) ||
-    /^import\s+"/.test(firstLine) ||
-    /^type\s+\w+\s+(struct|interface|\[\]|\*)/.test(firstLine)
-  ) return "go";
-  if (
-    /^def\s+/.test(firstLine) ||
-    /^class\s+\w+/.test(firstLine) ||
-    /^from\s+[\w.]+\s+import/.test(firstLine)
-  ) return "python";
-  if (
-    /^function\s+/.test(firstLine) ||
-    /^(const|let|var)\s+\w/.test(firstLine) ||
-    /^export\s+(default\s+)?/.test(firstLine) ||
-    /^import\s+\{/.test(firstLine)
-  ) return "js/ts";
-  if (
-    /^fn\s+/.test(firstLine) ||
-    /^pub\s+fn\s+/.test(firstLine) ||
-    /^impl\s+/.test(firstLine)
-  ) return "rust";
+  for (const [lang, patterns] of LANGUAGE_PATTERNS) {
+    if (patterns.some((re) => re.test(firstLine))) return lang;
+  }
   return "unknown";
 }
 
