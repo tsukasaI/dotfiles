@@ -63,64 +63,70 @@ function readGitBranch(start: string): { branch: string; isWorktree: boolean } |
   }
 }
 
+// A finite number, or null for anything else (missing, NaN, wrong type) so
+// callers can skip just that segment instead of throwing mid-render.
+const num = (v: unknown): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? v : null;
+
+// Runs one row's construction in isolation: a fault building row N (bad
+// field type, out-of-range value) must not discard rows that don't depend
+// on it. Returns [] on failure so the caller's `.length > 0` check still
+// works — fail silent per-row (no statusline row for that one) is the safe
+// default for a purely cosmetic tool.
+function safeRow(build: () => [number, number, string][]): [number, number, string][] {
+  try {
+    return build();
+  } catch (err) {
+    console.error(`[statusline] row failed: ${err instanceof Error ? err.message : err}`);
+    return [];
+  }
+}
+
 // Everything below reads/derives from stdin JSON whose shape is not under our
-// control (the harness's own schema evolves). Wrap it so a malformed/missing
-// field throws into this catch instead of crashing mid-render and dumping a
-// raw stack trace into the shell prompt — fail silent (no statusline output)
-// is the safe default for a purely cosmetic tool.
+// control (the harness's own schema evolves). This outer catch only guards
+// the stdin read/parse itself; per-row faults are handled by safeRow above.
 try {
   const input = await Bun.stdin.json();
-  const row1: [number, number, string][] = [];
-  const row2: [number, number, string][] = [];
-  const row3: [number, number, string][] = [];
 
   // --- Row 1: dir | git | model ---
 
-  const dir = input.workspace?.current_dir;
-  if (dir) {
-    const display = abbreviateHome(dir, Bun.env.HOME ?? "");
-    row1.push([153, 24, `» ${display}`]);
+  const row1 = safeRow(() => {
+    const segs: [number, number, string][] = [];
+    const dir = input.workspace?.current_dir;
+    if (typeof dir === "string" && dir) {
+      const display = abbreviateHome(dir, Bun.env.HOME ?? "");
+      segs.push([153, 24, `» ${display}`]);
 
-    const git = readGitBranch(dir);
-    if (git) {
-      row1.push([189, 60, `⎇ ${git.branch}${git.isWorktree ? " [wt]" : ""}`]);
+      const git = readGitBranch(dir);
+      if (git) {
+        segs.push([189, 60, `⎇ ${git.branch}${git.isWorktree ? " [wt]" : ""}`]);
+      }
     }
-  }
 
-  const modelName = input.model?.display_name ?? input.model?.id;
-  if (modelName) {
-    const short = modelName.replace(/^Claude /, "");
-    row1.push([159, 30, `◇ ${short}`]);
-  }
+    const modelName = input.model?.display_name ?? input.model?.id;
+    if (typeof modelName === "string" && modelName) {
+      const short = modelName.replace(/^Claude /, "");
+      segs.push([159, 30, `◇ ${short}`]);
+    }
 
-  // model-mode badges: reasoning effort, extended thinking, output style.
-  // Each field is only present when the corresponding mode is active, so a
-  // missing field simply omits its badge.
-  const effort = input.effort?.level;
-  if (effort) {
-    row1.push([223, 94, `↯ ${effort}`]);
-  }
-  if (input.thinking?.enabled) {
-    row1.push([189, 55, "✻ think"]);
-  }
-  const style = input.output_style?.name;
-  if (style && style !== "default") {
-    row1.push([159, 22, `✎ ${style}`]);
-  }
+    // model-mode badges: reasoning effort, extended thinking, output style.
+    // Each field is only present when the corresponding mode is active, so a
+    // missing field simply omits its badge.
+    const effort = input.effort?.level;
+    if (effort) {
+      segs.push([223, 94, `↯ ${effort}`]);
+    }
+    if (input.thinking?.enabled) {
+      segs.push([189, 55, "✻ think"]);
+    }
+    const style = input.output_style?.name;
+    if (style && style !== "default") {
+      segs.push([159, 22, `✎ ${style}`]);
+    }
+    return segs;
+  });
 
   // --- Row 2: context bar | rate limits ---
-
-  const ctx = input.context_window?.used_percentage;
-  if (ctx != null) {
-    const [fg, bg] = rlColor(ctx);
-    // used_percentage can exceed 100 in the harness's own schema; clamp so
-    // repeat() below never gets a negative or absurdly large count.
-    const filled = Math.max(0, Math.min(10, Math.round(ctx / 10)));
-    const bar = "█".repeat(filled) + "░".repeat(10 - filled);
-    const size = input.context_window?.context_window_size;
-    const sizeLabel = size ? ` /${size >= 1_000_000 ? `${size / 1_000_000}M` : `${size / 1000}k`}` : "";
-    row2.push([fg, bg, `${bar} ${ctx.toFixed(1)}%${sizeLabel}`]);
-  }
 
   // resets_at is Unix epoch seconds. 5H resets within the day (HH:mm); 7D spans
   // days, so prefix a weekday.
@@ -131,35 +137,55 @@ try {
     return `↻ ${withWeekday ? `${WEEKDAYS[d.getDay()]} ` : ""}${hm}`;
   }
 
-  const rl = input.rate_limits;
-  for (const [key, label] of [["five_hour", "5H"], ["seven_day", "7D"]] as const) {
-    const p = rl?.[key]?.used_percentage;
-    if (p == null) continue;
-    const [fg, bg] = rlColor(p);
-    const resetsAt = rl?.[key]?.resets_at;
-    const reset = resetsAt ? ` ${resetLabel(resetsAt, key === "seven_day")}` : "";
-    row2.push([fg, bg, `${label} ${p.toFixed(0)}%${reset}`]);
-  }
+  const row2 = safeRow(() => {
+    const segs: [number, number, string][] = [];
+    const ctx = num(input.context_window?.used_percentage);
+    if (ctx != null) {
+      const [fg, bg] = rlColor(ctx);
+      // used_percentage can exceed 100 in the harness's own schema; clamp so
+      // repeat() below never gets a negative or absurdly large count.
+      const filled = Math.max(0, Math.min(10, Math.round(ctx / 10)));
+      const bar = "█".repeat(filled) + "░".repeat(10 - filled);
+      const size = num(input.context_window?.context_window_size);
+      const sizeLabel = size ? ` /${size >= 1_000_000 ? `${size / 1_000_000}M` : `${size / 1000}k`}` : "";
+      segs.push([fg, bg, `${bar} ${ctx.toFixed(1)}%${sizeLabel}`]);
+    }
+
+    const rl = input.rate_limits;
+    for (const [key, label] of [["five_hour", "5H"], ["seven_day", "7D"]] as const) {
+      const p = num(rl?.[key]?.used_percentage);
+      if (p == null) continue;
+      const [fg, bg] = rlColor(p);
+      const resetsAt = num(rl?.[key]?.resets_at);
+      const reset = resetsAt ? ` ${resetLabel(resetsAt, key === "seven_day")}` : "";
+      segs.push([fg, bg, `${label} ${p.toFixed(0)}%${reset}`]);
+    }
+    return segs;
+  });
 
   // --- Row 3: tokens | lines changed ---
 
-  const inTok = input.context_window?.total_input_tokens ?? 0;
-  const outTok = input.context_window?.total_output_tokens ?? 0;
-  if (inTok > 0 || outTok > 0) {
-    row3.push([250, 239, `≡ ${fmt(inTok)}↓ ${fmt(outTok)}↑`]);
-  }
+  const row3 = safeRow(() => {
+    const segs: [number, number, string][] = [];
+    const inTok = num(input.context_window?.total_input_tokens) ?? 0;
+    const outTok = num(input.context_window?.total_output_tokens) ?? 0;
+    if (inTok > 0 || outTok > 0) {
+      segs.push([250, 239, `≡ ${fmt(inTok)}↓ ${fmt(outTok)}↑`]);
+    }
 
-  const costUsd = input.cost?.total_cost_usd;
-  if (costUsd > 0) {
-    row3.push([250, 238, `$${costUsd.toFixed(2)}`]);
-  }
+    const costUsd = num(input.cost?.total_cost_usd);
+    if (costUsd != null && costUsd > 0) {
+      segs.push([250, 238, `$${costUsd.toFixed(2)}`]);
+    }
 
-  const added = input.cost?.total_lines_added ?? 0;
-  const removed = input.cost?.total_lines_removed ?? 0;
-  if (added > 0 || removed > 0) {
-    row3.push([116, 23, `+${added}`]);
-    row3.push([175, 53, `-${removed}`]);
-  }
+    const added = num(input.cost?.total_lines_added) ?? 0;
+    const removed = num(input.cost?.total_lines_removed) ?? 0;
+    if (added > 0 || removed > 0) {
+      segs.push([116, 23, `+${added}`]);
+      segs.push([175, 53, `-${removed}`]);
+    }
+    return segs;
+  });
 
   // --- Output ---
 
