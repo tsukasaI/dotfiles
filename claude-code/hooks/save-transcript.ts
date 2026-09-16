@@ -3,6 +3,7 @@
 import { Database } from "bun:sqlite";
 import { readFileSync, mkdirSync, realpathSync, chmodSync, statSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
+import { abbreviateHome } from "../lib/home-path";
 
 // --- Types ---
 
@@ -192,9 +193,14 @@ function redactSecrets(text: string): string {
 // project_dir may end up pushed to a shared store (see push-to-turso.sh) — an
 // absolute path embeds the OS username, so redact the HOME prefix at this
 // logging boundary rather than trusting every downstream consumer to do it.
+// Scope, decided explicitly: this masks only a path that IS the HOME prefix
+// (e.g. /Users/inouetsukasa/x -> ~/x). A sibling path that merely shares
+// HOME's parent directory (e.g. /Users/inouetsukasa-old/x) is stored
+// verbatim, not masked — this machine has a single user account, so that
+// case does not carry this user's own username, and widening the match
+// risks over-redacting a genuinely different project path.
 function redactHome(path: string): string {
-  const home = Bun.env.HOME;
-  return home && path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+  return abbreviateHome(path, Bun.env.HOME ?? "");
 }
 
 // --- Transcript parsing ---

@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-import { Database } from "bun:sqlite";
 import {
   readFileSync,
   readdirSync,
@@ -9,15 +8,14 @@ import {
   existsSync,
 } from "fs";
 import { join, dirname } from "path";
+import { logsDbPath, expandHome as expandHomeShared, isNonPromptText, scanSessions, oldestSessionMs } from "./transcripts";
 
 const HOME = Bun.env.HOME;
 if (!HOME) {
   console.error("[skills.ts] HOME is not set; cannot locate claude-logs. Set HOME or CLAUDE_LOGS_DB.");
   process.exit(2);
 }
-// Overridable for tests (e.g. pointing at a nonexistent path to exercise the
-// DB-missing error path) — defaults to the standard claude-logs location.
-const LOGS_DB_PATH = Bun.env.CLAUDE_LOGS_DB || join(HOME, ".local", "share", "claude-logs", "logs.db");
+const LOGS_DB_PATH = logsDbPath(HOME);
 
 const WINDOW_DAYS = 90;
 const NOW = Date.now();
@@ -107,18 +105,25 @@ function listSkillDirsForCwd(cwd: string): SkillRecord[] {
   const records: SkillRecord[] = [];
   const seen = new Set<string>();
 
-  const userSkills = join(HOME, ".claude", "skills");
-  if (existsSync(userSkills)) {
-    for (const entry of readdirSync(userSkills, { withFileTypes: true })) {
+  // withFileTypes doesn't follow symlinks, so a symlinked skill dir (the
+  // same deployment pattern setup.sh uses for ~/.claude/skills) reports
+  // isDirectory() === false; accept isSymbolicLink() too in both scopes so
+  // a project's .claude/skills/foo -> ../../shared/foo isn't silently
+  // dropped.
+  const collect = (skillsDir: string, scope: "user" | "project") => {
+    for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
       if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
-      const skillMd = join(userSkills, entry.name, "SKILL.md");
+      const skillMd = join(skillsDir, entry.name, "SKILL.md");
       if (!existsSync(skillMd)) continue;
-      const rec = loadSkill(entry.name, skillMd, "user");
+      const rec = loadSkill(entry.name, skillMd, scope);
       if (seen.has(rec.path)) continue;
       seen.add(rec.path);
       records.push(rec);
     }
-  }
+  };
+
+  const userSkills = join(HOME, ".claude", "skills");
+  if (existsSync(userSkills)) collect(userSkills, "user");
 
   const gitRoot = findGitRoot(cwd);
   let dir = cwd;
@@ -126,15 +131,7 @@ function listSkillDirsForCwd(cwd: string): SkillRecord[] {
     const skillsDir = join(dir, ".claude", "skills");
     if (existsSync(skillsDir)) {
       try {
-        for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
-          if (!entry.isDirectory()) continue;
-          const skillMd = join(skillsDir, entry.name, "SKILL.md");
-          if (!existsSync(skillMd)) continue;
-          const rec = loadSkill(entry.name, skillMd, "project");
-          if (seen.has(rec.path)) continue;
-          seen.add(rec.path);
-          records.push(rec);
-        }
+        collect(skillsDir, "project");
       } catch {}
     }
     if (gitRoot && dir === gitRoot) break;
@@ -148,7 +145,7 @@ function listSkillDirsForCwd(cwd: string): SkillRecord[] {
 
 const skillsForCwdCache = new Map<string, SkillRecord[]>();
 function getSkillsForCwd(cwd: string): SkillRecord[] {
-  if (!cwd) return [];
+  if (typeof cwd !== "string" || !cwd) return [];
   const cached = skillsForCwdCache.get(cwd);
   if (cached) return cached;
   const result = listSkillDirsForCwd(cwd);
@@ -285,89 +282,27 @@ interface SessionExtract {
   sessionStartMs: number | null;
 }
 
-// project_dir may have HOME redacted to "~" by the SessionEnd hook
-// (save-transcript.ts's redactHome) before it was written to logs.db; this
-// machine only ever has one HOME, so expanding it back is unambiguous.
 function expandHome(p: string | null | undefined): string {
-  if (!p) return "";
-  if (p === "~") return HOME;
-  if (p.startsWith("~/")) return HOME + p.slice(1);
-  return p;
+  return expandHomeShared(p, HOME);
 }
 
-// Reads sessions from the claude-logs SQLite DB (written by the SessionEnd
-// hook, claude-code/hooks/save-transcript.ts) instead of walking
-// ~/.claude/projects/<encoded-cwd>/*.jsonl directly. transcript_raw stores
-// the same JSONL text the old per-file walk read, so per-line parsing below
-// is unchanged. Sessions are fetched one at a time (not joined/batched) so
-// peak memory stays proportional to one transcript, not the whole ~149MB
-// table.
 function scan(): ScanResult {
+  const s = scanSessions(LOGS_DB_PATH, CUTOFF_MS, (jsonl, projectDir) => {
+    const extract = extractSession(jsonl, projectDir);
+    return { extract, sessionStartMs: extract.sessionStartMs };
+  });
   const result: ScanResult = {
     invocations: [],
     prompts: [],
-    sessions_scanned: 0,
-    oldest_session_ms: null,
-    errors: [],
-    db_unavailable: false,
+    sessions_scanned: s.sessions_scanned,
+    oldest_session_ms: s.oldest_session_ms,
+    errors: s.errors,
+    db_unavailable: s.db_unavailable,
   };
-
-  let db: Database;
-  try {
-    db = new Database(LOGS_DB_PATH, { readonly: true });
-  } catch (e) {
-    result.errors.push(`could not open logs.db at ${LOGS_DB_PATH}: ${e instanceof Error ? e.message : e}`);
-    result.db_unavailable = true;
-    return result;
+  for (const extract of s.extracts) {
+    result.invocations.push(...extract.invocations);
+    result.prompts.push(...extract.prompts);
   }
-
-  try {
-    const sessionRows = db
-      .query<{ session_id: string; project_dir: string | null; started_at: string | null }, []>(
-        `SELECT session_id, project_dir, started_at FROM sessions ORDER BY started_at ASC`,
-      )
-      .all();
-    const transcriptStmt = db.query<{ transcript_jsonl: string }, [string]>(
-      `SELECT transcript_jsonl FROM transcript_raw WHERE session_id = ?`,
-    );
-
-    let missingTranscripts = 0;
-    for (const row of sessionRows) {
-      const startMs = row.started_at ? Date.parse(row.started_at) : NaN;
-      if (!isNaN(startMs) && startMs < CUTOFF_MS) continue;
-
-      const trow = transcriptStmt.get(row.session_id);
-      if (!trow || !trow.transcript_jsonl) {
-        missingTranscripts++;
-        continue;
-      }
-
-      // Contained per-session: a malformed transcript entry (e.g. a
-      // truncated/spliced record) must not abort every session queued
-      // behind it in sessionRows.
-      try {
-        const extract = extractSession(trow.transcript_jsonl, row.project_dir);
-        result.invocations.push(...extract.invocations);
-        result.prompts.push(...extract.prompts);
-        result.sessions_scanned++;
-        if (extract.sessionStartMs !== null) {
-          if (result.oldest_session_ms === null || extract.sessionStartMs < result.oldest_session_ms) {
-            result.oldest_session_ms = extract.sessionStartMs;
-          }
-        }
-      } catch (e) {
-        result.errors.push(`session ${row.session_id} skipped: ${e instanceof Error ? e.message : e}`);
-      }
-    }
-    if (missingTranscripts > 0) {
-      result.errors.push(`${missingTranscripts} session(s) had no transcript_raw row and were skipped`);
-    }
-  } catch (e) {
-    result.errors.push(`logs.db query failed: ${e instanceof Error ? e.message : e}`);
-  } finally {
-    db.close();
-  }
-
   return result;
 }
 
@@ -384,7 +319,10 @@ function extractSession(transcriptJsonl: string, projectDir: string | null): Ses
     } catch {
       continue;
     }
-    if (entry.cwd && !sessionCwd) sessionCwd = entry.cwd;
+    // entry.cwd comes verbatim from parsed transcript JSON, so its declared
+    // `string` type isn't enforced at runtime; coerce here so every
+    // downstream consumer (path.join, findGitRoot, etc.) can trust it.
+    if (typeof entry.cwd === "string" && entry.cwd && !sessionCwd) sessionCwd = entry.cwd;
     const tsStr = entry.timestamp;
     const tsMs = tsStr ? Date.parse(tsStr) : NaN;
     if (!isNaN(tsMs) && sessionStartMs === null) sessionStartMs = tsMs;
@@ -392,12 +330,13 @@ function extractSession(transcriptJsonl: string, projectDir: string | null): Ses
     if (entry.isSidechain === true) continue;
 
     const content = entry.message?.content;
-    if (!content || typeof content === "string") {
-      if (entry.type === "user" && typeof content === "string") {
+    if (typeof content === "string") {
+      if (entry.type === "user") {
         recordPrompt(content, tsStr, sessionCwd, entry.isMeta === true, extract);
       }
       continue;
     }
+    if (!content) continue;
     if (entry.type === "assistant") {
       for (const block of content) {
         if (block.type !== "tool_use") continue;
@@ -445,15 +384,10 @@ function recordPrompt(
   const trimmed = text.trim();
   if (!trimmed) return;
   if (trimmed.length > PROMPT_MAX_CHARS) return;
+  // handled as its own `interrupt` classification in corrections.ts, so it
+  // stays out of the shared isNonPromptText list
   if (trimmed.startsWith("[Request interrupted")) return;
-  if (trimmed.startsWith("<system-reminder>")) return;
-  if (trimmed.startsWith("<local-command-caveat>")) return;
-  if (trimmed.startsWith("<local-command-stdout>")) return;
-  if (trimmed.startsWith("<local-command-stderr>")) return;
-  if (trimmed.startsWith("<command-")) return;
-  if (trimmed.startsWith("<bash-")) return;
-  if (trimmed.startsWith("<user-prompt-submit-hook>")) return;
-  if (/^\[image #\d+]/i.test(trimmed)) return;
+  if (isNonPromptText(trimmed)) return;
   const isSlash = /^\/[a-z][a-z0-9_-]*/i.test(trimmed);
   extract.prompts.push({
     text: trimmed,
@@ -507,15 +441,18 @@ interface OverlapHint {
   match_count: number;
 }
 
-function computeOverlapHints(clusterSamples: string[], skills: SkillRecord[]): OverlapHint[] {
-  const clusterKw = extractKeywords(clusterSamples.join("\n"));
+function rankByKeywordOverlap(
+  targetKeywords: Set<string>,
+  minMatches: number,
+  skills: SkillRecord[],
+): OverlapHint[] {
   const hits: OverlapHint[] = [];
   for (const s of skills) {
     let matches = 0;
     for (const w of s.keywords) {
-      if (clusterKw.has(w)) matches++;
+      if (targetKeywords.has(w)) matches++;
     }
-    if (matches < OVERLAP_MIN_MATCHES) continue;
+    if (matches < minMatches) continue;
     hits.push({
       skill_name: s.frontmatter.name ?? s.name,
       skill_path: s.path,
@@ -528,29 +465,18 @@ function computeOverlapHints(clusterSamples: string[], skills: SkillRecord[]): O
   return hits.slice(0, 3);
 }
 
+function computeOverlapHints(clusterSamples: string[], skills: SkillRecord[]): OverlapHint[] {
+  return rankByKeywordOverlap(extractKeywords(clusterSamples.join("\n")), OVERLAP_MIN_MATCHES, skills);
+}
+
 const CODE_REVIEW_TOPIC_WORDS = new Set([
   "review", "code-review", "lc", "leetcode", "algorithm", "algo", "lint",
   "refactor", "debug", "coding", "interview", "tdd", "test", "tests",
 ]);
+const CODE_REVIEW_MIN_MATCHES = 2;
 
 function computeCodeReviewOverlap(skills: SkillRecord[]): OverlapHint[] {
-  const hits: OverlapHint[] = [];
-  for (const s of skills) {
-    const matched: string[] = [];
-    for (const w of s.keywords) {
-      if (CODE_REVIEW_TOPIC_WORDS.has(w)) matched.push(w);
-    }
-    if (matched.length < 2) continue;
-    hits.push({
-      skill_name: s.frontmatter.name ?? s.name,
-      skill_path: s.path,
-      scope: s.scope,
-      description: s.frontmatter.description ?? "",
-      match_count: matched.length,
-    });
-  }
-  hits.sort((a, b) => b.match_count - a.match_count);
-  return hits.slice(0, 3);
+  return rankByKeywordOverlap(CODE_REVIEW_TOPIC_WORDS, CODE_REVIEW_MIN_MATCHES, skills);
 }
 
 function detectLanguage(firstSample: string): string {
@@ -604,45 +530,37 @@ function buildPromptClusters(prompts: PromptEntry[]) {
     overall.set(fw, overallAgg);
   }
 
+  const makeCluster = (first_words: string, count: number, cwds: string[], scope: "project" | "user", scope_target: string, samples: string[]) => {
+    const skills = getSkillsForCwd(cwds[0] ?? "");
+    return {
+      first_words,
+      count,
+      cwds,
+      scope,
+      scope_target,
+      samples,
+      language: detectLanguage(samples[0] ?? ""),
+      overlap_hints: computeOverlapHints(samples, skills),
+      in_meta_cluster: false,
+    };
+  };
+
   const clusters: any[] = [];
   const projectFwSeen = new Set<string>();
   for (const v of perCwd.values()) {
     if (v.count < PROMPT_CLUSTER_MIN) continue;
-    const skills = getSkillsForCwd(v.cwd);
-    const overlap_hints = computeOverlapHints(v.samples, skills);
-    const language = detectLanguage(v.samples[0] ?? "");
-    clusters.push({
-      first_words: v.first_words,
-      count: v.count,
-      cwds: [v.cwd],
-      scope: "project",
-      scope_target: join(v.cwd, ".claude", "skills"),
-      samples: v.samples,
-      language,
-      overlap_hints,
-      in_meta_cluster: false,
-    });
+    clusters.push(
+      makeCluster(v.first_words, v.count, [v.cwd], "project", join(v.cwd, ".claude", "skills"), v.samples),
+    );
     projectFwSeen.add(v.first_words);
   }
   for (const v of overall.values()) {
     if (v.count < PROMPT_CLUSTER_MIN) continue;
     if (v.cwds.size < 2) continue;
     if (projectFwSeen.has(v.first_words)) continue;
-    const firstCwd = [...v.cwds][0];
-    const skills = getSkillsForCwd(firstCwd);
-    const overlap_hints = computeOverlapHints(v.samples, skills);
-    const language = detectLanguage(v.samples[0] ?? "");
-    clusters.push({
-      first_words: v.first_words,
-      count: v.count,
-      cwds: [...v.cwds],
-      scope: "user",
-      scope_target: join(HOME, ".claude", "skills"),
-      samples: v.samples,
-      language,
-      overlap_hints,
-      in_meta_cluster: false,
-    });
+    clusters.push(
+      makeCluster(v.first_words, v.count, [...v.cwds], "user", join(HOME, ".claude", "skills"), v.samples),
+    );
   }
   clusters.sort((a, b) => b.count - a.count);
   return clusters;
@@ -752,40 +670,54 @@ function listAvailableAgents(): Set<string> {
 
 const skills = getSkillsForCwd(process.cwd());
 const scanResult = scan();
-const oldestIso = scanResult.oldest_session_ms ? new Date(scanResult.oldest_session_ms).toISOString() : null;
-const dataSufficient =
-  scanResult.oldest_session_ms !== null &&
-  NOW - scanResult.oldest_session_ms >= DEAD_SKILL_DAYS * 24 * 3600 * 1000;
 
-const promptClusters = buildPromptClusters(scanResult.prompts);
-const metaClusters = buildMetaClusters(promptClusters);
+// Aggregation trusts fields copied verbatim out of transcript JSON (e.g.
+// cwd); a future field slip should be diagnosable, not a bare Bun stack
+// dump with no output at all.
+try {
+  const oldestIso = scanResult.oldest_session_ms ? new Date(scanResult.oldest_session_ms).toISOString() : null;
+  // Sufficiency is measured against the full sessions table, not the
+  // CUTOFF_MS-filtered window: every session that survives the WINDOW_DAYS
+  // filter is already newer than the cutoff, so oldest_session_ms alone could
+  // never reach the DEAD_SKILL_DAYS threshold no matter how much history
+  // accumulates.
+  const oldestOverallMs = scanResult.db_unavailable ? null : oldestSessionMs(LOGS_DB_PATH);
+  const dataSufficient =
+    oldestOverallMs !== null && NOW - oldestOverallMs >= DEAD_SKILL_DAYS * 24 * 3600 * 1000;
 
-const out = {
-  generated_at: new Date(NOW).toISOString(),
-  meta: {
-    source: "claude-logs",
-    data_window_days: WINDOW_DAYS,
-    sessions_scanned: scanResult.sessions_scanned,
-    oldest_session: oldestIso,
-    data_sufficient: dataSufficient,
-    skills_found: skills.length,
-    total_skill_invocations_in_window: scanResult.invocations.length,
-    errors: scanResult.errors,
-  },
-  available_skills: skills.map((s) => ({
-    name: s.frontmatter.name ?? s.name,
-    path: s.path,
-    scope: s.scope,
-    description: s.frontmatter.description ?? "",
-    body_first_500_chars: s.body_first_500_chars,
-  })),
-  dead_skills: buildDeadSkills(skills, scanResult, dataSufficient),
-  meta_clusters: metaClusters,
-  prompt_clusters: promptClusters,
-  slash_command_frequency: buildSlashFrequency(scanResult.prompts),
-  skill_review_hints: buildSkillReviewHints(skills, listAvailableAgents()),
-};
+  const promptClusters = buildPromptClusters(scanResult.prompts);
+  const metaClusters = buildMetaClusters(promptClusters);
 
-for (const err of scanResult.errors) console.error(`[skills.ts] ${err}`);
-console.log(JSON.stringify(out, null, 2));
-if (scanResult.db_unavailable) process.exit(2);
+  const out = {
+    generated_at: new Date(NOW).toISOString(),
+    meta: {
+      source: "claude-logs",
+      data_window_days: WINDOW_DAYS,
+      sessions_scanned: scanResult.sessions_scanned,
+      oldest_session: oldestIso,
+      data_sufficient: dataSufficient,
+      skills_found: skills.length,
+      total_skill_invocations_in_window: scanResult.invocations.length,
+      errors: scanResult.errors,
+    },
+    available_skills: skills.map((s) => ({
+      name: s.frontmatter.name ?? s.name,
+      path: s.path,
+      scope: s.scope,
+      description: s.frontmatter.description ?? "",
+      body_first_500_chars: s.body_first_500_chars,
+    })),
+    dead_skills: buildDeadSkills(skills, scanResult, dataSufficient),
+    meta_clusters: metaClusters,
+    prompt_clusters: promptClusters,
+    slash_command_frequency: buildSlashFrequency(scanResult.prompts),
+    skill_review_hints: buildSkillReviewHints(skills, listAvailableAgents()),
+  };
+
+  for (const err of scanResult.errors) console.error(`[skills.ts] ${err}`);
+  console.log(JSON.stringify(out, null, 2));
+  if (scanResult.db_unavailable) process.exit(2);
+} catch (e) {
+  console.error(`[skills.ts] aggregation failed: ${e instanceof Error ? e.message : e}`);
+  process.exit(1);
+}
