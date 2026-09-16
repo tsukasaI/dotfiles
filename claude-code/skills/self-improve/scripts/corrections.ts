@@ -245,13 +245,20 @@ function scan(): ScanResult {
         continue;
       }
 
-      const extract = extractSession(trow.transcript_jsonl, row.project_dir);
-      result.pairs.push(...extract.pairs);
-      result.sessions_scanned++;
-      if (extract.sessionStartMs !== null) {
-        if (result.oldest_session_ms === null || extract.sessionStartMs < result.oldest_session_ms) {
-          result.oldest_session_ms = extract.sessionStartMs;
+      // Contained per-session: a malformed transcript entry (e.g. a
+      // truncated/spliced record) must not abort every session queued
+      // behind it in sessionRows.
+      try {
+        const extract = extractSession(trow.transcript_jsonl, row.project_dir);
+        result.pairs.push(...extract.pairs);
+        result.sessions_scanned++;
+        if (extract.sessionStartMs !== null) {
+          if (result.oldest_session_ms === null || extract.sessionStartMs < result.oldest_session_ms) {
+            result.oldest_session_ms = extract.sessionStartMs;
+          }
         }
+      } catch (e) {
+        result.errors.push(`session ${row.session_id} skipped: ${e instanceof Error ? e.message : e}`);
       }
     }
     if (missingTranscripts > 0) {
