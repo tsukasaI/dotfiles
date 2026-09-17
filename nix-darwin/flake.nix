@@ -149,6 +149,7 @@
           { name = "libsql/sqld"; trusted = true; }  # sqld (turso CLI dependency)
           { name = "ariga/tap"; trusted = true; }  # atlas (DB schema migration tool)
           { name = "charmbracelet/tap"; trusted = true; }  # freeze (code screenshot tool)
+          { name = "abue-ammar/tinycast"; trusted = true; }  # tinycast (Raycast alternative, trial)
         ];
 
         # Nixに移行しないformulae
@@ -171,6 +172,7 @@
           "session-manager-plugin"
           "font-plemol-jp-nf"
           "font-blex-mono-nerd-font"
+          "abue-ammar/tinycast/tinycast"  # Raycast alternative, trial; self-signed/non-notarized
         ];
       };
 
