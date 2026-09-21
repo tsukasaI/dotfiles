@@ -8,7 +8,7 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 
 | Script | Matcher | Description |
 |---|---|---|
-| (inline) `shguard` | `Bash` | Deny dangerous shell commands per `claude-code/shguard/config.toml`, with `SHGUARD_STRICT_CONFIG=1` so a missing/malformed config denies instead of asking; see `docs/shguard-migration-deltas.md` |
+| (inline) `shguard` | `Bash` | Deny dangerous shell commands per `claude-code/shguard/config.toml`. `SHGUARD_STRICT_CONFIG=1` (set in `settings.json`'s top-level `env`) makes a missing/malformed config deny instead of ask; see `docs/shguard-migration-deltas.md` |
 | `block-config-edit.sh` | `Edit\|Write` | Block edits to linter/formatter config files |
 | `slop-guard.ts` | `Edit\|Write` | Deny prose edits (`.md`/`.mdx`/`.txt`) that newly introduce an em dash or a cliché phrase from `slop-phrases.conf`; only the net-new count vs. the pre-edit text is checked, never the whole file. `SLOP_GUARD_DISABLE=1` disables it. |
 
@@ -23,20 +23,20 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 
 | Script | Matcher | Description |
 |---|---|---|
-| `warn-uncommitted.sh` | `""` | Remind the agent to commit before ending the turn — scoped to files THIS session edited (per its `mark-session-edit.sh` manifest), not the whole working tree, so a concurrent session sharing the repo can't trigger a spurious reminder |
-| `slop-guard.ts` | `""` | Block the turn once if the last assistant reply mixes an unexpected Hangul/Cyrillic run into otherwise Japanese-context text (script-mixing decoding artifact). `SLOP_GUARD_DISABLE=1` disables it. |
+| `warn-uncommitted.sh` | `""` (timeout 10s) | Remind the agent to commit before ending the turn — scoped to files THIS session edited (per its `mark-session-edit.sh` manifest), not the whole working tree, so a concurrent session sharing the repo can't trigger a spurious reminder |
+| `slop-guard.ts` | `""` (timeout 10s) | Block the turn once if the last assistant reply mixes an unexpected Hangul/Cyrillic run into otherwise Japanese-context text (script-mixing decoding artifact). `SLOP_GUARD_DISABLE=1` disables it. |
 
 ### SessionEnd
 
 | Script | Matcher | Description |
 |---|---|---|
-| `save-transcript.ts` | `*` | Save session transcript to SQLite (async) |
+| `save-transcript.ts` | `""` | Save session transcript to SQLite (async) |
 
 ### SessionStart
 
 | Script | Matcher | Description |
 |---|---|---|
-| `~/.claude/hooks/herdr-agent-state.sh` | `*` | Reports agent session state to `herdr`. **Not part of this repo** — self-installed by the `herdr` flake package outside `setup.sh`'s symlinks; see root `README.md` Prerequisites/Troubleshooting. |
+| `~/.claude/hooks/herdr-agent-state.sh session` | `*` (timeout 10s) | Reports agent session state to `herdr`. **Not part of this repo** — self-installed by the `herdr` flake package outside `setup.sh`'s symlinks; see root `README.md` Prerequisites/Troubleshooting. |
 
 ## Session Edit Manifests
 

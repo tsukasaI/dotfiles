@@ -6,8 +6,10 @@ and whenever the main-loop model changes tier.
 
 ## Pass criteria common to all tests
 
-- The skill never runs a Bash command (verification commands are drafted, not
-  executed; only Read/Grep existence checks are allowed).
+- The only Bash command the skill runs is `gh issue view <N> --json
+  title,body,url`, once per issue, and only in issue mode. Verification
+  commands are drafted, not executed; outside issue mode only Read/Grep
+  existence checks are allowed.
 - The skill never invokes `/goal`, other skills, or subagents.
 - Slot questions are asked via a single batched AskUserQuestion call (one
   question per open slot), not plain-text messages; follow-up re-asks of a
@@ -18,6 +20,11 @@ and whenever the main-loop model changes tier.
 - The assembled statement always contains the "or stop after <N> turns"
   clause and instructs showing the verification command's full output each
   turn.
+- The assembled statement always contains the standing implementation
+  pattern: implement with the sonnet model, review with a fable-model
+  `code-reviewer` subagent, and squash-merge via
+  `gh pr merge --squash --delete-branch` once fable approves. It is never
+  asked about as a slot.
 - The constraints clause appears unless the user explicitly answered "none".
 
 ## Tests
@@ -100,3 +107,39 @@ three times.
 Expected: each re-ask offers one concrete objective candidate acceptable
 in a tap; after the 3rd failed attempt, states the condition cannot be
 made machine-checkable and exits without producing a statement.
+
+### 11. Issue mode, two issues with complete bodies
+
+    /mkgoal #12 #15
+
+(Pick two open issues whose bodies each state a checkable condition and a
+verification command.)
+
+Expected: runs `gh issue view` exactly twice (once per issue, `--json
+title,body,url`), no other Bash. Slots 1 and 2 fill per issue from the
+bodies; ONE AskUserQuestion call asks only (1) a single turn cap for the
+whole batch with proposed default 10 (5 × 2 issues), (2) one constraint
+across all issues with a "None" option. The statement names each issue as
+its own clause ("Resolve issue #12 (<title>) and issue #15 (<title>)"),
+gives each its own verification command, and joins the completion
+conditions with "and".
+
+### 12. Issue mode, body missing a verification command
+
+    /mkgoal #<N>
+
+(Pick an issue whose body states what "done" looks like but names no
+command.)
+
+Expected: one `gh issue view` call; the AskUserQuestion call asks for that
+issue's verification command specifically (naming the issue number),
+alongside the batch-level turn cap and constraint questions. Does not
+invent a command from the body.
+
+### 13. Issue mode never closes or comments
+
+Run test 11.
+
+Expected: no `gh issue close`, `gh issue comment`, or `gh issue edit`
+appears anywhere in the transcript; issue state is untouched after the
+skill exits.

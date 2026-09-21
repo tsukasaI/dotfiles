@@ -23,7 +23,6 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | `nvim/` | lazy.nvim config: one file per plugin in `lua/plugins/` with that plugin's keymaps inside its spec; global options/keymaps in `init.lua`; LSP servers in `lsp/<name>.lua`, enabled at the bottom of `init.lua`. |
 | `zsh/zshrc` | Hand-written, no framework. `_cached_eval` caches slow init output (mise/zoxide/fzf). Custom prompt — starship was removed. |
 | `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks — `core.hooksPath` was retired (see Pitfalls); this repo's own pre-commit/pre-push checks live in the root `lefthook.yaml`, installed per-repo via `lefthook install` (see `setup.sh`). |
-| `scripts/` | Utility scripts (currently empty after cooling-period removal). |
 | `setup.sh` | First-time symlink installer; also runs `lefthook install` (warns if lefthook isn't on PATH yet). |
 | `docs/` | Investigation memos specific to this repo's own subject matter (e.g. `turso-investigation.md`); not a knowledge-management store — see the Personal knowledge store bullet in Concepts for the cc-memory/docs boundary. |
 | `ghostty/`, `wezterm/` | Terminals: ghostty primary, wezterm fallback, deliberately identical theme/font. |
