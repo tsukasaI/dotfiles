@@ -1,6 +1,7 @@
 # Workflow
 - Commit messages must be in English, regardless of conversation language.
 - Use plain `git add` / `git commit` / `git status` inside the current project — the cwd is already the repo. Reserve `-C <path>` for a genuinely different repository.
+- `git` and `gh` run outside the Bash sandbox (`sandbox.excludedCommands` in `settings.json`): inside it, SSH remotes can't resolve `github.com`, GPG signing can't reach keyboxd, and `gh` can't read the keychain. Run them as a standalone command, not chained after `cd`/`&&`, because every command in a chain must match the exclusion or the whole line runs sandboxed. If `gh auth status` inside the sandbox reports an invalid keyring token, that is the sandbox, not a broken login; never run `gh auth refresh` for it.
 - "commitして" with no scope = commit ONLY files changed in this session. If the working tree has unrelated changes mixed in, list them and confirm instead of guessing.
 - Commit after each completed subtask; never start the next subtask while pre-commit fails — fix the check first. Bypass flags (`--no-verify`, `git push --force`) are hook-blocked; use `--force-with-lease` when force is genuinely needed.
 - Git workflow by repo: `dotfiles` and `ops` → commit directly to main and push once a subtask is complete, no explicit "commit" instruction needed. Every other repo → NEVER commit to main: create a branch (`<type>/<short-slug>`), open a PR. Merge via `gh pr merge --squash --delete-branch` once the `code-reviewer` (fable) review approves; if no review ran, or it did not approve, stop and wait for me to say so.
@@ -49,7 +50,7 @@
   |---|---|---|
   | Main loop (default sessions) | Whatever `settings.json` pins | `settings.json` — not this file |
   | Main loop (implementation sessions) | `sonnet` | `claude --model sonnet` at launch |
-  | Subagents (Explore, code-explorer, web-researcher, Agent/Workflow `agent()`) | Cheapest model that can do the subtask; default `sonnet` | `model:` argument at call time |
+  | Subagents (Explore, web-researcher, Agent/Workflow `agent()`) | Cheapest model that can do the subtask; default `sonnet` | `model:` argument at call time |
   | Review (code-reviewer) | `fable` | `agents/code-reviewer.md` frontmatter |
   | Advisor | `fable` | `settings.json` `advisorModel` |
 
@@ -61,7 +62,7 @@
 - When you invoke the `code-review` skill on your own initiative (not me typing `/code-review <level>` myself) and I haven't named a level, default to `high`.
 
 # Advisor usage
-- Use `/advisor` before committing to an approach for: non-trivial algorithm design, debugging that has stalled for two attempts, architectural trade-offs with no clear winner, and security-sensitive logic (auth, crypto, input validation).
+- Consult the advisor tool before committing to an approach for: non-trivial algorithm design, debugging that has stalled for two attempts, architectural trade-offs with no clear winner, and security-sensitive logic (auth, crypto, input validation).
 - Do not use the advisor for: straightforward implementation, formatting, refactoring with a clear target, or knowledge/research tasks (those are your strength).
 
 # Tone
