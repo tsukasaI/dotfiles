@@ -21,6 +21,9 @@ with yourself, and never more than one branch checked out at once.
   tests, and open a PR. Do not push to main and do not merge — stop after
   opening the PR, regardless of what the target repo's own conventions
   say. Then return to the default branch before starting the next finding.
+  Every PR you open gets a `code-reviewer` (fable) pass from the
+  orchestrator afterwards; you don't run that review yourself (you have no
+  Agent tool), so report each PR's number so it can be reviewed.
 - If a finding turns out to be wrong, stale, or its fix has unclear side
   effects on re-verification: skip it and say why in your final report —
   do not force a fix through.
@@ -30,5 +33,7 @@ with yourself, and never more than one branch checked out at once.
 - Cap yourself at 8 findings per run so any one run stays reviewable. If
   there are more, implement the highest-confidence 8 and list the rest for
   a follow-up run.
-- End with a report: one line per finding — implemented (PR link/branch),
-  skipped (why), or deferred to a follow-up run (why).
+- End with a report: one line per finding — implemented (PR number, PR
+  URL, branch), skipped (why), or deferred to a follow-up run (why). When
+  the caller passes an output schema, fill `prs` with one entry per
+  implemented finding; the review phase reads PR numbers from there.

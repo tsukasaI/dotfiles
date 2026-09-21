@@ -22,6 +22,10 @@ cannot — they never write anything:
    its own branch + PR per fix, never pushing to main or merging. Because
    it's a single agent working through the list serially, there's no
    concurrent-write conflict to isolate against.
+3. **Review** (fable, parallel, read-only): every PR the implementer opened
+   gets a `code-reviewer` pass. The implementer has no Agent tool, so the
+   workflow runs the reviews, not the implementer. PRs are independent
+   branches, so reviewing them in parallel is safe.
 
 Launch argument: $ARGUMENTS
 
@@ -52,9 +56,10 @@ Launch argument: $ARGUMENTS
      anything.
 3. State the plan before running: which routines investigate, that
    `maintenance-implementer` will act on whatever they find (each fix on
-   its own branch + PR, never pushed to main or merged), and that it caps
-   itself at 8 findings per run. The skill invocation itself is the
-   go-ahead — this is a status line, not a second confirmation prompt.
+   its own branch + PR, never pushed to main or merged), that it caps
+   itself at 8 findings per run, and that each PR then gets a fable
+   `code-reviewer` pass. The skill invocation itself is the go-ahead —
+   this is a status line, not a second confirmation prompt.
 
 ## Run
 
@@ -65,8 +70,51 @@ Call the Workflow tool with this script, passing the routine list from step
 ```js
 export const meta = {
   name: 'maintain-sweep',
-  description: 'Investigate with the maintenance agents in parallel (opus, read-only), then implement confirmed fixes sequentially (sonnet)',
-  phases: [{ title: 'Investigate' }, { title: 'Implement' }],
+  description: 'Investigate with the maintenance agents in parallel (opus, read-only), implement confirmed fixes sequentially (sonnet), then review every PR (fable)',
+  phases: [{ title: 'Investigate' }, { title: 'Implement' }, { title: 'Review' }],
+}
+
+const IMPLEMENT_SCHEMA = {
+  type: 'object',
+  properties: {
+    report: { type: 'string' },
+    prs: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          number: { type: 'number' },
+          url: { type: 'string' },
+          branch: { type: 'string' },
+          finding: { type: 'string' },
+        },
+        required: ['number', 'url', 'branch', 'finding'],
+      },
+    },
+  },
+  required: ['report', 'prs'],
+}
+
+const REVIEW_SCHEMA = {
+  type: 'object',
+  properties: {
+    approved: { type: 'boolean' },
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          severity: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
+          title: { type: 'string' },
+          file: { type: 'string' },
+          line: { type: 'number' },
+          summary: { type: 'string' },
+        },
+        required: ['severity', 'title', 'summary'],
+      },
+    },
+  },
+  required: ['approved', 'findings'],
 }
 
 const FINDING_SCHEMA = {
@@ -107,7 +155,7 @@ const allFindings = reports.flatMap(r =>
 log(`${allFindings.length} findings across ${args.length} routines`)
 
 if (!allFindings.length) {
-  return { reports, implemented: null }
+  return { reports, implemented: null, reviews: [] }
 }
 
 phase('Implement')
@@ -115,10 +163,22 @@ const implemented = await agent(
   "Here are this repository's maintenance findings from the investigation " +
   'pass, as JSON: ' + JSON.stringify(allFindings) +
   '. Verify and implement the ones that hold up, one at a time.',
-  { agentType: 'maintenance-implementer', label: 'implement' }
+  { agentType: 'maintenance-implementer', label: 'implement', schema: IMPLEMENT_SCHEMA }
 )
 
-return { reports, implemented }
+phase('Review')
+const reviews = await parallel((implemented.prs || []).map(pr => () =>
+  agent(
+    `Review pull request #${pr.number} (${pr.url}) in this repository. ` +
+    'Read the PR diff with `gh pr diff` and review it for correctness, ' +
+    'security, and quality. `approved` is true only when there is no ' +
+    'critical or high finding.',
+    { agentType: 'code-reviewer', label: `review:#${pr.number}`, schema: REVIEW_SCHEMA }
+  ).then(r => ({ ...pr, ...r }))
+   .catch(e => ({ ...pr, approved: false, findings: [], error: String(e) }))
+))
+
+return { reports, implemented, reviews }
 ```
 
 ## Report
@@ -129,6 +189,14 @@ Present:
   already lists implemented / skipped / deferred per finding with reasons
   and PR links) — do not re-summarize away a PR link, branch name, or
   skip reason.
+- One row per PR from the review phase: PR number, `approved`, and every
+  critical/high finding by title and file:line. A review that errored is
+  not approved; say so and name the PR rather than treating silence as a
+  pass.
+- What happens next follows the global CLAUDE.md fable gate: an approved
+  PR is mergeable (medium/low findings become GitHub issues); a PR with a
+  critical/high finding needs fixups and a re-review before merging. This
+  skill only reports the verdicts; it never merges.
 - If a routine returned zero findings, say so briefly; don't pad the
   report with "nothing found" detail per routine.
 
