@@ -48,8 +48,7 @@
 
   | Role | Model | Set in |
   |---|---|---|
-  | Main loop (default sessions) | Whatever `settings.json` pins | `settings.json` — not this file |
-  | Main loop (implementation sessions) | `sonnet` | `claude --model sonnet` at launch |
+  | Main loop | `sonnet` | `settings.json` `model` — not this file; `claude --model <x>` overrides for one session |
   | Subagents (Explore, web-researcher, Agent/Workflow `agent()`) | Cheapest model that can do the subtask; default `sonnet` | `model:` argument at call time |
   | Review (code-reviewer) | `fable` | `agents/code-reviewer.md` frontmatter |
   | Advisor | `fable` | `settings.json` `advisorModel` |
@@ -58,7 +57,7 @@
   - Example (escalate): "design a cache-invalidation strategy for this service" — no precedent, real trade-offs.
   - NG (stay at default): "write a table-driven test for this function" — a pattern to imitate exists.
 - Fable review gate: applies only to branch+PR repos (not `dotfiles`/`ops`, which never get a `code-reviewer` pass). For non-trivial implementation (multiple files/subsystems, a security boundary, or an architectural decision, same bar as plan mode), run the `code-reviewer` subagent once, automatically, right after `gh pr create` opens the PR to review the PR diff. Approved means no critical/high finding in that round: merge per the branch+PR rule above, filing a GitHub issue for any remaining medium/low findings instead of re-reviewing over them. A critical/high finding means it isn't approved yet: incorporate the fix (push fixups) and re-review per the next bullet. NOT for mechanical changes such as config edits, dependency/SHA bumps, docs, or formatting; those never warrant a fable pass.
-- Fable re-review: when fixups are pushed after a fable review found a critical/high finding, do not spawn a new `code-reviewer` Agent for the same PR; resume the original one via `SendMessage` to the agent id captured from its first `Agent` tool call, and ask only about the incremental diff (e.g. "does commit <sha> resolve findings A/B/C? flag anything new"). This keeps the original diff and its prior findings in context instead of re-reading the whole PR from scratch, and reuses the prompt cache. One caveat: a resumed instance is checking its own prior work, so treat its "resolved" verdict as less independent than a first pass; if a fixup touches code well outside the original findings, judge whether that new surface warrants a fresh `code-reviewer` Agent instead.
+- Fable re-review: when fixups are pushed after a fable review found a critical/high finding, do not spawn a new `code-reviewer` Agent for the same PR; resume the original one via `SendMessage` to the agent id captured from its first `Agent` tool call, and ask only about the incremental diff (e.g. "does commit <sha> resolve findings A/B/C? flag anything new"). This keeps the original diff and its prior findings in context instead of re-reading the whole PR from scratch, and reuses the prompt cache. One caveat: a resumed instance is checking its own prior work, so treat its "resolved" verdict as less independent than a first pass; if a fixup touches code well outside the original findings, judge whether that new surface warrants a fresh `code-reviewer` Agent instead. A reviewer that ran inside a Workflow script (e.g. `/maintain-sweep`'s review phase) has no addressable agent id, so its PRs always get a fresh `code-reviewer` Agent on re-review.
 - When you invoke the `code-review` skill on your own initiative (not me typing `/code-review <level>` myself) and I haven't named a level, default to `high`.
 
 # Advisor usage

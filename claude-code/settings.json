@@ -3,7 +3,6 @@
   "cleanupPeriodDays": 14,
   "env": {
     "EDITOR": "nvim",
-    "ENABLE_TOOL_SEARCH": "1",
     "SHGUARD_STRICT_CONFIG": "1"
   },
   "attribution": {

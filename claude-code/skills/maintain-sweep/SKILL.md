@@ -197,7 +197,9 @@ Present:
 - What happens next follows the global CLAUDE.md fable gate: an approved
   PR is mergeable (medium/low findings become GitHub issues); a PR with a
   critical/high finding needs fixups and a re-review before merging. This
-  skill only reports the verdicts; it never merges.
+  skill only reports the verdicts; it never merges. The re-review is a
+  fresh `code-reviewer` Agent, not a `SendMessage` resume: reviewers
+  spawned inside the Workflow script have no agent id to resume.
 - If a routine returned zero findings, say so briefly; don't pad the
   report with "nothing found" detail per routine.
 
