@@ -1,16 +1,17 @@
 ---
 name: maintain-sweep
-description: Runs the maintenance investigation agents (crash-fuzzer, dup-unifier, dead-code-removal, etc.) against the current repository in parallel — read-only, opus — then feeds their findings to a single sequential implementer agent (sonnet) that verifies and applies the confirmed fixes. Use when the user wants to run a maintenance sweep, "メンテナンスルーチンを回して", or asks to run several/all of the maintenance agents at once. Not for running one investigation agent by name with no implementation step — invoke that agent directly instead.
+description: Runs the maintenance investigation agents (crash-fuzzer, dup-unifier, dead-code-removal, etc.) against the current repository in parallel — read-only, opus — feeds their findings to a single sequential implementer agent (sonnet) that verifies and applies the confirmed fixes, then has a fable code-reviewer review every PR it opened. Use when the user wants to run a maintenance sweep, "メンテナンスルーチンを回して", or asks to run several/all of the maintenance agents at once. Not for running one investigation agent by name with no implementation step — invoke that agent directly instead.
 disable-model-invocation: true
 argument-hint: [routine ...] (optional — omit to run all 11 investigation agents)
 allowed-tools: Bash, Workflow
 ---
 
-# /maintain-sweep — investigate in parallel, implement sequentially
+# /maintain-sweep — investigate in parallel, implement sequentially, review in parallel
 
-Two-phase design, chosen because 11 agents editing the same working tree in
-parallel would conflict, while 11 agents *investigating* it in parallel
-cannot — they never write anything:
+Three-phase design. Phases 1 and 2 are split because 11 agents editing the
+same working tree in parallel would conflict, while 11 agents
+*investigating* it in parallel cannot — they never write anything. Phase 3
+exists because every PR falls under the global fable review gate:
 
 1. **Investigate** (opus, parallel, read-only): each selected routine agent
    inspects the repo and returns structured findings — it never edits a
