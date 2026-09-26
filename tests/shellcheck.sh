@@ -6,9 +6,5 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-shellcheck -x --severity=warning \
-  setup.sh \
-  claude-code/hooks/*.sh \
-  claude-code/scripts/*.sh \
-  tests/shguard-parity-check.sh \
-  tests/rules-paths-sync.sh
+# Every tracked *.sh, so a new script can't be silently left out of the list.
+git ls-files -z '*.sh' | xargs -0 shellcheck -x --severity=warning

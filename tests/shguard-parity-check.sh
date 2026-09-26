@@ -15,9 +15,9 @@
 # shguard binary resolution: $SHGUARD_BIN if set, else `shguard` on PATH.
 # shguard config resolution: $SHGUARD_CONFIG if set, else this repo's own
 # claude-code/shguard/config.toml — deliberately NOT shguard's own default
-# (~/.config/shguard/config.toml), since the deployed symlink lives at
-# ~/.claude/shguard/config.toml (see setup.sh) and this test must also pass
-# in CI, which has neither symlink.
+# (~/.config/shguard/config.toml, the symlink setup.sh creates and the live
+# hook reads), since this test must also pass in CI, which has no symlink.
+# SHGUARD_STRICT_CONFIG=1 matches the env settings.json gives the live hook.
 #
 # Exit: 0 if every case matches its expected decision, 1 otherwise.
 
@@ -26,6 +26,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 SHGUARD_BIN="${SHGUARD_BIN:-shguard}"
 export SHGUARD_CONFIG="${SHGUARD_CONFIG:-$(pwd)/claude-code/shguard/config.toml}"
+export SHGUARD_STRICT_CONFIG=1
 
 command -v "$SHGUARD_BIN" >/dev/null 2>&1 || {
   echo "shguard binary not found (SHGUARD_BIN=$SHGUARD_BIN) — set SHGUARD_BIN or put shguard on PATH" >&2
@@ -191,8 +192,9 @@ case_ "multi-line bash (issue #44)"      "$(printf 'echo setup\nbash script.sh')
 # claude-code/settings.json's PreToolUse/Bash hook sets SHGUARD_STRICT_CONFIG=1
 # so a missing/malformed config denies instead of asking (shguard#440/#441).
 # PATH-miss/crash (the other half of #440) can't be exercised through the
-# shguard binary itself — that's covered by the inline wrapper logic in
-# settings.json, not by this script.
+# shguard binary itself, and settings.json runs bare `shguard` with no
+# wrapper, so that path is currently uncovered (see
+# docs/shguard-migration-deltas.md #26).
 total=$((total + 1))
 bad_config=$(mktemp "${TMPDIR:-/tmp}/shguard-parity.XXXXXX") || {
   echo "FAIL could not create temp config for SHGUARD_STRICT_CONFIG case" >&2
