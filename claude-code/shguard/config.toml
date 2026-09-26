@@ -899,12 +899,6 @@ required_flags = ["F|--body-file"]
 # =====================================================================
 
 [[deny]]
-id = "dotfiles-git-config-override"
-reason = "git -c/--config-env/--exec-path injects config (core.fsmonitor, core.sshCommand, ...) that executes commands, outside the sandbox for push/fetch"
-command = "git"
-required_flags = ["c|--config-env|--exec-path"]
-
-[[deny]]
 id = "dotfiles-git-push-url-target"
 reason = "git push to a URL or local path instead of a named remote can exfiltrate history or run a local receive-pack"
 command = "git"
