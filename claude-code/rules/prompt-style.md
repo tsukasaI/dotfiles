@@ -9,11 +9,9 @@ paths:
 # Prompt style
 
 Loaded when editing a prompt file itself (rule/skill/agent/CLAUDE.md), not on
-every session — this file is about writing these files, not about code. Based
-on a review of all `claude-code/` prompt files against Sonnet 5 / Opus 4.6 /
-Fable 5.1 (2026-08-07): most files already pass; the failures found were a
-broken tool reference, a stale worked example, a cross-file contradiction, and
-one unscoped cluster of unreasoned prohibitions — not verbosity in general.
+every session; this file is about writing these files, not about code. The
+usual defects are broken tool references, stale worked examples, cross-file
+contradictions, and unscoped clusters of unreasoned prohibitions, not length.
 
 ## Keep
 - A prohibition that carries a stated reason tied to a real, reproducible
@@ -33,13 +31,18 @@ one unscoped cluster of unreasoned prohibitions — not verbosity in general.
   worked examples and named tools still exist before trusting them.
 
 ## Model-specific
-- **Opus 4.6**: emphasis only on the one instruction that's actually
-  under-triggering. Marking everything critical erases the signal.
+- **Opus 5.5**: thinking is always on and effort is the depth control; lower
+  `effort:` before adding "be brief" or "think less" prose. Emphasis only on
+  the one instruction that's actually under-triggering; marking everything
+  critical erases the signal. Re-test rules written for older Opus verbosity
+  or over-verification before keeping them.
 - **Sonnet 5**: state scope explicitly — it won't generalize a rule from one
   case to another on its own. A worked example gets followed literally,
   including a wrong one, so keep examples correct and current.
 - **Fable 5.1**: state the goal and constraints, not the steps, unless the
-  operation is fragile enough to need an exact script.
+  operation is fragile enough to need an exact script. State the autonomy
+  boundary and the scope explicitly: it tends to ask permission it doesn't
+  need and to widen scope and test coverage on its own.
 
 ## Test
 Would deleting this line lose a reason, a script for something fragile, or a

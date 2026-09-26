@@ -16,7 +16,7 @@ when the launch argument is in issue mode (see below); never any other
 command, and never `gh issue close`/`comment`/`edit` (that is `/triage`'s job,
 not this skill's).
 
-Root quality: **checkable** — the evaluator model (Haiku) can answer yes/no from
+Root quality: **checkable** — the evaluator model (Haiku by default) can answer yes/no from
 transcript text alone, with zero judgment.
 
 Launch argument: $ARGUMENTS
