@@ -9,10 +9,15 @@ Personal dotfiles for macOS (Apple Silicon) managed with nix-darwin.
 ├── nix-darwin/    # System configuration (packages, Homebrew, macOS defaults)
 ├── nvim/          # Neovim with lazy.nvim
 ├── zsh/           # Shell config and aliases
-├── ghostty/       # Terminal emulator
-├── mise/          # Task runner config
+├── ghostty/       # Terminal emulator (primary)
+├── wezterm/       # Terminal emulator (fallback)
+├── karabiner/     # Keyboard remapping
+├── ssh/           # SSH client config
+├── mise/          # Near-empty on purpose; toolchains come from Nix
 ├── git/           # Git configuration
-└── claude-code/   # Claude Code permissions and hooks
+├── claude-code/   # Global Claude Code config (settings, hooks, skills, agents, rules)
+├── docs/          # Investigation memos for this repo
+└── tests/         # shellcheck / shguard parity / rules sync checks (CI + lefthook)
 ```
 
 ## Prerequisites
@@ -36,7 +41,10 @@ git clone https://github.com/tsukasaI/dotfiles.git ~/dotfiles
 sh setup.sh
 
 # Apply nix-darwin configuration
-darwin-rebuild switch --flake ~/dotfiles/nix-darwin
+# First run (darwin-rebuild not on PATH yet):
+sudo nix run nix-darwin/master#darwin-rebuild -- switch --flake ~/dotfiles/nix-darwin
+# Afterwards:
+sudo darwin-rebuild switch --flake ~/dotfiles/nix-darwin
 ```
 
 ## nix-darwin
@@ -70,7 +78,6 @@ Zsh with modern CLI aliases:
 ## Editor
 
 - **Neovim**: lazy.nvim plugin manager, fzf-lua, transparent background
-- **VS Code**: Solarized Dark, Biome formatter
 
 ## Terminal
 
@@ -120,11 +127,7 @@ a change as done.
 ### Read tool restrictions
 
 `settings.json` `permissions.deny` still covers the `Read` tool (the hook is Bash-only):
-
-```json
-"Read(**/*secret*)", "Read(**/*credential*)",
-"Read(.env*)", "Read(id_rsa)", "Read(id_ed25519)"
-```
+see the `Read(...)` entries there (secrets, credentials, `.env*`, private keys, build output).
 
 ### Session habits
 

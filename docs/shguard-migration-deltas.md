@@ -10,7 +10,7 @@ was found not to reproduce `block-dangerous.sh` exactly, per
 silent" requirement, and of how each was resolved or accepted. Written
 during the migration plan at
 `.claude/plans/https-github-com-tsukasai-shguard-hook-b-stateless-sloth.md`
-(step 4); the numbered gaps below are historical now, not a pending
+(step 4; local-only, `.claude/plans/` is gitignored); the numbered gaps below are historical now, not a pending
 decision, but keep updating this file if a new gap in shguard's behavior
 is found later.
 
@@ -591,8 +591,8 @@ limitation, not expressible from the config side.
 
 Found while writing the shguard-based replacement for
 `tests/hooks-regression.sh` (the full-cutover work), independent of
-every other gap catalogued in this doc so far. This repo's own
-`CLAUDE.md` mandates a heredoc-style `-m` for every commit
+every other gap catalogued in this doc so far. Commits in this repo
+habitually use a heredoc-style `-m` (no CLAUDE.md rule requires it)
 (`git commit -m "$(cat <<'EOF' ... EOF)"`, so multi-line messages
 survive quoting safely) — a pattern used on effectively every commit
 made in this repo.
