@@ -20,9 +20,9 @@ jobs:
     # module evaluation while still building nothing.
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: cachix/install-nix-action@a49548c11d9846ad46ecc0115273879b045f001c # v31.10.7
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       - name: evaluate darwin system (no build)
         run: nix eval --raw ./nix-darwin#darwinConfigurations.Ino-macbook-air.system.drvPath
