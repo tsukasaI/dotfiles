@@ -13,4 +13,5 @@ karabiner/automatic_backups/
 !.claude/
 .claude/memory/
 .claude/plans/
+.claude/worktrees/
 .claude/settings.local.json

@@ -32,6 +32,8 @@ mkdir -p ~/.config
 link_with_backup "$DOTFILES/nvim" ~/.config/nvim
 link_with_backup "$DOTFILES/ghostty" ~/.config/ghostty
 link_with_backup "$DOTFILES/wezterm" ~/.config/wezterm
+mkdir -p ~/.config/mise
+link_with_backup "$DOTFILES/mise/config.toml" ~/.config/mise/config.toml
 mkdir -p ~/.config/karabiner
 link_with_backup "$DOTFILES/karabiner/karabiner.json" ~/.config/karabiner/karabiner.json
 

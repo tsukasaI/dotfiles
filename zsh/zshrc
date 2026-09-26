@@ -22,8 +22,14 @@ _cached_eval() {
   local resolved=${bin:A}
   if [[ ! -f "$cache" || "$bin" -nt "$cache" || "$(cat "$src" 2>/dev/null)" != "$resolved" ]]; then
     mkdir -p "$cache_dir"
-    eval "$cmd" > "$cache.tmp" && mv -f "$cache.tmp" "$cache" # atomic write
-    print -r -- "$resolved" > "$src"
+    # atomic write; record $resolved only on success so a failed regeneration
+    # is retried next shell instead of pinning the stale cache
+    if eval "$cmd" > "$cache.tmp"; then
+      mv -f "$cache.tmp" "$cache"
+      print -r -- "$resolved" > "$src"
+    else
+      rm -f "$cache.tmp"
+    fi
   fi
   [[ -f "$cache" ]] && source "$cache"
 }
