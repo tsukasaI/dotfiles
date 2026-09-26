@@ -1,21 +1,19 @@
 return {
   cmd = { 'gopls' },
   filetypes = { 'go', 'gomod', 'gowork' },
-  root_markers = { 'go.mod', 'go.work', '.git' },
+  -- 順序 = 優先度。go.work を先にしないと最寄りの go.mod が勝ち、ワークスペース内でモジュールごとに client が立つ
+  root_markers = { 'go.work', 'go.mod', '.git' },
   settings = {
     gopls = {
       analyses = {
         nilness = true,
         unusedparams = true,
         unusedwrite = true,
-        useany = true,
       },
       staticcheck = true,
       gofumpt = true,
-      completeUnimported = true,
       semanticTokens = true,
       codelenses = {
-        gc_details = true,
         generate = true,
         run_govulncheck = true,
         test = true,

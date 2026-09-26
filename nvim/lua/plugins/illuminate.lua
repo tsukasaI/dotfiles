@@ -7,7 +7,7 @@ return {
       delay = 200,
       filetypes_denylist = { 'aerial', 'trouble', 'harpoon', 'fzf', 'qf' },
     })
-    -- ジャンプは LSP の gd / fzf-lua / treesitter-textobjects に任せ、
+    -- ジャンプは glance の gp* / fzf-lua / treesitter-textobjects に任せ、
     -- illuminate は同一シンボルのハイライト責務のみ。
   end,
 }

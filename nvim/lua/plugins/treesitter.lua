@@ -14,8 +14,15 @@ return {
     keys = {
       {
         '[c',
-        function() require('treesitter-context').go_to_context(vim.v.count1) end,
-        desc = 'Jump to context (treesitter)',
+        -- diff モードではネイティブの [c(前の変更へ)を優先
+        function()
+          if vim.wo.diff then
+            vim.cmd('normal! ' .. vim.v.count1 .. '[c')
+            return
+          end
+          require('treesitter-context').go_to_context(vim.v.count1)
+        end,
+        desc = 'Jump to context (treesitter) / prev change in diff',
       },
     },
   },
