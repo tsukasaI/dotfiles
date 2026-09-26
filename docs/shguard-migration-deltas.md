@@ -857,3 +857,59 @@ listed). The rsync bare-relative-path sub-gap in #23 remains the only
 open item in this rule area. Filed as
 [dotfiles#49](https://github.com/tsukasaI/dotfiles/issues/49), close
 manually once this note is reviewed.
+
+## 26. Unsandboxed git/gh as an execution path (review B1/B3/B5), resolved 2026-09-26
+
+Threat model: prompt-injected content steering Claude. With
+`excludedCommands: ["git:*", "gh:*"]`, every git subcommand ran outside
+Seatbelt, so anything that fed an unsandboxed process was an execution
+path with no prompt: `mv x lefthook.yaml` then `git commit` (pre-commit
+runs unsandboxed), `git -c core.fsmonitor=... status`, relative
+`sed -i`/`mv` into `claude-code/shguard/config.toml` (shguard has no cwd,
+so its self-protection only resolves absolute and `~` paths), and redirects
+attached to excluded commands (`gh api x > lefthook.yaml`: the redirect
+runs in the same unsandboxed shell).
+
+The fix is structural first, rules second:
+
+1. `excludedCommands` narrowed to `git push:*`, `git fetch:*`, `git pull:*`,
+   `git ls-remote:*`, `gh:*`. `git commit` runs sandboxed; GPG reaches its
+   agent via `sandbox.network.allowUnixSockets` (`S.gpg-agent`,
+   `S.keyboxd`). Verified live: a signed commit succeeds inside the
+   sandbox. `git -c k=v push` and `GIT_SSH_COMMAND=... git push` do not
+   match the exclusion, so they run sandboxed and fail SSH (verified live);
+   shguard does not need to catch them, which matters because shguard
+   0.7.0 strips leading env assignments and treats git's global `-c` as
+   non-matchable, and does not accept `[[token]]` in user config.
+2. `sandbox.filesystem.denyWrite` covers every repo path an unsandboxed
+   process executes or evaluates: lefthook config, `tests/` (run by the
+   hooks), `git/`, `ssh/`, `zsh/`, `setup.sh`, `nvim/`, `wezterm/`,
+   `ghostty/`, `karabiner/`, `nix-darwin/` (evaluated as root by
+   `darwin-rebuild`), `claude-code/{hooks,lib,shguard,statusline.ts}`.
+   Kernel-enforced, so relative paths, `mv`, `fd -x`, and redirects from
+   sandboxed commands are all denied regardless of how the path is
+   spelled. The Edit/Write tools are not sandboxed and still edit these
+   files (visible diffs, permission-gated); `block-config-edit.sh` blocks
+   Edit on the guard files and lefthook config.
+3. `config.toml` rules for what still runs unsandboxed: push to a URL or
+   local path, `:ref`, `--delete`/`--mirror`/`--prune`,
+   `--receive-pack`/`--exec`/`--upload-pack`, fetch/pull from a URL or
+   local path; gh `extension`, `alias set --shell`, `pr checkout`/`co`,
+   `repo clone|fork|sync`, `gist`, `release upload|download`,
+   `run download`, `api -F/--field/--input`, `--body-file`, `auth token`;
+   and a `[[redirect]]` block rule for redirects into the denyWrite set
+   (raw relative prefixes, since shguard has no cwd; `../` forms fall to
+   its unknown-cwd floor). Parity cases in `tests/shguard-parity-check.sh`.
+
+Behavior changes to expect: sandboxed git operations that rewrite the
+worktree (`stash`, `checkout <branch>`, `merge`, `cherry-pick`, `revert`)
+fail on denyWrite paths, and `git log --show-signature` cannot verify
+inside the sandbox (gpg opens `trustdb.gpg` read-write; `~/.gnupg` stays
+unwritable on purpose, since `gpg-agent.conf`'s pinentry-program would
+otherwise be an unsandboxed execution path).
+
+Still open (accepted): Edit-tool writes to live config (visible,
+classifier-gated); other repos' pre-push hooks run unsandboxed on
+`git push`; `dangerouslyDisableSandbox` retries (decide separately
+whether to set `allowUnsandboxedCommands: false`); `gh api` POST bodies
+built from `-f` strings can still carry data out.

@@ -11,8 +11,29 @@
   },
   "sandbox": {
     "enabled": true,
-    "excludedCommands": ["git:*", "gh:*"],
+    "excludedCommands": ["git push:*", "git fetch:*", "git pull:*", "git ls-remote:*", "gh:*"],
+    "filesystem": {
+      "denyWrite": [
+        "~/dotfiles/lefthook.yaml",
+        "~/dotfiles/lefthook-local.yaml",
+        "~/dotfiles/tests",
+        "~/dotfiles/git",
+        "~/dotfiles/ssh",
+        "~/dotfiles/zsh",
+        "~/dotfiles/setup.sh",
+        "~/dotfiles/nvim",
+        "~/dotfiles/wezterm",
+        "~/dotfiles/ghostty",
+        "~/dotfiles/karabiner",
+        "~/dotfiles/nix-darwin",
+        "~/dotfiles/claude-code/hooks",
+        "~/dotfiles/claude-code/lib",
+        "~/dotfiles/claude-code/shguard",
+        "~/dotfiles/claude-code/statusline.ts"
+      ]
+    },
     "network": {
+      "allowUnixSockets": ["~/.gnupg/S.gpg-agent", "~/.gnupg/S.keyboxd"],
       "strictAllowlist": true,
       "allowedDomains": [
         "github.com",
@@ -81,7 +102,8 @@
       "WebSearch",
       "Bash(gh repo view:*)",
       "Bash(gh search:*)",
-      "Bash(gh issue:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
       "Bash(defaults read *)",
       "Bash(cat:*)",
       "Bash(head:*)",
@@ -157,7 +179,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "shguard"
+            "command": "shguard || exit 2"
           }
         ]
       },
@@ -251,7 +273,6 @@
     "mode": "hold"
   },
   "autoMemoryEnabled": false,
-  "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "custom:dark-ansi-readable",
   "verbose": true,

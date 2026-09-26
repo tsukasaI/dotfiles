@@ -33,11 +33,16 @@ BASENAME=$(basename "$FILE_PATH")
 # covered: the repo path (claude-code/hooks/) and the deployed symlink path
 # (.claude/hooks/). Changing these files is a manual, human action — see
 # the hooks-guardrails skill for the procedure.
+# Exception to full-path matching: lefthook config in any project, because
+# git push runs its pre-push hooks outside the Bash sandbox.
 case "$FILE_PATH" in
   */claude-code/hooks/block-config-edit.sh | \
   */.claude/hooks/block-config-edit.sh | \
+  */claude-code/hooks/* | \
   */claude-code/shguard/config.toml | \
-  */.claude/shguard/config.toml)
+  */.claude/shguard/config.toml | \
+  */.config/shguard/config.toml | \
+  */lefthook.yaml | */lefthook.yml | */lefthook-local.yaml | */lefthook-local.yml)
     printf '[BLOCKED: GUARDRAIL_PROTECTION] "%s" defines the PreToolUse guardrails and must not be edited by Claude.\nAsk the user to change it manually (procedure: hooks-guardrails skill).\n' "$BASENAME" >&2
     exit 2
     ;;

@@ -87,11 +87,20 @@ There is no staging or deploy step (hooks apply on the next tool call,
 - **Trust files over docs.** Parts of `hooks/README.md` are known-stale.
   When any doc — including this one — disagrees with reality, reality wins;
   update the doc.
+- **Live config is write-protected from Bash.** `sandbox.filesystem.denyWrite`
+  in `claude-code/settings.json` covers every path an unsandboxed process
+  runs or evaluates (lefthook config, `tests/`, `git/`, `ssh/`, `zsh/`,
+  `nvim/`, `nix-darwin/`, `claude-code/hooks` and more; see
+  `docs/shguard-migration-deltas.md` #26). Edit these with the Edit/Write
+  tools, never `sed -i`/`mv`/redirects. Sandboxed git operations that
+  rewrite the worktree (`stash`, `checkout <branch>`, `merge`) fail on those
+  paths, and `git log --show-signature` can't verify inside the sandbox;
+  both are expected, not a broken sandbox.
 - **shguard is the PreToolUse Bash enforcer.** `claude-code/settings.json`
-  calls the `shguard` binary directly (inline command, with
-  `SHGUARD_STRICT_CONFIG=1` so a missing/malformed config denies instead of
-  asking) against `claude-code/shguard/config.toml`, with no separate
-  wrapper script. `block-dangerous.sh`, `shguard-gate.sh`, and
+  calls the `shguard` binary directly (`shguard || exit 2`, so a PATH-miss or
+  crash blocks; `SHGUARD_STRICT_CONFIG=1` so a missing/malformed config
+  denies instead of asking) against `claude-code/shguard/config.toml`, with
+  no separate wrapper script. `block-dangerous.sh`, `shguard-gate.sh`, and
   `shguard-shadow.sh` are deleted; historical gaps found during the
   migration are tracked in `docs/shguard-migration-deltas.md`. `config.toml`
   is Claude-edit-blocked like the other guard files. `ask` verdicts are not

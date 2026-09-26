@@ -12,10 +12,9 @@ ask_outcome = "deny"
 
 # shguard user policy for this machine.
 #
-# Deployed to ~/.claude/shguard/config.toml via a setup.sh symlink so it
-# stays versioned and CI-testable — the PreToolUse hook in settings.json
-# points shguard at this path explicitly via $SHGUARD_CONFIG (shguard's
-# own default is ~/.config/shguard/config.toml, not used here).
+# Deployed to ~/.config/shguard/config.toml (shguard's default lookup path)
+# via a setup.sh symlink so it stays versioned and CI-testable. The
+# PreToolUse hook in settings.json runs bare `shguard`, which reads that path.
 #
 # Schema (see shguard's rules/blocklist.toml for the authoritative version):
 #   [[deny]]  - hard-blocks a command shape (id, reason, command/command_prefix,
@@ -28,7 +27,7 @@ ask_outcome = "deny"
 # Precedence: deny > ask > allow, evaluated across the built-in blocklist and
 # this file together.
 #
-# This file ports claude-code/hooks/blocklist.conf's categories that aren't
+# This file ports the old blocklist.conf's categories (file since deleted) that aren't
 # already covered by shguard's built-in blocklist (rules/blocklist.toml).
 # Every `dotfiles-*` id below is namespaced to avoid colliding with a
 # built-in id (merge_user_config is additive-only: an id collision is a
@@ -839,3 +838,235 @@ command = "gitleaks"
 id = "dotfiles-allow-trufflehog"
 reason = "trufflehog is a secret-scanning tool, not a threat"
 command = "trufflehog"
+# =====================================================================
+# Exec-capable search tools (fd/rg are allow-listed in settings.json)
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-code-fd-exec"
+reason = "fd -x/-X/--exec/--exec-batch runs an arbitrary command per match (same class as xargs)"
+command = "fd"
+required_flags = ["x|X|--exec|--exec-batch"]
+
+[[deny]]
+id = "dotfiles-code-rg-pre"
+reason = "rg --pre runs an arbitrary preprocessor command on every searched file"
+command = "rg"
+required_flags = ["--pre"]
+
+# =====================================================================
+# Credentials (push-to-turso.sh is intentionally manual)
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-gh-auth-token"
+reason = "gh auth token prints the GitHub token"
+command = "gh"
+required_tokens = ["auth", "token"]
+
+[[deny]]
+id = "dotfiles-gh-auth-status-show-token"
+reason = "gh auth status -t/--show-token prints the GitHub token"
+command = "gh"
+required_tokens = ["auth", "status"]
+required_flags = ["t|--show-token"]
+
+[[deny]]
+id = "dotfiles-turso"
+reason = "turso credentials are deliberately kept out of Claude's process tree; run push-to-turso.sh manually"
+command = "turso"
+
+# =====================================================================
+# Exfiltration via gh file uploads (gh runs outside the sandbox)
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-gh-issue-body-file"
+reason = "gh issue create/comment --body-file uploads a local file to a remote issue"
+command = "gh"
+required_tokens = ["issue"]
+required_flags = ["F|--body-file"]
+
+[[deny]]
+id = "dotfiles-gh-pr-body-file"
+reason = "gh pr create/comment --body-file uploads a local file to a remote PR"
+command = "gh"
+required_tokens = ["pr"]
+required_flags = ["F|--body-file"]
+# =====================================================================
+# Unsandboxed git (push/fetch/pull/ls-remote run outside the Seatbelt
+# sandbox for SSH; see claude-code/settings.json sandbox.excludedCommands)
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-git-config-override"
+reason = "git -c/--config-env/--exec-path injects config (core.fsmonitor, core.sshCommand, ...) that executes commands, outside the sandbox for push/fetch"
+command = "git"
+required_flags = ["c|--config-env|--exec-path"]
+
+[[deny]]
+id = "dotfiles-git-push-url-target"
+reason = "git push to a URL or local path instead of a named remote can exfiltrate history or run a local receive-pack"
+command = "git"
+required_tokens = ["push"]
+targets = [
+  { prefix = "https://" }, { prefix = "http://" }, { prefix = "ssh://" },
+  { prefix = "git://" }, { prefix = "git@" }, { prefix = "file://" },
+  { prefix = "ext::" }, { prefix = "/" }, { prefix = "." }, { prefix = "~" },
+]
+
+[[deny]]
+id = "dotfiles-git-push-delete-refspec"
+reason = "git push <remote> :ref deletes the remote ref"
+command = "git"
+required_tokens = ["push"]
+targets = [{ prefix = ":" }]
+
+[[deny]]
+id = "dotfiles-git-push-destructive-flags"
+reason = "git push --delete/--mirror/--prune deletes remote refs; --receive-pack/--exec runs a chosen command"
+command = "git"
+required_tokens = ["push"]
+required_flags = ["d|--delete|--mirror|--prune|--receive-pack|--exec"]
+
+[[deny]]
+id = "dotfiles-git-fetch-upload-pack"
+reason = "git fetch/pull/ls-remote --upload-pack runs a chosen command"
+command = "git"
+required_flags = ["--upload-pack"]
+
+[[deny]]
+id = "dotfiles-git-fetch-url-source"
+reason = "git fetch from a URL or local path pulls unreviewed content outside the sandbox"
+command = "git"
+required_tokens = ["fetch"]
+targets = [
+  { prefix = "https://" }, { prefix = "http://" }, { prefix = "ssh://" },
+  { prefix = "git://" }, { prefix = "git@" }, { prefix = "file://" },
+  { prefix = "ext::" }, { prefix = "/" }, { prefix = "." }, { prefix = "~" },
+]
+
+[[deny]]
+id = "dotfiles-git-pull-url-source"
+reason = "git pull from a URL or local path merges unreviewed content into the worktree outside the sandbox"
+command = "git"
+required_tokens = ["pull"]
+targets = [
+  { prefix = "https://" }, { prefix = "http://" }, { prefix = "ssh://" },
+  { prefix = "git://" }, { prefix = "git@" }, { prefix = "file://" },
+  { prefix = "ext::" }, { prefix = "/" }, { prefix = "." }, { prefix = "~" },
+]
+
+# =====================================================================
+# Unsandboxed gh: execution, uploads, downloads
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-gh-extension"
+reason = "gh extension install/exec/upgrade runs third-party code outside the sandbox"
+command = "gh"
+required_tokens = ["extension"]
+
+[[deny]]
+id = "dotfiles-gh-ext-alias"
+reason = "gh ext is the short form of gh extension"
+command = "gh"
+required_tokens = ["ext"]
+
+[[deny]]
+id = "dotfiles-gh-alias-shell"
+reason = "gh alias set --shell defines an alias that runs an arbitrary shell command"
+command = "gh"
+required_tokens = ["alias"]
+required_flags = ["s|--shell"]
+
+[[deny]]
+id = "dotfiles-gh-gist"
+reason = "gh gist create uploads local files; gh gist clone writes files outside the sandbox"
+command = "gh"
+required_tokens = ["gist"]
+
+[[deny]]
+id = "dotfiles-gh-api-file-input"
+reason = "gh api -F/--field (reads @file) and --input upload local file contents"
+command = "gh"
+required_tokens = ["api"]
+required_flags = ["F|--field|--input"]
+
+[[deny]]
+id = "dotfiles-gh-release-upload"
+reason = "gh release upload sends local files to a release"
+command = "gh"
+required_tokens = ["release", "upload"]
+
+[[deny]]
+id = "dotfiles-gh-release-download"
+reason = "gh release download writes files outside the sandbox's write protections"
+command = "gh"
+required_tokens = ["release", "download"]
+
+[[deny]]
+id = "dotfiles-gh-run-download"
+reason = "gh run download writes artifacts outside the sandbox's write protections"
+command = "gh"
+required_tokens = ["run", "download"]
+# gh subcommands that write the worktree outside the sandbox.
+[[deny]]
+id = "dotfiles-gh-pr-checkout"
+reason = "gh pr checkout writes PR-authored files into the worktree outside the sandbox (a later git push runs its pre-push hook)"
+command = "gh"
+required_tokens = ["pr", "checkout"]
+
+[[deny]]
+id = "dotfiles-gh-co"
+reason = "gh co is the short form of gh pr checkout"
+command = "gh"
+required_tokens = ["co"]
+
+[[deny]]
+id = "dotfiles-gh-repo-clone"
+reason = "gh repo clone writes files outside the sandbox"
+command = "gh"
+required_tokens = ["repo", "clone"]
+
+[[deny]]
+id = "dotfiles-gh-repo-fork"
+reason = "gh repo fork --clone writes files outside the sandbox"
+command = "gh"
+required_tokens = ["repo", "fork"]
+
+[[deny]]
+id = "dotfiles-gh-repo-sync"
+reason = "gh repo sync rewrites local branches outside the sandbox"
+command = "gh"
+required_tokens = ["repo", "sync"]
+
+# Redirect writes into files that unsandboxed processes execute. Seatbelt
+# denyWrite already stops sandboxed commands; this covers redirects attached
+# to sandbox-excluded commands (gh, git push/fetch/pull/ls-remote), whose
+# redirect runs in the unsandboxed shell.
+[[redirect]]
+id = "dotfiles-redirect-live-config"
+reason = "redirect into a dotfiles path that an unsandboxed process executes (hooks, lefthook, tests, git/ssh/zsh/nvim config)"
+decision = "block"
+targets = [
+  { normalized_basename = "lefthook.yaml" },
+  { normalized_basename = "lefthook.yml" },
+  { normalized_basename = "lefthook-local.yaml" },
+  { normalized_prefix = "~/dotfiles/" },
+  { normalized_prefix = "/Users/inouetsukasa/dotfiles/" },
+  # Relative forms: shguard has no cwd, so these are raw prefixes that assume
+  # the repo root as cwd. `../`-ascent forms fall to shguard's own
+  # unknown-cwd floor.
+  { prefix = "tests/" }, { prefix = "./tests/" },
+  { prefix = "git/" }, { prefix = "./git/" },
+  { prefix = "ssh/" }, { prefix = "./ssh/" },
+  { prefix = "zsh/" }, { prefix = "./zsh/" },
+  { prefix = "nvim/" }, { prefix = "./nvim/" },
+  { prefix = "wezterm/" }, { prefix = "./wezterm/" },
+  { prefix = "ghostty/" }, { prefix = "./ghostty/" },
+  { prefix = "karabiner/" }, { prefix = "./karabiner/" },
+  { prefix = "nix-darwin/" }, { prefix = "./nix-darwin/" },
+  { prefix = "claude-code/" }, { prefix = "./claude-code/" },
+  { exact = "setup.sh" }, { exact = "./setup.sh" },
+]
