@@ -43,3 +43,5 @@ dist/
 coverage/
 *.log
 Thumbs.db
+
+**/.claude/.cc-writes/
