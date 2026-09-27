@@ -95,11 +95,15 @@ CREATE TABLE IF NOT EXISTS session_days (
 CREATE INDEX IF NOT EXISTS idx_session_days_day ON session_days(day);
 SQL
 
-# --- 3. Push rows ---
+# --- 3. Push rows, batched by session ---
 # Notes on `turso db shell` / libSQL constraints discovered in practice:
 #   - no sqlite dot-commands (.bail), and BEGIN/COMMIT are NOT honored as one atomic txn
 #     (each statement autocommits) — so partial pushes persist.
 #   - libSQL lacks unistr(), which modern sqlite `.mode insert` emits for control chars.
+#   - a single `turso db shell < file` piping the whole snapshot in one call rides one
+#     Hrana stream, which expires under a long-running/large input (upstream issues
+#     #839, #925, #671, #985) — so we split the push into one shell call per batch of
+#     sessions instead of one call for the whole dump.
 # We therefore build the INSERTs ourselves with the SQL quote() function (standard literal,
 # control bytes raw, single quotes doubled — libSQL-compatible and safe for multi-line
 # transcripts). Each INSERT is an UPSERT whose update fires only when the incoming row is
@@ -107,24 +111,34 @@ SQL
 # longer transcript replaces the stale remote copy, and an older local row never
 # overwrites a newer remote one. The count gate in step 4 cannot catch a stale remote
 # row (the count matches either way), so this ordering is what prevents that loss.
-SESSIONS_SQL="SELECT 'INSERT INTO sessions (session_id,project_dir,git_branch,model,claude_version,started_at,ended_at,end_reason,input_tokens,output_tokens,num_user_messages,num_assistant_messages) VALUES ('||quote(session_id)||','||quote(project_dir)||','||quote(git_branch)||','||quote(model)||','||quote(claude_version)||','||quote(started_at)||','||quote(ended_at)||','||quote(end_reason)||','||quote(input_tokens)||','||quote(output_tokens)||','||quote(num_user_messages)||','||quote(num_assistant_messages)||') ON CONFLICT(session_id) DO UPDATE SET project_dir=excluded.project_dir,git_branch=excluded.git_branch,model=excluded.model,claude_version=excluded.claude_version,started_at=excluded.started_at,ended_at=excluded.ended_at,end_reason=excluded.end_reason,input_tokens=excluded.input_tokens,output_tokens=excluded.output_tokens,num_user_messages=excluded.num_user_messages,num_assistant_messages=excluded.num_assistant_messages WHERE coalesce(excluded.ended_at,'''') >= coalesce(sessions.ended_at,'''');' FROM sessions;"
-TRANSCRIPT_SQL="SELECT 'INSERT INTO transcript_raw (session_id,transcript_jsonl,size_bytes) VALUES ('||quote(session_id)||','||quote(transcript_jsonl)||','||quote(size_bytes)||') ON CONFLICT(session_id) DO UPDATE SET transcript_jsonl=excluded.transcript_jsonl,size_bytes=excluded.size_bytes WHERE coalesce(excluded.size_bytes,0) >= coalesce(transcript_raw.size_bytes,0);' FROM transcript_raw;"
-DAYS_SQL="SELECT 'INSERT INTO session_days (session_id,day,message_count) VALUES ('||quote(session_id)||','||quote(day)||','||quote(message_count)||') ON CONFLICT(session_id,day) DO UPDATE SET message_count=max(coalesce(excluded.message_count,0),coalesce(session_days.message_count,0));' FROM session_days;"
+sessions_sql() { echo "SELECT 'INSERT INTO sessions (session_id,project_dir,git_branch,model,claude_version,started_at,ended_at,end_reason,input_tokens,output_tokens,num_user_messages,num_assistant_messages) VALUES ('||quote(session_id)||','||quote(project_dir)||','||quote(git_branch)||','||quote(model)||','||quote(claude_version)||','||quote(started_at)||','||quote(ended_at)||','||quote(end_reason)||','||quote(input_tokens)||','||quote(output_tokens)||','||quote(num_user_messages)||','||quote(num_assistant_messages)||') ON CONFLICT(session_id) DO UPDATE SET project_dir=excluded.project_dir,git_branch=excluded.git_branch,model=excluded.model,claude_version=excluded.claude_version,started_at=excluded.started_at,ended_at=excluded.ended_at,end_reason=excluded.end_reason,input_tokens=excluded.input_tokens,output_tokens=excluded.output_tokens,num_user_messages=excluded.num_user_messages,num_assistant_messages=excluded.num_assistant_messages WHERE coalesce(excluded.ended_at,'''') >= coalesce(sessions.ended_at,'''');' FROM sessions WHERE session_id IN ($1);"; }
+transcript_sql() { echo "SELECT 'INSERT INTO transcript_raw (session_id,transcript_jsonl,size_bytes) VALUES ('||quote(session_id)||','||quote(transcript_jsonl)||','||quote(size_bytes)||') ON CONFLICT(session_id) DO UPDATE SET transcript_jsonl=excluded.transcript_jsonl,size_bytes=excluded.size_bytes WHERE coalesce(excluded.size_bytes,0) >= coalesce(transcript_raw.size_bytes,0);' FROM transcript_raw WHERE session_id IN ($1);"; }
+days_sql() { echo "SELECT 'INSERT INTO session_days (session_id,day,message_count) VALUES ('||quote(session_id)||','||quote(day)||','||quote(message_count)||') ON CONFLICT(session_id,day) DO UPDATE SET message_count=max(coalesce(excluded.message_count,0),coalesce(session_days.message_count,0));' FROM session_days WHERE session_id IN ($1);"; }
 
-echo "Pushing rows..."
-# Each producer writes to a shared file rather than feeding a pipe: a brace-group
-# piped into another command only exposes the LAST command's exit status, so an
-# earlier sqlite3 failure would go unnoticed. Chaining with && checks every
-# producer's exit code individually before we ever call the push a success.
-if sqlite3 "$SNAP" "$SESSIONS_SQL" > "$PUSH_SQL" \
-   && sqlite3 "$SNAP" "$TRANSCRIPT_SQL" >> "$PUSH_SQL" \
-   && sqlite3 "$SNAP" "$DAYS_SQL" >> "$PUSH_SQL" \
-   && turso db shell "$TURSO_DB" < "$PUSH_SQL"; then
-  echo "送信コマンド成功。"
-else
-  echo "送信に失敗しました。ローカルは無変更（次回は UPSERT で再開可能）。" >&2
-  exit 1
-fi
+BATCH_SIZE="${TURSO_PUSH_BATCH_SIZE:-10}"
+TOTAL_SESSIONS="$(sqlite3 "$SNAP" "SELECT count(*) FROM sessions;")"
+echo "Pushing rows in batches of $BATCH_SIZE sessions ($TOTAL_SESSIONS total)..."
+offset=0
+batch_num=0
+while [ "$offset" -lt "$TOTAL_SESSIONS" ]; do
+  batch_num=$((batch_num + 1))
+  ids="$(sqlite3 "$SNAP" "SELECT group_concat(quote(session_id)) FROM (SELECT session_id FROM sessions ORDER BY session_id LIMIT $BATCH_SIZE OFFSET $offset);")"
+  # Each producer writes to a shared file rather than feeding a pipe: a brace-group
+  # piped into another command only exposes the LAST command's exit status, so an
+  # earlier sqlite3 failure would go unnoticed. Chaining with && checks every
+  # producer's exit code individually before we ever call this batch a success.
+  if sqlite3 "$SNAP" "$(sessions_sql "$ids")" > "$PUSH_SQL" \
+     && sqlite3 "$SNAP" "$(transcript_sql "$ids")" >> "$PUSH_SQL" \
+     && sqlite3 "$SNAP" "$(days_sql "$ids")" >> "$PUSH_SQL" \
+     && turso db shell "$TURSO_DB" < "$PUSH_SQL"; then
+    echo "  batch $batch_num (offset=$offset) 送信成功。"
+  else
+    echo "送信に失敗しました（batch $batch_num, offset=$offset）。ローカルは無変更（次回は UPSERT で再開可能）。" >&2
+    exit 1
+  fi
+  offset=$((offset + BATCH_SIZE))
+done
+echo "送信コマンド成功。"
 
 # --- 4. Snapshot-scoped confirmation gate ---
 # Compare, per table, how many of THIS snapshot's rows are present in Turso (scoped by the
