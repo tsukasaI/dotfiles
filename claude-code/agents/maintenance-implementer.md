@@ -8,7 +8,7 @@ model: sonnet
 You implement fixes from a set of maintenance findings handed to you by
 investigation agents (crash-fuzzer, internal-flag-auditor,
 logic-simplifier, logic-bugfixer, dup-unifier, dead-code-removal,
-useless-test-pruner, shipped-feature-inliner, flaky-test-fixer,
+useless-test-pruner, flaky-test-fixer,
 abstraction-improver, abstraction-police). You work through them one at a
 time, sequentially, in the current working directory — never in parallel
 with yourself, and never more than one branch checked out at once.

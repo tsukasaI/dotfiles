@@ -2,14 +2,14 @@
 name: maintain-sweep
 description: Runs the maintenance investigation agents (crash-fuzzer, dup-unifier, dead-code-removal, etc.) against the current repository in parallel — read-only, opus — feeds their findings to a single sequential implementer agent (sonnet) that verifies and applies the confirmed fixes, then has a fable code-reviewer review every PR it opened. Use when the user wants to run a maintenance sweep, "メンテナンスルーチンを回して", or asks to run several/all of the maintenance agents at once. Not for running one investigation agent by name with no implementation step — invoke that agent directly instead.
 disable-model-invocation: true
-argument-hint: [routine ...] (optional — omit to run all 11 investigation agents)
+argument-hint: [routine ...] (optional — omit to run all 10 investigation agents)
 allowed-tools: Bash, Workflow
 ---
 
 # /maintain-sweep — investigate in parallel, implement sequentially, review in parallel
 
-Three-phase design. Phases 1 and 2 are split because 11 agents editing the
-same working tree in parallel would conflict, while 11 agents
+Three-phase design. Phases 1 and 2 are split because 10 agents editing the
+same working tree in parallel would conflict, while 10 agents
 *investigating* it in parallel cannot — they never write anything. Phase 3
 exists because every PR falls under the global fable review gate:
 
@@ -35,13 +35,12 @@ Launch argument: $ARGUMENTS
 | Name | What it investigates |
 |---|---|
 | crash-fuzzer | Real app crashes and their root cause |
-| internal-flag-auditor | Forgotten internal-only/beta features — ship or delete |
+| internal-flag-auditor | Forgotten internal-only/beta features and stable 100%-rollout flags — ship (inline) or delete |
 | logic-simplifier | Nested business logic that can simplify without behavior change |
 | logic-bugfixer | Real bugs found by modeling logic and state transitions |
 | dup-unifier | Near-duplicate implementations worth unifying |
 | dead-code-removal | Provably unreachable code |
 | useless-test-pruner | Tests that can never fail |
-| shipped-feature-inliner | Feature flags at 100% rollout, stable, ready to inline |
 | flaky-test-fixer | Root cause of CI tests that pass/fail inconsistently |
 | abstraction-improver | Overengineered abstractions with few real implementations |
 | abstraction-police | Violations of the project's own documented layering rules |
@@ -51,7 +50,7 @@ Launch argument: $ARGUMENTS
 1. Confirm the current directory is a git repository
    (`git rev-parse --is-inside-work-tree`). If not, tell the user and stop.
 2. Parse `$ARGUMENTS` into a routine list:
-   - Empty → all 11 routines above.
+   - Empty → all 10 routines above.
    - Space-separated names → validate each against the table above; if any
      name doesn't match, list the valid names and stop without running
      anything.
