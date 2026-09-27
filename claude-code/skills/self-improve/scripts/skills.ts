@@ -619,6 +619,25 @@ function buildSlashFrequency(prompts: PromptEntry[]) {
     .map(([command, count]) => ({ command, count }));
 }
 
+// A project-scope SKILL.md comes from whatever repo the cwd sits in, so its
+// text is third-party input flowing into an Edit/Write-capable skill. Emit
+// no body excerpt for it and cap its description; keyword matching and the
+// reference checks still use the full body internally.
+const PROJECT_DESCRIPTION_MAX = 200;
+
+function skillExcerpt(
+  s: SkillRecord,
+  bodyField: "body_first_300_chars" | "body_first_500_chars",
+): { frontmatter: SkillRecord["frontmatter"]; [k: string]: unknown } {
+  if (s.scope === "user") return { frontmatter: s.frontmatter, [bodyField]: s[bodyField] };
+  return {
+    frontmatter: {
+      name: s.frontmatter.name,
+      description: s.frontmatter.description?.slice(0, PROJECT_DESCRIPTION_MAX),
+    },
+  };
+}
+
 function buildSkillReviewHints(skills: SkillRecord[], availableAgentNames: Set<string>) {
   const hints: any[] = [];
   for (const s of skills) {
@@ -639,8 +658,7 @@ function buildSkillReviewHints(skills: SkillRecord[], availableAgentNames: Set<s
     hints.push({
       path: s.path,
       mtime: s.mtime,
-      frontmatter: s.frontmatter,
-      body_first_300_chars: s.body_first_300_chars,
+      ...skillExcerpt(s, "body_first_300_chars"),
       issues,
     });
   }
@@ -690,13 +708,16 @@ try {
       total_skill_invocations_in_window: scanResult.invocations.length,
       errors: scanResult.errors,
     },
-    available_skills: skills.map((s) => ({
-      name: s.frontmatter.name ?? s.name,
-      path: s.path,
-      scope: s.scope,
-      description: s.frontmatter.description ?? "",
-      body_first_500_chars: s.body_first_500_chars,
-    })),
+    available_skills: skills.map((s) => {
+      const { frontmatter, ...body } = skillExcerpt(s, "body_first_500_chars");
+      return {
+        name: s.frontmatter.name ?? s.name,
+        path: s.path,
+        scope: s.scope,
+        description: frontmatter.description ?? "",
+        ...body,
+      };
+    }),
     dead_skills: buildDeadSkills(skills, scanResult, dataSufficient),
     meta_clusters: metaClusters,
     prompt_clusters: promptClusters,
