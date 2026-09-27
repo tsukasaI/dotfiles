@@ -33,8 +33,11 @@ BASENAME=$(basename "$FILE_PATH")
 # covered: the repo path (claude-code/hooks/) and the deployed symlink path
 # (.claude/hooks/). Changing these files is a manual, human action — see
 # the hooks-guardrails skill for the procedure.
-# Exception to full-path matching: lefthook config in any project, because
-# git push runs its pre-push hooks outside the Bash sandbox.
+# Exception to full-path matching: lefthook config in any project (every
+# name/extension lefthook reads, plus its .lefthook*/ dirs), because git push
+# runs its pre-push hooks outside the Bash sandbox. Case-insensitive because
+# APFS is.
+shopt -s nocasematch
 case "$FILE_PATH" in
   */claude-code/hooks/block-config-edit.sh | \
   */.claude/hooks/block-config-edit.sh | \
@@ -42,11 +45,12 @@ case "$FILE_PATH" in
   */claude-code/shguard/config.toml | \
   */.claude/shguard/config.toml | \
   */.config/shguard/config.toml | \
-  */lefthook.yaml | */lefthook.yml | */lefthook-local.yaml | */lefthook-local.yml)
+  */lefthook.* | */lefthook-local.* | */.lefthook*)
     printf '[BLOCKED: GUARDRAIL_PROTECTION] "%s" defines the PreToolUse guardrails and must not be edited by Claude.\nAsk the user to change it manually (procedure: hooks-guardrails skill).\n' "$BASENAME" >&2
     exit 2
     ;;
 esac
+shopt -u nocasematch
 
 # Protected config file patterns
 PROTECTED=(

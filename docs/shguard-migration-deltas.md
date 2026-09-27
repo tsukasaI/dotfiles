@@ -913,3 +913,52 @@ classifier-gated); other repos' pre-push hooks run unsandboxed on
 `git push`; `dangerouslyDisableSandbox` retries (decide separately
 whether to set `allowUnsandboxedCommands: false`); `gh api` POST bodies
 built from `-f` strings can still carry data out.
+
+### Round 2 (fable review of a1d808a), 2026-09-27
+
+The first round still denylisted push/fetch destinations. The review
+bypassed that with `git push --repo=<url>`, a legacy remote file
+(`.git/branches/<name>`, `.git/remotes/<name>`, still honored by git
+2.55), and a bare local repo name whose `hooks/pre-receive` then ran
+unsandboxed. It also found `bunfig.toml` in any project cwd preloading
+code into every unsandboxed `bun` hook and the statusline, lefthook
+config names outside the protected set (`.lefthook-local.yml`,
+`lefthook-local.toml`, ...), writable `mise/` and `claude-code/scripts/`,
+more gh subcommands (`alias`, `config set`, `secret`, `repo edit`,
+`auth setup-git`, ...), and a false positive (`dotfiles-git-config-override`
+denied `git switch -c`; removed in 38a5ff5).
+
+Fixes:
+
+1. `excludedCommands` is now an allowlist of shapes: bare `git push` /
+   `fetch` / `pull`, or `origin` right after the subcommand (`git push
+   origin:*`, `git push -u origin:*`, `git fetch --prune origin:*`,
+   `git pull --rebase origin:*`, `git ls-remote origin:*`), plus `gh:*`.
+   Verified live with legacy remote files pointing at this repo: `git
+   ls-remote/fetch/push originx` and `origin-x` run sandboxed and fail SSH,
+   while `git push`, `git push origin`, `git push -u origin main`, `git
+   fetch`, `git fetch --prune origin`, `git pull origin main` reach GitHub.
+   `--repo=`, URLs, bare paths, and legacy remote names no longer need a
+   shguard rule to be safe.
+2. Hooks and the statusline run `bun --config=/dev/null`: verified that
+   this skips a cwd `bunfig.toml` preload and that bun does not search
+   parent directories for one.
+3. denyWrite adds every lefthook config name and `.lefthook*/` dir,
+   `mise/`, `claude-code/scripts/`, `.git/branches`, `.git/remotes`
+   (verified, including creating new files and directories).
+4. config.toml: gh denies above, `git push --repo`, and the redirect rule
+   extended (`.git/`, `mise/`, all lefthook names). shguard only accepts
+   `case_insensitive` on `normalized`/`normalized_prefix`, so only the
+   absolute redirect targets fold case.
+5. `block-config-edit.sh` matches `*/lefthook.*`, `*/lefthook-local.*`,
+   `*/.lefthook*` under `nocasematch`.
+
+Measured, not assumed: a line whose excluded command carries a redirect or
+pipe runs inside the sandbox (`gh api user > file` fails TLS; `gh ... | tee
+tests/x` is denied), so redirect-based bypasses of the shguard redirect
+rule (case variants, `$PWD/...`) still hit denyWrite; the rule is defense
+in depth. Nested `.git/config` and `.git/hooks` anywhere under the project
+are write-protected by Claude Code (a `git init` under `.claude/worktrees/`
+was denied). A repo under `$TMPDIR` is not protected, but the Bash cwd
+cannot leave the project (a `cd` there is reset), and `git -C <dir> push`
+does not match the exclusion, so a push from such a repo runs sandboxed.

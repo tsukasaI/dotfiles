@@ -11,11 +11,36 @@
   },
   "sandbox": {
     "enabled": true,
-    "excludedCommands": ["git push:*", "git fetch:*", "git pull:*", "git ls-remote:*", "gh:*"],
+    "excludedCommands": [
+      "git push", "git push origin:*", "git push -u origin:*",
+      "git fetch", "git fetch origin:*", "git fetch --prune origin:*",
+      "git pull", "git pull origin:*", "git pull --rebase origin:*",
+      "git ls-remote origin:*", "gh:*"
+    ],
     "filesystem": {
       "denyWrite": [
         "~/dotfiles/lefthook.yaml",
         "~/dotfiles/lefthook-local.yaml",
+        "~/dotfiles/lefthook.yml",
+        "~/dotfiles/lefthook.json",
+        "~/dotfiles/lefthook.toml",
+        "~/dotfiles/lefthook-local.yml",
+        "~/dotfiles/lefthook-local.json",
+        "~/dotfiles/lefthook-local.toml",
+        "~/dotfiles/.lefthook.yml",
+        "~/dotfiles/.lefthook.yaml",
+        "~/dotfiles/.lefthook.json",
+        "~/dotfiles/.lefthook.toml",
+        "~/dotfiles/.lefthook-local.yml",
+        "~/dotfiles/.lefthook-local.yaml",
+        "~/dotfiles/.lefthook-local.json",
+        "~/dotfiles/.lefthook-local.toml",
+        "~/dotfiles/.lefthook",
+        "~/dotfiles/.lefthook-local",
+        "~/dotfiles/mise",
+        "~/dotfiles/claude-code/scripts",
+        "~/dotfiles/.git/branches",
+        "~/dotfiles/.git/remotes",
         "~/dotfiles/tests",
         "~/dotfiles/git",
         "~/dotfiles/ssh",
@@ -192,7 +217,7 @@
           },
           {
             "type": "command",
-            "command": "bun $HOME/dotfiles/claude-code/hooks/slop-guard.ts"
+            "command": "bun --config=/dev/null $HOME/dotfiles/claude-code/hooks/slop-guard.ts"
           }
         ]
       }
@@ -203,7 +228,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun $HOME/dotfiles/claude-code/hooks/save-transcript.ts",
+            "command": "bun --config=/dev/null $HOME/dotfiles/claude-code/hooks/save-transcript.ts",
             "async": true
           }
         ]
@@ -232,7 +257,7 @@
           },
           {
             "type": "command",
-            "command": "bun $HOME/dotfiles/claude-code/hooks/slop-guard.ts",
+            "command": "bun --config=/dev/null $HOME/dotfiles/claude-code/hooks/slop-guard.ts",
             "timeout": 10
           }
         ]
@@ -241,7 +266,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "bun $HOME/dotfiles/claude-code/statusline.ts"
+    "command": "bun --config=/dev/null $HOME/dotfiles/claude-code/statusline.ts"
   },
   "enabledPlugins": {
     "eli5@claude-community": true

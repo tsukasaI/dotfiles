@@ -968,13 +968,6 @@ command = "gh"
 required_tokens = ["ext"]
 
 [[deny]]
-id = "dotfiles-gh-alias-shell"
-reason = "gh alias set --shell defines an alias that runs an arbitrary shell command"
-command = "gh"
-required_tokens = ["alias"]
-required_flags = ["s|--shell"]
-
-[[deny]]
 id = "dotfiles-gh-gist"
 reason = "gh gist create uploads local files; gh gist clone writes files outside the sandbox"
 command = "gh"
@@ -1035,20 +1028,35 @@ reason = "gh repo sync rewrites local branches outside the sandbox"
 command = "gh"
 required_tokens = ["repo", "sync"]
 
-# Redirect writes into files that unsandboxed processes execute. Seatbelt
-# denyWrite already stops sandboxed commands; this covers redirects attached
-# to sandbox-excluded commands (gh, git push/fetch/pull/ls-remote), whose
-# redirect runs in the unsandboxed shell.
+# Redirect writes into files that unsandboxed processes execute. Defense in
+# depth: Claude Code runs a line with a redirect or pipe inside the sandbox
+# even when its command is in sandbox.excludedCommands (verified 2026-09-26),
+# so sandbox.filesystem.denyWrite is the primary control. shguard accepts
+# case_insensitive only on normalized/normalized_prefix, so only the absolute
+# forms fold case; the relative and basename forms are case-sensitive.
 [[redirect]]
 id = "dotfiles-redirect-live-config"
-reason = "redirect into a dotfiles path that an unsandboxed process executes (hooks, lefthook, tests, git/ssh/zsh/nvim config)"
+reason = "redirect into a dotfiles path that an unsandboxed process executes (hooks, lefthook, tests, git/ssh/zsh/nvim/mise config, .git remotes)"
 decision = "block"
 targets = [
   { normalized_basename = "lefthook.yaml" },
   { normalized_basename = "lefthook.yml" },
+  { normalized_basename = "lefthook.json" },
+  { normalized_basename = "lefthook.toml" },
   { normalized_basename = "lefthook-local.yaml" },
-  { normalized_prefix = "~/dotfiles/" },
-  { normalized_prefix = "/Users/inouetsukasa/dotfiles/" },
+  { normalized_basename = "lefthook-local.yml" },
+  { normalized_basename = "lefthook-local.json" },
+  { normalized_basename = "lefthook-local.toml" },
+  { normalized_basename = ".lefthook.yaml" },
+  { normalized_basename = ".lefthook.yml" },
+  { normalized_basename = ".lefthook.json" },
+  { normalized_basename = ".lefthook.toml" },
+  { normalized_basename = ".lefthook-local.yaml" },
+  { normalized_basename = ".lefthook-local.yml" },
+  { normalized_basename = ".lefthook-local.json" },
+  { normalized_basename = ".lefthook-local.toml" },
+  { normalized_prefix = "~/dotfiles/", case_insensitive = true },
+  { normalized_prefix = "/Users/inouetsukasa/dotfiles/", case_insensitive = true },
   # Relative forms: shguard has no cwd, so these are raw prefixes that assume
   # the repo root as cwd. `../`-ascent forms fall to shguard's own
   # unknown-cwd floor.
@@ -1062,5 +1070,97 @@ targets = [
   { prefix = "karabiner/" }, { prefix = "./karabiner/" },
   { prefix = "nix-darwin/" }, { prefix = "./nix-darwin/" },
   { prefix = "claude-code/" }, { prefix = "./claude-code/" },
+  { prefix = "mise/" }, { prefix = "./mise/" },
+  { prefix = ".git/" }, { prefix = "./.git/" },
+  { prefix = ".lefthook/" }, { prefix = ".lefthook-local/" },
   { exact = "setup.sh" }, { exact = "./setup.sh" },
 ]
+
+# git push --repo=<url|path> overrides the remote positional. It already falls
+# outside sandbox.excludedCommands (runs sandboxed); defense in depth.
+[[deny]]
+id = "dotfiles-git-push-repo-flag"
+reason = "git push --repo names an arbitrary destination instead of a configured remote"
+command = "git"
+required_tokens = ["push"]
+required_flags = ["--repo"]
+
+# gh subcommands that execute, persist config, or change repo/credential state
+# (gh runs outside the sandbox).
+[[deny]]
+id = "dotfiles-gh-alias"
+reason = "gh alias set/import can define '!'-prefixed shell aliases"
+command = "gh"
+required_tokens = ["alias"]
+
+[[deny]]
+id = "dotfiles-gh-config-set"
+reason = "gh config set pager/editor/browser runs a chosen command on later gh calls"
+command = "gh"
+required_tokens = ["config", "set"]
+
+[[deny]]
+id = "dotfiles-gh-secret"
+reason = "gh secret uploads local values to repository secrets"
+command = "gh"
+required_tokens = ["secret"]
+
+[[deny]]
+id = "dotfiles-gh-variable"
+reason = "gh variable uploads local values to repository variables"
+command = "gh"
+required_tokens = ["variable"]
+
+[[deny]]
+id = "dotfiles-gh-repo-edit"
+reason = "gh repo edit can change visibility or settings of any owned repo"
+command = "gh"
+required_tokens = ["repo", "edit"]
+
+[[deny]]
+id = "dotfiles-gh-repo-create"
+reason = "gh repo create --source --push publishes local content"
+command = "gh"
+required_tokens = ["repo", "create"]
+
+[[deny]]
+id = "dotfiles-gh-auth-login"
+reason = "gh auth login replaces the stored credential"
+command = "gh"
+required_tokens = ["auth", "login"]
+
+[[deny]]
+id = "dotfiles-gh-auth-setup-git"
+reason = "gh auth setup-git rewrites the global git credential helper"
+command = "gh"
+required_tokens = ["auth", "setup-git"]
+
+[[deny]]
+id = "dotfiles-gh-auth-refresh"
+reason = "gh auth refresh changes token scopes (and inside the sandbox the keyring error is not a broken login)"
+command = "gh"
+required_tokens = ["auth", "refresh"]
+
+[[deny]]
+id = "dotfiles-gh-release-edit"
+reason = "gh release edit --notes-file uploads a local file"
+command = "gh"
+required_tokens = ["release", "edit"]
+
+[[deny]]
+id = "dotfiles-gh-workflow-run"
+reason = "gh workflow run triggers CI with repository credentials"
+command = "gh"
+required_tokens = ["workflow", "run"]
+
+[[deny]]
+id = "dotfiles-gh-codespace"
+reason = "gh codespace runs remote shells and copies files"
+command = "gh"
+required_tokens = ["codespace"]
+
+[[deny]]
+id = "dotfiles-gh-cs"
+reason = "gh cs is the short form of gh codespace"
+command = "gh"
+required_tokens = ["cs"]
