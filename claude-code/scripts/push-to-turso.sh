@@ -12,13 +12,14 @@
 #   1. Take a WAL-consistent snapshot of the local DB (.backup) so we don't race the hook.
 #   2. Create the Turso schema if absent (CREATE TABLE IF NOT EXISTS).
 #   3. Stream the snapshot's rows as INSERTs to Turso. `turso db shell` autocommits
-#      each statement (not one transaction), so INSERT OR IGNORE keeps re-runs idempotent.
+#      each statement (not one transaction), so an UPSERT keeps re-runs idempotent.
 #   4. Gate deletion on BOTH: the push exited 0 AND per-table counts reconcile.
 #   5. Delete from the LIVE local DB only the rows that were in the snapshot, then VACUUM
 #      to reclaim space. Rows added by the hook after the snapshot are left intact.
 #
 # On any doubt the script keeps the local data and exits non-zero (fail-safe).
-# INSERT OR IGNORE makes re-runs idempotent (existing rows are skipped).
+# Re-runs are idempotent: a row already in Turso is only overwritten by a newer copy
+# (a session resumed after an earlier push is re-saved locally with INSERT OR REPLACE).
 #
 # REDACTION (#4): save-transcript.ts masks well-known credential formats at
 # write time since 2026-07-13, but transcript_raw rows written BEFORE that
@@ -101,10 +102,14 @@ SQL
 #   - libSQL lacks unistr(), which modern sqlite `.mode insert` emits for control chars.
 # We therefore build the INSERTs ourselves with the SQL quote() function (standard literal,
 # control bytes raw, single quotes doubled — libSQL-compatible and safe for multi-line
-# transcripts) and use INSERT OR IGNORE so re-runs after a partial push are idempotent.
-SESSIONS_SQL="SELECT 'INSERT OR IGNORE INTO sessions (session_id,project_dir,git_branch,model,claude_version,started_at,ended_at,end_reason,input_tokens,output_tokens,num_user_messages,num_assistant_messages) VALUES ('||quote(session_id)||','||quote(project_dir)||','||quote(git_branch)||','||quote(model)||','||quote(claude_version)||','||quote(started_at)||','||quote(ended_at)||','||quote(end_reason)||','||quote(input_tokens)||','||quote(output_tokens)||','||quote(num_user_messages)||','||quote(num_assistant_messages)||');' FROM sessions;"
-TRANSCRIPT_SQL="SELECT 'INSERT OR IGNORE INTO transcript_raw (session_id,transcript_jsonl,size_bytes) VALUES ('||quote(session_id)||','||quote(transcript_jsonl)||','||quote(size_bytes)||');' FROM transcript_raw;"
-DAYS_SQL="SELECT 'INSERT OR IGNORE INTO session_days (session_id,day,message_count) VALUES ('||quote(session_id)||','||quote(day)||','||quote(message_count)||');' FROM session_days;"
+# transcripts). Each INSERT is an UPSERT whose update fires only when the incoming row is
+# at least as new, so re-runs after a partial push are idempotent, a resumed session's
+# longer transcript replaces the stale remote copy, and an older local row never
+# overwrites a newer remote one. The count gate in step 4 cannot catch a stale remote
+# row (the count matches either way), so this ordering is what prevents that loss.
+SESSIONS_SQL="SELECT 'INSERT INTO sessions (session_id,project_dir,git_branch,model,claude_version,started_at,ended_at,end_reason,input_tokens,output_tokens,num_user_messages,num_assistant_messages) VALUES ('||quote(session_id)||','||quote(project_dir)||','||quote(git_branch)||','||quote(model)||','||quote(claude_version)||','||quote(started_at)||','||quote(ended_at)||','||quote(end_reason)||','||quote(input_tokens)||','||quote(output_tokens)||','||quote(num_user_messages)||','||quote(num_assistant_messages)||') ON CONFLICT(session_id) DO UPDATE SET project_dir=excluded.project_dir,git_branch=excluded.git_branch,model=excluded.model,claude_version=excluded.claude_version,started_at=excluded.started_at,ended_at=excluded.ended_at,end_reason=excluded.end_reason,input_tokens=excluded.input_tokens,output_tokens=excluded.output_tokens,num_user_messages=excluded.num_user_messages,num_assistant_messages=excluded.num_assistant_messages WHERE coalesce(excluded.ended_at,'''') >= coalesce(sessions.ended_at,'''');' FROM sessions;"
+TRANSCRIPT_SQL="SELECT 'INSERT INTO transcript_raw (session_id,transcript_jsonl,size_bytes) VALUES ('||quote(session_id)||','||quote(transcript_jsonl)||','||quote(size_bytes)||') ON CONFLICT(session_id) DO UPDATE SET transcript_jsonl=excluded.transcript_jsonl,size_bytes=excluded.size_bytes WHERE coalesce(excluded.size_bytes,0) >= coalesce(transcript_raw.size_bytes,0);' FROM transcript_raw;"
+DAYS_SQL="SELECT 'INSERT INTO session_days (session_id,day,message_count) VALUES ('||quote(session_id)||','||quote(day)||','||quote(message_count)||') ON CONFLICT(session_id,day) DO UPDATE SET message_count=max(coalesce(excluded.message_count,0),coalesce(session_days.message_count,0));' FROM session_days;"
 
 echo "Pushing rows..."
 # Each producer writes to a shared file rather than feeding a pipe: a brace-group
@@ -117,7 +122,7 @@ if sqlite3 "$SNAP" "$SESSIONS_SQL" > "$PUSH_SQL" \
    && turso db shell "$TURSO_DB" < "$PUSH_SQL"; then
   echo "送信コマンド成功。"
 else
-  echo "送信に失敗しました。ローカルは無変更（次回は OR IGNORE で再開可能）。" >&2
+  echo "送信に失敗しました。ローカルは無変更（次回は UPSERT で再開可能）。" >&2
   exit 1
 fi
 
