@@ -999,3 +999,45 @@ Still open (accepted): in other repos, `.claude/` is not in denyWrite, so a
 sandboxed interpreter's `rename()` of `.claude` there is only stopped if
 Claude Code protects it (not verified outside this repo); shguard rule 2
 covers the shell-command forms.
+
+### Round 4 (remaining review items B7/B10/B11/B14), 2026-09-27
+
+Secret reads (B7): sandboxed Bash could read the Turso token
+(`~/Library/Application Support/turso/settings.json`), the kube client key
+and `~/.aws/login/cache`; the Read deny list only had filename patterns.
+Those paths plus `~/.docker/config.json`, `~/.netrc`, `~/.npmrc`,
+`~/.pypirc`, gh's `hosts.yml` and the gnupg private-key and revocation
+directories are now in both `permissions.deny` (`Read(...)`, for the
+Read/Grep/Glob tools) and `sandbox.filesystem.denyRead` (for sandboxed
+Bash). The docs describe these as separate layers; this Claude Code build
+also copied `Read()` denies into the sandbox read policy, but listing both
+doesn't depend on that. `~/.gnupg` as a whole stays readable because sandboxed signing
+needs it; `logs.db` stays readable because self-improve reads it.
+
+Sandbox escape: `sandbox.allowUnsandboxedCommands: false`, so a
+`dangerouslyDisableSandbox` retry is refused instead of classifier-gated,
+and `excludedCommands` is the only unsandboxed path. Cost: commands that
+need the nix daemon socket (`nix build`, `darwin-rebuild build`) must be
+run by the user with `!`.
+
+shguard (B10/B11): denies for `node --eval/-p/--print`, `bun -e/-p`,
+`deno eval`, `perl -E`, versioned/alternate Pythons (`python2`,
+`python3.12`, `python3.13`, `pypy`, `pypy3`) and `uv run python -c` /
+`uvx python -c`, bare `tcsh`/`csh`/`ash` script files, `diskutil
+eraseDisk/eraseVolume`, `launchctl bootstrap/submit`, and positional
+misses (`kubectl get secret(s)`, `docker image push`, `docker buildx build
+--push`, `gh api -X Delete`). Parity cases added.
+
+MCP (B14): the cc-memory allow rules named `mcp__cc-memory__*`, which is the
+unauthenticated local server, not the claude.ai connector in use
+(`mcp__claude_ai_cc-memory__*`); renamed. Destructive tools (`delete_fact`,
+staygreen `delete_*`) stay allowed by decision.
+
+Still open (accepted):
+- `gh api -X dElEtE` and other casings: `exact` targets have no
+  case-insensitive option.
+- Bare `env` / `set` dump the environment; a blanket rule would also deny
+  `env FOO=1 cmd`, and shguard has no "no further args" matcher.
+- `git restore --staged` and `git rm --cached` stay denied (B12): shguard
+  can't express "unless only `--staged`", so the rules stay fail-closed.
+  `perl -ne/-pe` denies are correct, not false positives: they cluster `-e`.

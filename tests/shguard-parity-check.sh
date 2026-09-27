@@ -250,6 +250,31 @@ case_ "gh workflow list"                 'gh workflow list'                    a
 case_ "fd -x"                            'fd . -x rm {}'                       deny "fd is allow-listed; -x/--exec is xargs-equivalent"
 case_ "rg --pre"                         'rg --pre ./x foo'                    deny
 
+# ── Interpreter variants and positional-token gaps (deltas #26 round 4) ──
+case_ "node --eval"                      "node --eval '1'"                     deny
+case_ "node -p"                          "node -p '1'"                         deny
+case_ "node script"                      'node script.js'                      allow
+case_ "bun -e"                           "bun -e '1'"                          deny
+case_ "bun test"                         'bun test'                            allow
+case_ "deno eval"                        "deno eval '1'"                       deny
+case_ "perl -E"                          "perl -E 'say 1'"                     deny
+case_ "python3.12 -c"                    "python3.12 -c 'print(1)'"            deny
+case_ "pypy3 -c"                         "pypy3 -c 'print(1)'"                 deny
+case_ "uv run python -c"                 "uv run python -c 'print(1)'"         deny
+case_ "uvx python -c"                    "uvx python -c 1"                     deny
+case_ "python3 script"                   'python3 script.py'                   allow
+case_ "tcsh script"                      'tcsh x.sh'                           deny
+case_ "diskutil eraseDisk"               'diskutil eraseDisk APFS x disk9'     deny
+case_ "diskutil list"                    'diskutil list'                       allow
+case_ "kubectl get secret"               'kubectl get secret foo -o yaml'      deny
+case_ "kubectl get pods"                 'kubectl get pods'                    allow
+case_ "docker image push"                'docker image push x'                 deny
+case_ "docker buildx --push"             'docker buildx build --push .'        deny
+case_ "docker build"                     'docker build .'                      allow
+case_ "launchctl bootstrap"              'launchctl bootstrap gui/501 x.plist' deny
+case_ "launchctl submit"                 'launchctl submit -l x -- /bin/sh'    deny
+case_ "gh api -X Delete"                 'gh api -X Delete repos/a/b'          deny
+
 # ── config-load fail-closed (SHGUARD_STRICT_CONFIG) ─────────────────────────
 # claude-code/settings.json's PreToolUse/Bash hook sets SHGUARD_STRICT_CONFIG=1
 # so a missing/malformed config denies instead of asking (shguard#440/#441).

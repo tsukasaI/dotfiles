@@ -33,6 +33,9 @@ There is no staging or deploy step (hooks apply on the next tool call,
 - Apply system config: `sudo darwin-rebuild switch --flake ~/dotfiles/nix-darwin`
   (flake output resolved by hostname; macOS `defaults` changes need logout).
 - Verify a flake change without activating: `darwin-rebuild build --flake ~/dotfiles/nix-darwin`.
+  It needs the nix daemon socket, which the Bash sandbox blocks, and
+  `sandbox.allowUnsandboxedCommands` is `false`, so Claude can't run it or
+  `nix build`: ask the user to run them with `!`.
 - Update flake inputs: `nix flake update` (in `nix-darwin/`), then
   `darwin-rebuild switch` to activate.
 - Test a hook change with a synthetic payload:

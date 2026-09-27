@@ -11,6 +11,7 @@
   },
   "sandbox": {
     "enabled": true,
+    "allowUnsandboxedCommands": false,
     "excludedCommands": [
       "git push", "git push origin:*", "git push -u origin:*",
       "git fetch", "git fetch origin:*", "git fetch --prune origin:*",
@@ -18,6 +19,18 @@
       "git ls-remote origin:*", "gh:*"
     ],
     "filesystem": {
+      "denyRead": [
+        "~/Library/Application Support/turso",
+        "~/.kube/config",
+        "~/.aws",
+        "~/.docker/config.json",
+        "~/.netrc",
+        "~/.npmrc",
+        "~/.pypirc",
+        "~/.config/gh/hosts.yml",
+        "~/.gnupg/private-keys-v1.d",
+        "~/.gnupg/openpgp-revocs.d"
+      ],
       "denyWrite": [
         "~/dotfiles/lefthook.yaml",
         "~/dotfiles/lefthook-local.yaml",
@@ -135,15 +148,15 @@
       "Bash(git show:*)",
       "Bash(git branch:*)",
       "Bash(git ls-files:*)",
-      "mcp__cc-memory__get_last_retro",
-      "mcp__cc-memory__list_facts",
-      "mcp__cc-memory__process_inbox",
-      "mcp__cc-memory__edit_fact",
-      "mcp__cc-memory__delete_fact",
-      "mcp__cc-memory__upsert_learnings",
-      "mcp__cc-memory__upsert_summary",
-      "mcp__cc-memory__update_hot_facts",
-      "mcp__cc-memory__record_retro_run",
+      "mcp__claude_ai_cc-memory__get_last_retro",
+      "mcp__claude_ai_cc-memory__list_facts",
+      "mcp__claude_ai_cc-memory__process_inbox",
+      "mcp__claude_ai_cc-memory__edit_fact",
+      "mcp__claude_ai_cc-memory__delete_fact",
+      "mcp__claude_ai_cc-memory__upsert_learnings",
+      "mcp__claude_ai_cc-memory__upsert_summary",
+      "mcp__claude_ai_cc-memory__update_hot_facts",
+      "mcp__claude_ai_cc-memory__record_retro_run",
       "mcp__claude_ai_staygreen__*"
     ],
     "deny": [
@@ -168,7 +181,17 @@
       "Read(**/.next/**)",
       "Read(**/.turbo/**)",
       "Read(**/__pycache__/**)",
-      "Read(**/.pytest_cache/**)"
+      "Read(**/.pytest_cache/**)",
+      "Read(~/Library/Application Support/turso/**)",
+      "Read(~/.kube/config)",
+      "Read(~/.aws/**)",
+      "Read(~/.docker/config.json)",
+      "Read(~/.netrc)",
+      "Read(~/.npmrc)",
+      "Read(~/.pypirc)",
+      "Read(~/.config/gh/hosts.yml)",
+      "Read(~/.gnupg/private-keys-v1.d/**)",
+      "Read(~/.gnupg/openpgp-revocs.d/**)"
     ],
     "defaultMode": "auto"
   },

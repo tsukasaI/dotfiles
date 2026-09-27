@@ -133,6 +133,19 @@ reason = "diskutil erase permanently destroys disk data"
 command = "diskutil"
 required_tokens = ["erase"]
 
+# eraseDisk/eraseVolume are distinct verbs, not "erase" plus an argument.
+[[deny]]
+id = "dotfiles-disk-diskutil-erasedisk"
+reason = "diskutil eraseDisk destroys all data on a disk"
+command = "diskutil"
+required_tokens = ["eraseDisk"]
+
+[[deny]]
+id = "dotfiles-disk-diskutil-erasevolume"
+reason = "diskutil eraseVolume destroys all data on a volume"
+command = "diskutil"
+required_tokens = ["eraseVolume"]
+
 # =====================================================================
 # Network
 # =====================================================================
@@ -260,6 +273,18 @@ command = "launchctl"
 required_tokens = ["unload"]
 
 [[deny]]
+id = "dotfiles-service-launchctl-bootstrap"
+reason = "launchctl bootstrap loads a service into a launchd domain"
+command = "launchctl"
+required_tokens = ["bootstrap"]
+
+[[deny]]
+id = "dotfiles-service-launchctl-submit"
+reason = "launchctl submit runs an arbitrary command as a launchd job"
+command = "launchctl"
+required_tokens = ["submit"]
+
+[[deny]]
 id = "dotfiles-service-systemctl-enable"
 reason = "systemctl enable can alter Linux system services"
 command = "systemctl"
@@ -308,6 +333,20 @@ id = "dotfiles-credential-kubectl-secrets"
 reason = "kubectl secrets exposes or manipulates Kubernetes secrets"
 command = "kubectl"
 required_tokens = ["secrets"]
+
+# required_tokens matches from the first positional, so the two rules above
+# miss the common `kubectl get secret` shape (same class as deltas #21).
+[[deny]]
+id = "dotfiles-credential-kubectl-get-secret"
+reason = "kubectl get secret exposes Kubernetes secrets"
+command = "kubectl"
+required_tokens = ["get", "secret"]
+
+[[deny]]
+id = "dotfiles-credential-kubectl-get-secrets"
+reason = "kubectl get secrets exposes Kubernetes secrets"
+command = "kubectl"
+required_tokens = ["get", "secrets"]
 
 # =====================================================================
 # Environment variable exfiltration
@@ -366,6 +405,21 @@ reason = "fish script.fish executes an unreviewed script file; fish -c/-C is han
 command = "fish"
 
 [[deny]]
+id = "dotfiles-code-tcsh"
+reason = "tcsh script.sh executes an unreviewed script file; tcsh -c is handled by shguard's own recursion into the inner command"
+command = "tcsh"
+
+[[deny]]
+id = "dotfiles-code-csh"
+reason = "csh script.sh executes an unreviewed script file; csh -c is handled by shguard's own recursion into the inner command"
+command = "csh"
+
+[[deny]]
+id = "dotfiles-code-ash"
+reason = "ash script.sh executes an unreviewed script file; ash -c is handled by shguard's own recursion into the inner command"
+command = "ash"
+
+[[deny]]
 id = "dotfiles-code-xargs"
 reason = "xargs can invoke arbitrary executables (e.g. xargs sh -c)"
 command = "xargs"
@@ -382,17 +436,76 @@ reason = "python3 -c executes an arbitrary string as Python"
 command = "python3"
 required_flags = ["c"]
 
+# `command` is an exact argv[0] match, so each versioned or alternate Python
+# needs its own entry.
 [[deny]]
-id = "dotfiles-code-node-e"
-reason = "node -e executes an arbitrary string as JavaScript"
-command = "node"
-required_flags = ["e"]
+id = "dotfiles-code-python2-c"
+reason = "python2 -c executes an arbitrary string as Python"
+command = "python2"
+required_flags = ["c"]
 
 [[deny]]
+id = "dotfiles-code-python312-c"
+reason = "python3.12 -c executes an arbitrary string as Python"
+command = "python3.12"
+required_flags = ["c"]
+
+[[deny]]
+id = "dotfiles-code-python313-c"
+reason = "python3.13 -c executes an arbitrary string as Python"
+command = "python3.13"
+required_flags = ["c"]
+
+[[deny]]
+id = "dotfiles-code-pypy-c"
+reason = "pypy -c executes an arbitrary string as Python"
+command = "pypy"
+required_flags = ["c"]
+
+[[deny]]
+id = "dotfiles-code-pypy3-c"
+reason = "pypy3 -c executes an arbitrary string as Python"
+command = "pypy3"
+required_flags = ["c"]
+
+[[deny]]
+id = "dotfiles-code-uv-run-python-c"
+reason = "uv run python -c executes an arbitrary string as Python"
+command = "uv"
+required_tokens = ["run", "python"]
+required_flags = ["c"]
+
+[[deny]]
+id = "dotfiles-code-uvx-python-c"
+reason = "uvx python -c executes an arbitrary string as Python"
+command = "uvx"
+required_tokens = ["python"]
+required_flags = ["c"]
+
+[[deny]]
+id = "dotfiles-code-node-e"
+reason = "node -e/--eval/-p/--print executes an arbitrary string as JavaScript"
+command = "node"
+required_flags = ["e|--eval|p|--print"]
+
+[[deny]]
+id = "dotfiles-code-bun-e"
+reason = "bun -e/--eval/-p/--print executes an arbitrary string as JavaScript"
+command = "bun"
+required_flags = ["e|--eval|p|--print"]
+
+[[deny]]
+id = "dotfiles-code-deno-eval"
+reason = "deno eval executes an arbitrary string as JavaScript/TypeScript"
+command = "deno"
+required_tokens = ["eval"]
+
+# -ne/-pe stay denied: they cluster -e and run the code once per input line.
+[[deny]]
 id = "dotfiles-code-perl-e"
-reason = "perl -e executes an arbitrary string as Perl"
+reason = "perl -e/-E executes an arbitrary string as Perl"
 command = "perl"
-required_flags = ["e"]
+required_flags = ["e|E"]
 
 [[deny]]
 id = "dotfiles-code-ruby-e"
@@ -521,6 +634,15 @@ command = "gh"
 required_tokens = ["api"]
 targets = [{ exact = "delete" }]
 
+# `exact` has no case_insensitive option, so only the likely casings are
+# listed; arbitrary casings (dElEtE) remain an accepted gap (deltas #26).
+[[deny]]
+id = "dotfiles-github-api-delete-title"
+reason = "gh api -X Delete / --method Delete issues a destructive HTTP DELETE request"
+command = "gh"
+required_tokens = ["api"]
+targets = [{ exact = "Delete" }]
+
 # =====================================================================
 # History manipulation
 # =====================================================================
@@ -572,6 +694,19 @@ id = "dotfiles-docker-push"
 reason = "docker push publishes images to a registry"
 command = "docker"
 required_tokens = ["push"]
+
+[[deny]]
+id = "dotfiles-docker-image-push"
+reason = "docker image push publishes images to a registry"
+command = "docker"
+required_tokens = ["image", "push"]
+
+[[deny]]
+id = "dotfiles-docker-buildx-push"
+reason = "docker buildx build --push publishes images to a registry"
+command = "docker"
+required_tokens = ["buildx", "build"]
+required_flags = ["--push"]
 
 # =====================================================================
 # SSH / remote access
