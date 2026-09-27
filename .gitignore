@@ -15,3 +15,7 @@ karabiner/automatic_backups/
 .claude/plans/
 .claude/worktrees/
 .claude/settings.local.json
+
+# Claude Code's local cache of claude.ai account skills, written through the
+# ~/.claude/skills symlink; machine-generated and includes personal custom skills.
+claude-code/skills/synced/
