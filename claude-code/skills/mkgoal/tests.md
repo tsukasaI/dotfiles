@@ -21,7 +21,8 @@ and whenever the main-loop model changes tier.
   clause and instructs showing the verification command's full output each
   turn.
 - The assembled statement always contains the standing implementation
-  pattern: implement with the sonnet model, review with a fable-model
+  pattern: delegate the implementation to a `model: sonnet` subagent,
+  review with a fable-model
   `code-reviewer` subagent, and squash-merge via
   `gh pr merge --squash --delete-branch` once fable approves. It is never
   asked about as a slot.

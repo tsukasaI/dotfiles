@@ -121,7 +121,9 @@ Every statement this skill drafts bakes in the same fixed agent/review
 pattern. This is not a slot, it is never asked about, and it is always
 included:
 
-- Implement using the **sonnet** model.
+- Delegate the implementation to a subagent launched with `model: sonnet`.
+  `/goal` never switches the model, so naming the model only in prose would
+  bind nothing; the Agent tool's `model` argument does.
 - Review with a **fable**-model `code-reviewer` subagent before completion
   counts.
 - On fable's approval, the PR is pre-authorized to squash-merge via
@@ -133,8 +135,9 @@ included:
 
 Build the statement on a single line from this template:
 
-    /goal <task summary drawn from the user's stated goal>. Implement using
-    the sonnet model, then have a fable-model code-reviewer subagent review
+    /goal <task summary drawn from the user's stated goal>. Delegate the
+    implementation to a subagent launched with model: sonnet, then have a
+    fable-model code-reviewer subagent review
     the change; run `<verification command>` and show its full output in the
     conversation each turn; the goal is met when that output confirms
     <objective condition>, while <constraints> holds; once fable approves the
@@ -145,8 +148,8 @@ In issue mode, list each issue as its own named clause instead of one task
 summary, and join the per-issue completion conditions with "and":
 
     /goal Resolve issue #<N1> (<title1>) and issue #<N2> (<title2>) [...].
-    Implement using the sonnet model, then have a fable-model code-reviewer
-    subagent review each change; for #<N1>, run `<verification command 1>`;
+    Delegate each implementation to a subagent launched with model: sonnet,
+    then have a fable-model code-reviewer subagent review each change; for #<N1>, run `<verification command 1>`;
     for #<N2>, run `<verification command 2>` [...]; show full output each
     turn. The goal is met when every issue's output confirms its own
     condition, while <batch constraints> holds; once fable approves a PR's
