@@ -880,19 +880,48 @@ command = "turso"
 # Exfiltration via gh file uploads (gh runs outside the sandbox)
 # =====================================================================
 
+# A multi-line -b argument makes Claude Code run the line sandboxed (newlines
+# split it, so it no longer matches sandbox.excludedCommands) and gh then
+# fails on the keychain, so multi-line bodies must go through --body-file.
+# Only a file under the session scratchpad is allowed as the body source.
 [[deny]]
 id = "dotfiles-gh-issue-body-file"
-reason = "gh issue create/comment --body-file uploads a local file to a remote issue"
+reason = "gh issue create/comment --body-file uploads a local file; write the body under /private/tmp/claude-501/ first"
 command = "gh"
 required_tokens = ["issue"]
 required_flags = ["F|--body-file"]
+value_flags = ["t", "title", "b", "body", "R", "repo", "l", "label", "a", "assignee", "m", "milestone", "p", "project", "T", "template"]
+except_targets = [
+  { prefix = "/private/tmp/claude-501/" },
+  # subcommand positionals are candidate targets too
+  { exact = "issue" }, { exact = "create" }, { exact = "comment" }, { exact = "edit" },
+]
 
 [[deny]]
 id = "dotfiles-gh-pr-body-file"
-reason = "gh pr create/comment --body-file uploads a local file to a remote PR"
+reason = "gh pr create/comment --body-file uploads a local file; write the body under /private/tmp/claude-501/ first"
 command = "gh"
 required_tokens = ["pr"]
 required_flags = ["F|--body-file"]
+value_flags = ["t", "title", "b", "body", "R", "repo", "B", "base", "H", "head", "l", "label", "a", "assignee", "r", "reviewer", "m", "milestone", "p", "project", "T", "template"]
+except_targets = [
+  { prefix = "/private/tmp/claude-501/" },
+  # subcommand positionals are candidate targets too
+  { exact = "pr" }, { exact = "create" }, { exact = "comment" }, { exact = "edit" }, { exact = "review" },
+]
+
+# except_targets is literal, so `/private/tmp/claude-501/../../../Users/...`
+# passes the carve-out above; deny body files that normalize outside it.
+[[deny]]
+id = "dotfiles-gh-body-file-escape"
+reason = "gh --body-file path escapes the scratchpad via .."
+command = "gh"
+required_flags = ["F|--body-file"]
+targets = [
+  { normalized_prefix = "/Users/" }, { normalized_prefix = "/etc/" },
+  { normalized_prefix = "/private/etc/" }, { normalized_prefix = "/private/var/" },
+  { normalized_prefix = "/var/" }, { normalized_prefix = "/opt/" }, { normalized_prefix = "/nix/" },
+]
 # =====================================================================
 # Unsandboxed git (push/fetch/pull/ls-remote run outside the Seatbelt
 # sandbox for SSH; see claude-code/settings.json sandbox.excludedCommands)
@@ -1164,3 +1193,41 @@ id = "dotfiles-gh-cs"
 reason = "gh cs is the short form of gh codespace"
 command = "gh"
 required_tokens = ["cs"]
+
+# Renaming, linking or copying over a directory that CONTAINS protected paths
+# defeats path-literal protection (Seatbelt denyWrite and Claude Code's own
+# .git/config, .git/hooks, .claude/settings*.json checks): rename it away,
+# edit inside, rename it back. Renaming a denyWrite path itself is already
+# denied by Seatbelt; these rules cover the unlisted ancestors, in either
+# direction and in any repo. Python/node rename() from a sandboxed script is
+# not covered (accepted, see docs/shguard-migration-deltas.md #26).
+[[deny]]
+id = "dotfiles-rename-protected-ancestor-mv"
+reason = "mv of .git/.claude/claude-code swaps a directory holding protected files"
+command = "mv"
+targets = [{ normalized_basename = ".git" }, { normalized_basename = ".claude" }, { normalized_basename = "claude-code" }]
+
+[[deny]]
+id = "dotfiles-rename-protected-ancestor-git-mv"
+reason = "git mv of .claude/claude-code swaps a directory holding protected files"
+command = "git"
+required_tokens = ["mv"]
+targets = [{ normalized_basename = ".git" }, { normalized_basename = ".claude" }, { normalized_basename = "claude-code" }]
+
+[[deny]]
+id = "dotfiles-rename-protected-ancestor-ln"
+reason = "ln onto .git/.claude/claude-code substitutes a directory holding protected files"
+command = "ln"
+targets = [{ normalized_basename = ".git" }, { normalized_basename = ".claude" }, { normalized_basename = "claude-code" }]
+
+[[deny]]
+id = "dotfiles-rename-protected-ancestor-cp"
+reason = "cp onto or out of .git/.claude/claude-code recreates a directory holding protected files"
+command = "cp"
+targets = [{ normalized_basename = ".git" }, { normalized_basename = ".claude" }, { normalized_basename = "claude-code" }]
+
+[[deny]]
+id = "dotfiles-rename-protected-ancestor-ditto"
+reason = "ditto onto .git/.claude/claude-code recreates a directory holding protected files"
+command = "ditto"
+targets = [{ normalized_basename = ".git" }, { normalized_basename = ".claude" }, { normalized_basename = "claude-code" }]

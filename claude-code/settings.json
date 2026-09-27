@@ -38,7 +38,6 @@
         "~/dotfiles/.lefthook",
         "~/dotfiles/.lefthook-local",
         "~/dotfiles/mise",
-        "~/dotfiles/claude-code/scripts",
         "~/dotfiles/.git/branches",
         "~/dotfiles/.git/remotes",
         "~/dotfiles/tests",
@@ -51,10 +50,8 @@
         "~/dotfiles/ghostty",
         "~/dotfiles/karabiner",
         "~/dotfiles/nix-darwin",
-        "~/dotfiles/claude-code/hooks",
-        "~/dotfiles/claude-code/lib",
-        "~/dotfiles/claude-code/shguard",
-        "~/dotfiles/claude-code/statusline.ts"
+        "~/dotfiles/claude-code",
+        "~/dotfiles/.claude"
       ]
     },
     "network": {
@@ -104,7 +101,6 @@
       "Bash(gh pr list:*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
-      "Bash(mv:*)",
       "Bash(jq:*)",
       "Bash(rg:*)",
       "Bash(fd:*)",

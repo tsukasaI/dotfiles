@@ -232,6 +232,18 @@ case_ "gh redirect into .lefthook-local" 'gh api x > .lefthook-local.yml'      d
 case_ "gh redirect into .git/"           'gh api x > .git/branches/evil'       deny
 case_ "gh redirect into mise/"           'gh api x > mise/config.toml'         deny
 case_ "gh redirect, abs path case-fold"  'gh api x > /Users/inouetsukasa/Dotfiles/zsh/zshrc' deny
+case_ "mv protected ancestor away"       'mv claude-code claude-code-x'        deny "rename away, edit, rename back defeats path-literal protection"
+case_ "mv decoy back onto ancestor"      'mv claude-code-x claude-code'        deny
+case_ "mv .git aside"                    'mv .git .git-x'                      deny
+case_ "mv prepared dir onto .claude"     'mv /private/tmp/claude-501/x/.claude .claude' deny
+case_ "git mv protected ancestor"        'git mv claude-code cc'               deny
+case_ "ln onto .git"                     'ln -s /tmp/evil .git'                deny
+case_ "cp -R onto .git"                  'cp -R /tmp/g .git'                   deny
+case_ "mv ordinary file"                 'mv notes.md docs/notes.md'           allow
+case_ "git mv ordinary file"             'git mv docs/a.md docs/b.md'          allow
+case_ "body-file from scratchpad"        'gh pr create -t t --body-file /private/tmp/claude-501/b.md' allow "multi-line -b runs sandboxed, so bodies go through a scratch file"
+case_ "body-file escaping scratchpad"    'gh pr create -t t --body-file /private/tmp/claude-501/../../../Users/x/.netrc' deny
+case_ "body-file relative path"          'gh pr create -t t --body-file ../../.netrc' deny
 case_ "git switch -c (no -c false positive)" 'git switch -c feat/x'            allow
 case_ "gh config get"                    'gh config get pager'                 allow
 case_ "gh workflow list"                 'gh workflow list'                    allow

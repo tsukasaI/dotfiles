@@ -962,3 +962,40 @@ are write-protected by Claude Code (a `git init` under `.claude/worktrees/`
 was denied). A repo under `$TMPDIR` is not protected, but the Bash cwd
 cannot leave the project (a `cd` there is reset), and `git -C <dir> push`
 does not match the exclusion, so a push from such a repo runs sandboxed.
+
+### Round 3 (fable re-review of b48397b), 2026-09-27
+
+Path-literal protection (Seatbelt denyWrite and Claude Code's own
+`.git/config`, `.git/hooks`, `.claude/settings*.json` checks) did not stop
+renaming an unlisted ancestor away, editing inside, and renaming it back:
+`mv claude-code claude-code-x`, `mv .git .git-x`, `mv .claude .claude-x`,
+all shguard-allow and zero-prompt through `Bash(mv:*)`. Renaming a listed
+path itself was already denied. A log review (597 transcripts, 14,834 Bash
+commands) found no real use of this shape; `mv` itself ran 21 times in
+two weeks, 5 of them outside security testing and shguard/fini dev work,
+none in the main loop.
+
+Fixes:
+
+1. denyWrite `~/dotfiles/claude-code` and `~/dotfiles/.claude` as whole
+   directories. Verified with `os.rename()` from a sandboxed Python script
+   (bypassing shguard entirely): `claude-code`, `.claude` and `.git` are
+   all denied at the Seatbelt layer in this repo.
+2. config.toml denies `mv`, `git mv`, `ln`, `cp`, `ditto` with `.git`,
+   `.claude` or `claude-code` as any argument (either direction, any repo).
+3. `Bash(mv:*)` removed from `permissions.allow`.
+4. Multi-line `-b` bodies split the line on newlines, so the line no
+   longer matches `excludedCommands`, runs sandboxed, and gh fails on the
+   keychain. `--body-file` is now allowed only from
+   `/private/tmp/claude-501/`; a separate normalized rule denies `..`
+   escapes (`except_targets` only accepts literal prefixes). Known false
+   positive: numbered forms (`gh pr comment 3 --body-file <scratch>`) still
+   deny, since the number is a candidate target with no literal carve-out.
+5. shguard#549 filed: resolve relative targets against the payload `cwd`,
+   which would let self-protection catch `mv claude-code x` and relative
+   `sed -i` on its own.
+
+Still open (accepted): in other repos, `.claude/` is not in denyWrite, so a
+sandboxed interpreter's `rename()` of `.claude` there is only stopped if
+Claude Code protects it (not verified outside this repo); shguard rule 2
+covers the shell-command forms.
