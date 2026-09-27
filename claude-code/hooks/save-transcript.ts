@@ -182,6 +182,23 @@ const REDACTIONS: Array<[RegExp, string]> = [
     "[REDACTED:jwt]",
   ],
   [/\bBearer\s+[A-Za-z0-9._~+/=-]{20,}/g, "Bearer [REDACTED:token]"],
+  [/\b[rs]k_(?:live|test)_[A-Za-z0-9]{16,}/g, "[REDACTED:stripe-key]"],
+  [/\bnpm_[A-Za-z0-9]{36}\b/g, "[REDACTED:npm-token]"],
+  [/\bglpat-[A-Za-z0-9_-]{20,}/g, "[REDACTED:gitlab-token]"],
+  [
+    // The secret key has no prefix of its own, so only the assignment form is
+    // recognizable. Quote/backslash runs are allowed around the separator
+    // because the text is JSON-escaped (`\"aws_secret_access_key\": \"...`).
+    /\b(aws_secret_access_key["'\\\s]*[=:]["'\\\s]*)[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+])/gi,
+    "$1[REDACTED:aws-secret-key]",
+  ],
+  [
+    // user:password@ in a URL. `"` and `\` are excluded so a match can't span
+    // a JSON string boundary; a `/` before the `@` (path, port-then-path)
+    // means it isn't userinfo.
+    /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/:@"\\]+:[^\s/@"\\]+@/gi,
+    "$1[REDACTED:url-creds]@",
+  ],
 ];
 
 function redactSecrets(text: string): string {
