@@ -17,11 +17,19 @@ const REVIEW_LABEL = {
 // shguard's deny wording, both rule hits and unresolved-argument floors.
 const SHGUARD_DENY = /matches (?:blocklist )?rule "|could not be resolved to Allow|ask_outcome = "deny"/
 const RULE = /rule "([^"]+)"/
+// Rules that only steer toward a gitignore-aware tool (grep → rg, find → fd);
+// nothing unsafe is being stopped, so the model just switches tools.
+const TOOL_POLICY = /^dotfiles-tool-policy-/
 
 const NOTE =
   'dotfiles-mod: this command is now shown to the user above the prompt as `! <command>`. ' +
-  'Do not route around the block with an equivalent command; use an allowed tool if one ' +
-  'genuinely fits, otherwise stop and let the user run it.'
+  'Do not route around the block with an equivalent shell command (`unlink` for `rm`, piping ' +
+  'around it). If a dedicated tool (Read, Grep, Glob, Edit, Write) does the job, use it; ' +
+  'otherwise stop and let the user run it.'
+
+const TOOL_POLICY_NOTE =
+  'dotfiles-mod: this is a tool-preference rule, not a safety block. Retry right away with ' +
+  'the tool the reason names (rg or the Grep tool for grep, fd or the Glob tool for find).'
 
 export function parseShguardDeny(text: string | undefined): { rule: string } | undefined {
   if (text === undefined || !SHGUARD_DENY.test(text)) return undefined
@@ -34,6 +42,7 @@ export function registerBlockedBand(on: On): void {
     if (ran.isError !== true) return ran
     const hit = parseShguardDeny(ran.text)
     if (hit === undefined) return ran
+    if (TOOL_POLICY.test(hit.rule)) return { ...ran, context: [...(ran.context ?? []), TOOL_POLICY_NOTE] }
 
     await update($, blocked, list =>
       [...list.filter(b => b.command !== e.command), { command: e.command, rule: hit.rule }].slice(-KEEP),

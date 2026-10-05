@@ -49,6 +49,19 @@ test('a shguard deny lands in the band as `! cmd` and tells the model', async ($
   await ui.unmount()
 })
 
+test('a tool-policy deny skips the band and points at the replacement tool', async ($, on) => {
+  stubEngine(on)
+  on('classic.PreToolUse', () => ({ deny: 'matches blocklist rule "dotfiles-tool-policy-grep": use rg' }))
+  const ran = await $.tool.call({ tool: 'Bash', command: 'grep -r foo .' })
+  expect(ran.isError).toBe(true)
+  expect(ran.context?.some(c => c.includes('Retry right away'))).toBe(true)
+  expect(ran.context?.some(c => c.includes('Do not route around'))).toBe(false)
+
+  const ui = await $.ui.mount({ plugin: 'dotfiles-mod', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  expect(await ui.find({ type: 'Code' })).toBeUndefined()
+  await ui.unmount()
+})
+
 test('an ordinary tool error does not reach the band', async ($, on) => {
   stubEngine(on)
   on('tool.call', () => ({ isError: true, result: 'Exit code 1', text: 'Exit code 1' }))
