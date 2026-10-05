@@ -17,7 +17,7 @@ const REVIEW_LABEL = {
 // shguard's deny wording, both rule hits and unresolved-argument floors.
 const SHGUARD_DENY = /matches (?:blocklist )?rule "|could not be resolved to Allow|ask_outcome = "deny"/
 const RULE = /rule "([^"]+)"/
-// Rules that only steer toward a gitignore-aware tool (grep → rg, find → fd);
+// Rules that only steer toward a gitignore-aware tool (find → fd);
 // nothing unsafe is being stopped, so the model just switches tools.
 const TOOL_POLICY = /^dotfiles-tool-policy-/
 
@@ -29,7 +29,7 @@ const NOTE =
 
 const TOOL_POLICY_NOTE =
   'dotfiles-mod: this is a tool-preference rule, not a safety block. Retry right away with ' +
-  'the tool the reason names (rg or the Grep tool for grep, fd or the Glob tool for find).'
+  'the tool the reason names (fd or the Glob tool for find).'
 
 export function parseShguardDeny(text: string | undefined): { rule: string } | undefined {
   if (text === undefined || !SHGUARD_DENY.test(text)) return undefined

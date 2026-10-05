@@ -732,29 +732,6 @@ command = "sftp"
 # =====================================================================
 
 [[deny]]
-id = "dotfiles-tool-policy-grep"
-reason = "grep ignores .gitignore and walks into node_modules / dist / target — use rg (or the built-in Grep tool)"
-command = "grep"
-
-[[deny]]
-id = "dotfiles-tool-policy-egrep"
-reason = "egrep is deprecated grep -E and ignores .gitignore — use rg (supports extended regex by default)"
-command = "egrep"
-
-[[deny]]
-id = "dotfiles-tool-policy-fgrep"
-reason = "fgrep is deprecated grep -F and ignores .gitignore — use rg -F"
-command = "fgrep"
-
-# `command = "grep"` only matches argv[0]; this covers grep as a git
-# subcommand (deltas #21).
-[[deny]]
-id = "dotfiles-tool-policy-git-grep"
-reason = "git grep ignores nothing but is still grep — prefer rg or the built-in Grep tool"
-command = "git"
-required_tokens = ["grep"]
-
-[[deny]]
 id = "dotfiles-tool-policy-find"
 reason = "find ignores .gitignore and walks into node_modules / dist / target — use fd (or the built-in Glob tool)"
 command = "find"

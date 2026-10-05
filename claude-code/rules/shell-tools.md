@@ -1,8 +1,10 @@
 # Shell tooling
 
-`grep`/`egrep`/`fgrep`/`find` are hook-blocked: they ignore `.gitignore` and
-walk into `node_modules`, wasting tokens. Use the built-ins — `Grep` for
-content, `Glob` for filenames — or `rg`/`fd` when Bash is needed.
+`find` is hook-blocked: it ignores `.gitignore` and walks into
+`node_modules`, wasting tokens, and its `-exec`/`-delete` can run or delete
+anything. `grep` is allowed but has the same `.gitignore` blind spot, so for
+a recursive search prefer the built-ins (`Grep` for content, `Glob` for
+filenames) or `rg`/`fd` when Bash is needed.
 
 ## Idioms the built-ins can't do
 

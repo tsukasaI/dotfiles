@@ -39,7 +39,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 - Update flake inputs: `nix flake update` (in `nix-darwin/`), then
   `darwin-rebuild switch` to activate.
 - Test a hook change with a synthetic payload:
-  `echo '{"tool_input":{"command":"grep foo"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard`
+  `echo '{"tool_input":{"command":"find ."},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard`
   and check `.hookSpecificOutput.permissionDecision` (`allow`/`ask`/`deny`).
 - CI: see `.github/workflows/ci.yaml` and `flake-check.yaml`. CI is a
   backstop, not the only loop — re-run `lefthook install` after pulling
@@ -69,7 +69,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 
 ## Pitfalls
 
-- **The hooks police this session too.** `grep`/`find`/`ssh`/`scp`, `curl` to
+- **The hooks police this session too.** `find`/`ssh`/`scp`, `curl` to
   non-localhost hosts, and more are denied for you by `shguard`. A "matches
   blocklist rule ..." result is policy, not a flaky tool; surface the
   command to the user instead of routing around it. `block-config-edit.sh`

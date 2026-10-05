@@ -51,8 +51,8 @@ test('a shguard deny lands in the band as `! cmd` and tells the model', async ($
 
 test('a tool-policy deny skips the band and points at the replacement tool', async ($, on) => {
   stubEngine(on)
-  on('classic.PreToolUse', () => ({ deny: 'matches blocklist rule "dotfiles-tool-policy-grep": use rg' }))
-  const ran = await $.tool.call({ tool: 'Bash', command: 'grep -r foo .' })
+  on('classic.PreToolUse', () => ({ deny: 'matches blocklist rule "dotfiles-tool-policy-find": use fd' }))
+  const ran = await $.tool.call({ tool: 'Bash', command: 'find . -name x' })
   expect(ran.isError).toBe(true)
   expect(ran.context?.some(c => c.includes('Retry right away'))).toBe(true)
   expect(ran.context?.some(c => c.includes('Do not route around'))).toBe(false)
