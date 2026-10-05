@@ -35,6 +35,7 @@ test('a shguard deny lands in the band as `! cmd` and tells the model', async ($
   const ran = await $.tool.call({ tool: 'Bash', command: 'rm -rf build' })
   expect(ran.isError).toBe(true)
   expect(ran.context?.some(c => c.includes('Do not route around'))).toBe(true)
+  expect(ran.context?.some(c => c.includes('/copy'))).toBe(true)
 
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ plugin: 'dotfiles-mod', surface, component: 'AbovePrompt', props: BAND })

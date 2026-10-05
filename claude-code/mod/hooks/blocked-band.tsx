@@ -25,7 +25,9 @@ const NOTE =
   'dotfiles-mod: this command is now shown to the user above the prompt as `! <command>`. ' +
   'Do not route around the block with an equivalent shell command (`unlink` for `rm`, piping ' +
   'around it). If a dedicated tool (Read, Grep, Glob, Edit, Write) does the job, use it; ' +
-  'otherwise stop and let the user run it.'
+  'otherwise stop and let the user run it. When you stop, repeat the blocked command verbatim in ' +
+  'a fenced bash code block in your reply: the band truncates long commands, and the user copies ' +
+  'from your reply with /copy.'
 
 const TOOL_POLICY_NOTE =
   'dotfiles-mod: this is a tool-preference rule, not a safety block. Retry right away with ' +
