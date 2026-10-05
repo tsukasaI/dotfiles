@@ -18,7 +18,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | Path | What it is |
 |---|---|
 | `nix-darwin/flake.nix` | Source of truth for packages, Homebrew, and macOS defaults. Single host config; `system.primaryUser` must equal `whoami`. |
-| `claude-code/` | The user's **global** Claude Code config. Symlinked by `setup.sh`: `CLAUDE.md`, `settings.json`, `rules/`, `skills/`, `agents/`, `themes/` into `~/.claude/`, and `shguard/config.toml` into `~/.config/shguard/` (the path shguard reads). Referenced from `settings.json` by absolute `$HOME/dotfiles/...` path instead: `hooks/`, `statusline.ts` (`~/.claude/hooks` is herdr's own directory). |
+| `claude-code/` | The user's **global** Claude Code config. Symlinked by `setup.sh`: `CLAUDE.md`, `settings.json`, `rules/`, `skills/`, `agents/`, `themes/` into `~/.claude/`, and `shguard/config.toml` into `~/.config/shguard/` (the path shguard reads). Referenced from `settings.json` by absolute `$HOME/dotfiles/...` path instead: `hooks/`, `statusline.ts` (`~/.claude/hooks` is herdr's own directory), and `mod/` (the `dotfiles-mod` plugin, via `env.CLAUDE_CODE_PLUGIN_DIRS`; see `hooks/README.md`). |
 | `.claude/` | Project-scoped Claude state for *this repo only* (plans, memory, local settings). Not the same thing as `claude-code/`. |
 | `nvim/` | lazy.nvim config: one file per plugin in `lua/plugins/` with that plugin's keymaps inside its spec; global options/keymaps in `init.lua`; LSP servers in `lsp/<name>.lua`, enabled at the bottom of `init.lua`. |
 | `zsh/zshrc` | Hand-written, no framework. `_cached_eval` caches slow init output (mise/zoxide/fzf). Custom prompt — starship was removed. |

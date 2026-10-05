@@ -19,7 +19,7 @@
     - `constraint(scope)`: hard limits shaping implementation
     - `learned(scope)`: discovered quirks / gotchas
 - Editor: nvim
-- When a command is blocked by PreToolUse hook, present the blocked command so I can run it manually. Never retry with an equivalent command (`unlink` for `rm`, piping around a block, etc.). Before setup work that ends in a hook-protected action (editing linter/formatter configs, destructive git ops), check the protection first — don't discover it after installing/initializing.
+- When a Bash command is blocked by a PreToolUse hook, never retry with an equivalent command (`unlink` for `rm`, piping around a block, etc.); `dotfiles-mod` already shows it to me above the prompt as `! <command>`, so just stop if no allowed tool fits. A blocked Edit/Write still needs presenting by you. Before setup work that ends in a hook-protected action (editing linter/formatter configs, destructive git ops), check the protection first — don't discover it after installing/initializing.
 - Enter plan mode when the change spans multiple files/subsystems or involves an architectural decision; single-file fixes don't need a plan. I'll ask when I want more than this default. If the approach breaks down mid-task, stop and re-plan.
 
 # Clarify before acting

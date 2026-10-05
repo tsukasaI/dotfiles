@@ -17,14 +17,6 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 | Script | Matcher | Description |
 |---|---|---|
 | (inline) `fini` | `Edit\|Write` | Auto-format edited files with fini |
-| `mark-session-edit.sh` | `Edit\|Write\|NotebookEdit` | Record edited file paths per `session_id` so `warn-uncommitted.sh` can scope its reminder to this session's own edits |
-
-### Stop
-
-| Script | Matcher | Description |
-|---|---|---|
-| `warn-uncommitted.sh` | `""` (timeout 10s) | Remind the agent to commit before ending the turn — scoped to files THIS session edited (per its `mark-session-edit.sh` manifest), not the whole working tree, so a concurrent session sharing the repo can't trigger a spurious reminder |
-| `slop-guard.ts` | `""` (timeout 10s) | Block the turn once if the last assistant reply mixes an unexpected Hangul/Cyrillic run into otherwise Japanese-context text (script-mixing decoding artifact). `SLOP_GUARD_DISABLE=1` disables it. |
 
 ### SessionEnd
 
@@ -38,18 +30,37 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 |---|---|---|
 | `~/.claude/hooks/herdr-agent-state.sh session` | `*` (timeout 10s) | Reports agent session state to `herdr`. **Not part of this repo** — self-installed by the `herdr` flake package outside `setup.sh`'s symlinks; see root `README.md` Prerequisites/Troubleshooting. |
 
-## Session Edit Manifests
+## Mod (`claude-code/mod/`)
 
-`mark-session-edit.sh` records every Edit/Write/NotebookEdit `file_path` (or
-`notebook_path`) for the current session at
-`${TMPDIR:-/tmp}/claude-session-edits/<session_id>`, one NUL-delimited path
-per record. `warn-uncommitted.sh` reads it back to scope its reminder to
-this session's own edits.
+Behavior that only needs to be *seen* by the user, or that enforces a
+mechanically checkable CLAUDE.md rule, lives in the `dotfiles-mod` plugin
+(Claude Code function hooks), loaded via `CLAUDE_CODE_PLUGIN_DIRS` in
+`settings.json`'s `env`. Mod hooks fail open (a throwing hook is skipped), so
+guardrails stay here as settings hooks.
 
-**Lifecycle**: no explicit cleanup — macOS's periodic daily job clears files
-under `$TMPDIR` unaccessed for 3+ days. A session resumed via `--resume`
-gets a new `session_id`, so its manifest resets (acceptable for a
-best-effort reminder).
+- **Session edits pane** (`/edits`, auto-opens at 144+ columns): files this
+  session edited via Edit/Write/NotebookEdit with their `git status`; an
+  uncommitted file under `~/dotfiles` (outside `docs/`, `.claude/`, `tests/`,
+  `.github/`) is flagged `LIVE`. Replaces the former `mark-session-edit.sh` +
+  `warn-uncommitted.sh` Stop reminder, which mostly produced extra
+  "not committing because..." turns.
+- **Shell canonicalization**: rewrites `$TMPDIR` (to the sandbox's
+  `/private/tmp/claude-<uid>`) and `$HOME` to literal paths before shguard
+  sees a Bash command, so shguard checks the real target instead of denying
+  an unresolved variable. Skipped inside single quotes, heredocs and
+  `$(...)`/backquotes. shguard still decides.
+- **Blocked-command band**: when shguard denies a Bash call, the command
+  appears above the prompt as `! <command>` for the user to run, and the
+  model is told not to route around it. Cleared on the next prompt.
+- **Rule guards**: deny an Agent call without `model:` (unless the agent
+  definition pins one, or it is a fork); deny `git commit` on main/master
+  outside `tsukasaI/dotfiles`/`ops`, and a `-m` message that isn't
+  Conventional Commits or contains Japanese. Unreadable cases pass.
+- **PR review band**: PRs opened via `gh pr create` and their
+  `code-reviewer` state (a wording guess; display only, never a merge gate).
+
+Test with `claude plugin test claude-code/mod`; check with
+`claude plugin validate claude-code/mod`.
 
 ## Session Log Storage
 

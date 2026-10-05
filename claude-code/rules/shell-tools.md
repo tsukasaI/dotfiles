@@ -17,12 +17,14 @@ content, `Glob` for filenames — or `rg`/`fd` when Bash is needed.
 
 shguard can't introspect a bare inline script, and can't rule out an
 unresolved `$VAR` expanding to a dangerous value anywhere in argv; both
-block outright (`ask_outcome` floors every ask to deny). Prefer the form
-shguard can verify statically:
+block outright (`ask_outcome` floors every ask to deny). `$TMPDIR` and
+`$HOME` are the exception: the `dotfiles-mod` plugin rewrites them to
+literal paths before shguard sees the command (not inside single quotes, a
+heredoc, or `$(...)`). Prefer the form shguard can verify statically:
 
 - `awk '{ ... }' file`: write the script to a file at a literal path (a
-  relative `./script.awk` or an absolute path, not `$TMPDIR/...` and not
-  `-`/process substitution, those are themselves unresolved) and run
+  relative `./script.awk` or an absolute path, not `-`/process
+  substitution, which is itself unresolved) and run
   `awk -f ./script.awk file` instead. Note this only satisfies shguard, not
   actual safety: awk's `system()`/`print | "cmd"` can still run arbitrary
   shell and the script's contents aren't inspected either way.

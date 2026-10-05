@@ -1,0 +1,6 @@
+{
+  "name": "dotfiles-mod",
+  "version": "0.1.0",
+  "description": "Session edits pane, shguard input canonicalization, blocked-command band, CLAUDE.md rule guards and PR review state",
+  "types": "./types/index.d.ts"
+}

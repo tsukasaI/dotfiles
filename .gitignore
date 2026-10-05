@@ -19,3 +19,6 @@ karabiner/automatic_backups/
 # Claude Code's local cache of claude.ai account skills, written through the
 # ~/.claude/skills symlink; machine-generated and includes personal custom skills.
 claude-code/skills/synced/
+
+# API declarations Claude Code writes beside a loaded plugin on every load.
+claude-code/mod/.claude-plugin/types/

@@ -3,7 +3,8 @@
   "cleanupPeriodDays": 14,
   "env": {
     "EDITOR": "nvim",
-    "SHGUARD_STRICT_CONFIG": "1"
+    "SHGUARD_STRICT_CONFIG": "1",
+    "CLAUDE_CODE_PLUGIN_DIRS": "~/dotfiles/claude-code/mod"
   },
   "attribution": {
     "commit": "",
@@ -206,15 +207,6 @@
             "command": "fini \"$(jq -r '.tool_input.file_path')\""
           }
         ]
-      },
-      {
-        "matcher": "Edit|Write|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/dotfiles/claude-code/hooks/mark-session-edit.sh"
-          }
-        ]
       }
     ],
     "PreToolUse": [
@@ -260,23 +252,6 @@
           {
             "type": "command",
             "command": "bash $HOME/.claude/hooks/herdr-agent-state.sh session",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/dotfiles/claude-code/hooks/warn-uncommitted.sh",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "bun --config=/dev/null $HOME/dotfiles/claude-code/hooks/slop-guard.ts",
             "timeout": 10
           }
         ]
