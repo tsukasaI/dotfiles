@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { statSync, readFileSync } from "fs";
-import { dirname } from "path";
+import { dirname, resolve } from "path";
 import { abbreviateHome } from "./lib/home-path";
 
 // ANSI helpers
@@ -50,7 +50,8 @@ function readGitBranch(start: string): { branch: string; isWorktree: boolean } |
       if (isWorktree) {
         const m = readFileSync(gitPath, "utf-8").trim().match(/^gitdir:\s*(.+)$/);
         if (!m) return null;
-        gitDir = m[1];
+        // A relative gitdir is relative to the directory holding the .git file.
+        gitDir = resolve(dir, m[1]);
       }
       let head: string;
       try { head = readFileSync(`${gitDir}/HEAD`, "utf-8").trim(); } catch { return null; }
