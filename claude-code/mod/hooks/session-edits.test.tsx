@@ -23,6 +23,39 @@ test('isLivePath: dotfiles is live except docs/.claude/tests/.github', async () 
   expect(isLivePath(`${HOME}/dotfilesX/a`, HOME)).toBe(false)
 })
 
+test('isLivePath: edits through the setup.sh symlinks under ~/.claude are live', async () => {
+  expect(isLivePath(`${HOME}/.claude/rules/x.md`, HOME)).toBe(true)
+  expect(isLivePath(`${HOME}/.claude/skills/a/SKILL.md`, HOME)).toBe(true)
+  expect(isLivePath(`${HOME}/.claude/CLAUDE.md`, HOME)).toBe(true)
+  expect(isLivePath(`${HOME}/.claude/settings.json`, HOME)).toBe(true)
+  expect(isLivePath(`${HOME}/.config/shguard/config.toml`, HOME)).toBe(true)
+  expect(isLivePath(`${HOME}/.claude/rulesX/x.md`, HOME)).toBe(false)
+  expect(isLivePath(`${HOME}/.claude/projects/p/s.jsonl`, HOME)).toBe(false)
+  expect(isLivePath(`${HOME}x/.claude/rules/x.md`, HOME)).toBe(false)
+})
+
+test('shows ~ only at a HOME path boundary', async ($, on) => {
+  stubEngine(on)
+  on('tool.call', () => ({ result: { ok: true } }))
+  on('process.run', () => ({
+    value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false },
+  }))
+
+  await $.tool.call({ tool: 'Write', file_path: `${HOME}bar/x.md`, content: 'x' })
+  await $.tool.call({ tool: 'Write', file_path: `${HOME}/src/y.md`, content: 'y' })
+
+  const ui = await $.ui.mount({
+    plugin: 'dotfiles-mod',
+    surface: 'terminal',
+    component: 'Pane',
+    requestId: 'session-edits',
+    props: { title: 'Session edits', isFocused: false, bodyColumns: 80, placement: 'dock' },
+  })
+  expect(await ui.find({ type: 'Text', text: `${HOME}bar/x.md` })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '~/src/y.md' })).toBeDefined()
+  await ui.unmount()
+})
+
 test('records edits and shows dirty live files', async ($, on) => {
   stubEngine(on)
   on('tool.call', () => ({ result: { ok: true } }))

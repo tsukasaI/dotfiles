@@ -13,11 +13,40 @@ const status = atom({ plugin: 'dotfiles-mod', key: 'status' } as const, {})
 // running system, so an uncommitted edit there is not live.
 const NOT_LIVE = ['docs/', '.claude/', 'tests/', '.github/']
 
-export function isLivePath(path: string, home: string): boolean {
-  const root = `${home}/dotfiles/`
+// Symlinks setup.sh creates from $HOME into dotfiles/claude-code (keep in sync
+// with setup.sh). A hooks module cannot import node:fs, so these are explicit
+// rather than resolved with realpath.
+const SYMLINKED: ReadonlyArray<readonly [link: string, target: string]> = [
+  ['.claude/skills', 'claude-code/skills'],
+  ['.claude/rules', 'claude-code/rules'],
+  ['.claude/agents', 'claude-code/agents'],
+  ['.claude/themes', 'claude-code/themes'],
+  ['.claude/settings.json', 'claude-code/settings.json'],
+  ['.claude/CLAUDE.md', 'claude-code/CLAUDE.md'],
+  ['.claude/shguard/config.toml', 'claude-code/shguard/config.toml'],
+  ['.config/shguard/config.toml', 'claude-code/shguard/config.toml'],
+]
+
+function isLiveUnder(path: string, root: string): boolean {
   if (!path.startsWith(root)) return false
   const rel = path.slice(root.length)
   return !NOT_LIVE.some(prefix => rel.startsWith(prefix))
+}
+
+export function isLivePath(path: string, home: string): boolean {
+  const root = `${home}/dotfiles/`
+  if (isLiveUnder(path, root)) return true
+  return SYMLINKED.some(([link, target]) => {
+    const from = `${home}/${link}`
+    return (path === from || path.startsWith(`${from}/`)) && isLiveUnder(`${root}${target}${path.slice(from.length)}`, root)
+  })
+}
+
+// Mirrors lib/home-path.ts abbreviateHome; the plugin cannot import outside mod/.
+function abbreviateHome(path: string, home: string): string {
+  if (!home) return path
+  if (path === home) return '~'
+  return path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path
 }
 
 function dirname(path: string): string {
@@ -87,7 +116,7 @@ export function registerSessionEdits(on: On): void {
     const cwd = await $.session.cwd()
     const home = (await $.env.get('HOME')) ?? ''
     const show = (p: string) =>
-      p.startsWith(`${cwd}/`) ? p.slice(cwd.length + 1) : home && p.startsWith(home) ? `~${p.slice(home.length)}` : p
+      p.startsWith(`${cwd}/`) ? p.slice(cwd.length + 1) : abbreviateHome(p, home)
 
     return (
       <Box flexDirection="column">
