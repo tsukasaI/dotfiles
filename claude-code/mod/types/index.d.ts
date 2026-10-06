@@ -3,12 +3,14 @@
 /** A file this session edited through Edit/Write/NotebookEdit. */
 export type EditEntry = {
   path: string
+  /** Where `path` lives inside ~/dotfiles (itself, or its symlink target); git status runs on this. */
+  gitPath: string
   /** Under ~/dotfiles outside docs/.claude/tests/.github: live the moment it is saved. */
   isLive: boolean
 }
 
 /**
- * `git status --porcelain` code for an edited file: "M", "A", "??", ...;
+ * `git status --porcelain` code for an edited file, keyed by `gitPath`:"M", "A", "??", ...;
  * "ok" when committed (no status line), "-" when outside a git repository.
  */
 export type EditStatus = Record<string, string>

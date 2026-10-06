@@ -94,8 +94,23 @@ const COMMIT_FORMS: Array<[string, string, string | undefined]> = [
   ['&& chain', "git add x && git commit -m 'wip'", 'wip'],
   ['-F - heredoc', "git commit -F - <<'EOF'\nwip stuff\nEOF", 'wip stuff'],
   ['--file=- heredoc', "git commit --file=- <<EOF\nwip stuff\nEOF", 'wip stuff'],
+  ['-F /dev/stdin heredoc', "git commit -F /dev/stdin <<'EOF'\nwip stuff\nEOF", 'wip stuff'],
+  ['--file=/dev/stdin heredoc', "git commit --file=/dev/stdin <<'EOF'\nwip stuff\nEOF", 'wip stuff'],
+  ['-F - with flags before the heredoc', "git commit -F - --signoff <<'EOF'\nwip stuff\nEOF", 'wip stuff'],
   ['repeated -m', "git commit -m 'feat: x' -m 'more'", 'feat: x\n\nmore'],
   ['scoped past an earlier flag', "ls -lm 'x' && git commit -m 'wip'", 'wip'],
+  [
+    'flag names inside the message',
+    'git commit -m "docs: mention -m, -am, --message and -F -"',
+    'docs: mention -m, -am, --message and -F -',
+  ],
+  ['-am inside the message', 'git commit -m "fix(mod): handle -am forms"', 'fix(mod): handle -am forms'],
+  ['-F - inside the message', 'git commit -m "feat: read -F - heredoc"', 'feat: read -F - heredoc'],
+  [
+    'escaped backquotes in the message',
+    'git commit -m "fix(mod): drop \\`-C\\` skip"',
+    'fix(mod): drop \\`-C\\` skip',
+  ],
 ]
 
 for (const [name, command, message] of COMMIT_FORMS) {
@@ -104,6 +119,7 @@ for (const [name, command, message] of COMMIT_FORMS) {
     stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
     const ran = await $.tool.call({ tool: 'Bash', command })
     if (messageProblem(message ?? '') !== undefined) expect(ran.deny).toMatch(/Conventional/)
+    else expect(ran.deny).toBeUndefined()
   })
 }
 
@@ -128,11 +144,18 @@ test('an unreadable message flag is denied (fail closed)', async ($, on) => {
     'git commit --message',
     'git commit -am "$(date)"',
     'git commit -F -',
+    'git commit -F /dev/stdin',
     'cat m | git commit -F -',
   ]) {
     const ran = await $.tool.call({ tool: 'Bash', command })
     expect(ran.deny, command).toMatch(/not readable; use -m/)
   }
+})
+
+test('the unreadable-message deny names both readable forms', async ($, on) => {
+  stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
+  const ran = await $.tool.call({ tool: 'Bash', command: 'git commit -m "$SUBJECT"' })
+  expect(ran.deny).toContain(`use -m '<msg>' or -m "$(cat <<'EOF' ... EOF)"`)
 })
 
 test('reusing or editing an existing message is not denied', async ($, on) => {

@@ -11,14 +11,15 @@ const GIT_COMMIT = new RegExp(String.raw`(^|[;&|(\n]\s*)git${GIT_GLOBAL_OPTIONS}
 const SUBJECT = /^(feat|fix|refactor|chore|docs|test|perf|build|ci|style|revert)(\([^)]+\))?!?: \S/
 const JAPANESE = /[぀-ヿ㐀-鿿ｦ-ﾟ]/
 const HEREDOC_BODY = /(<<-?\s*['"]?(\w+)['"]?\n)([\s\S]*?)(\n\s*\2\b)/g
-// A heredoc only counts as the message when its consumer is `-m "$(cat <<EOF`, or `-F - <<EOF`.
+// A heredoc only counts as the message when its consumer is `-m "$(cat <<EOF`, or `-F - <<EOF`
+// (`-` or `/dev/stdin`, optionally followed by other flags such as `--signoff`).
 const HEREDOC_M =
   /(?:^|\s)(?:-[a-zA-Z]*m\s*|--m[a-z]*(?:=|\s+))"?\$\(\s*cat\s+<<-?\s*['"]?(?<tag>\w+)['"]?\n(?<body>[\s\S]*?)\n\s*\k<tag>\b(?:\s*\)"?)?/g
 const HEREDOC_F =
-  /(?:^|\s)(?:-F\s*-|--file(?:=|\s+)-)\s*<<-?\s*['"]?(?<tag>\w+)['"]?\n(?<body>[\s\S]*?)\n\s*\k<tag>\b/g
+  /(?:^|\s)(?:-F\s*(?:-|\/dev\/stdin)|--file(?:=|\s+)(?:-|\/dev\/stdin))(?:\s+-[\w=-]+)*\s*<<-?\s*['"]?(?<tag>\w+)['"]?\n(?<body>[\s\S]*?)\n\s*\k<tag>\b/g
 // `-m`, a combined short flag ending in `m` (`-am`), or `--message` / an abbreviation of it.
 const MESSAGE_FLAG = /(?:^|\s)(?:-[a-zA-Z]*m|--m(?:e(?:s(?:s(?:a(?:g(?:e)?)?)?)?)?)?(?=[=\s]|$))/g
-const FILE_STDIN = /(?:^|\s)(?:-F\s*-|--file(?:=|\s+)-)(?=\s|$)/g
+const FILE_STDIN = /(?:^|\s)(?:-F\s*(?:-|\/dev\/stdin)|--file(?:=|\s+)(?:-|\/dev\/stdin))(?=\s|$)/g
 const MESSAGE_VALUE =
   /(?:^|\s)(?:-[a-zA-Z]*m\s*|--m(?:e(?:s(?:s(?:a(?:g(?:e)?)?)?)?)?)?(?:=|\s+))(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|([^\s"'`$;&|()<>\\]+))/g
 
@@ -62,16 +63,18 @@ function readMessage(tail: string): ReadMessage {
     })
   const rest = blankHeredocBodies(consume(HEREDOC_F)(consume(HEREDOC_M)(tail)))
 
+  // Flags are counted on `remainder`, where every readable flag+value is blanked, so flag-like
+  // text inside a message (`-m "note -am"`) isn't mistaken for a flag.
+  let remainder = rest
   let expands = false
-  let values = 0
   for (const m of rest.matchAll(MESSAGE_VALUE)) {
-    values++
-    // A double-quoted message with `$`/backquote expands at run time: unreadable here.
-    if (m[1] !== undefined && /[$`]/.test(m[1])) expands = true
+    remainder =
+      remainder.slice(0, m.index) + ' '.repeat(m[0].length) + remainder.slice(m.index + m[0].length)
+    // A double-quoted message with an unescaped `$`/backquote expands at run time: unreadable here.
+    if (m[1] !== undefined && /[$`]/.test(m[1].replace(/\\./g, ''))) expands = true
     else parts.push(m[1] ?? m[2] ?? m[3])
   }
-  const flags = count(rest, MESSAGE_FLAG) + count(rest, FILE_STDIN)
-  const unreadable = expands || flags > values
+  const unreadable = expands || count(remainder, MESSAGE_FLAG) + count(remainder, FILE_STDIN) > 0
   return { message: unreadable || parts.length === 0 ? undefined : parts.join('\n\n'), unreadable }
 }
 
@@ -128,7 +131,11 @@ export function registerRuleGuards(on: On): void {
     if (commit === undefined) return next(e)
 
     const { message, unreadable } = readMessage(commit.tail)
-    if (unreadable) return { deny: "dotfiles-mod: commit message not readable; use -m '<msg>'." }
+    if (unreadable) {
+      return {
+        deny: `dotfiles-mod: commit message not readable; use -m '<msg>' or -m "$(cat <<'EOF' ... EOF)".`,
+      }
+    }
     const badMessage = message === undefined ? undefined : messageProblem(message)
     if (badMessage !== undefined) return { deny: `dotfiles-mod: ${badMessage}.` }
 

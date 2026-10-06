@@ -1,19 +1,10 @@
 import { Database } from "bun:sqlite";
 import { join } from "path";
-import { expandHome as expandHomeShared } from "../../../lib/home-path";
-
-export const HOME = Bun.env.HOME;
 
 // Overridable for tests (e.g. pointing at a nonexistent path to exercise the
 // DB-missing error path) — defaults to the standard claude-logs location.
 export function logsDbPath(home: string): string {
   return Bun.env.CLAUDE_LOGS_DB || join(home, ".local", "share", "claude-logs", "logs.db");
-}
-
-// project_dir may have HOME redacted to "~" by the SessionEnd hook
-// (save-transcript.ts's redactHome) before it was written to logs.db.
-export function expandHome(p: string | null | undefined, home: string): string {
-  return expandHomeShared(p, home);
 }
 
 // Synthetic "user" turns the harness injects — not something the user typed,
@@ -62,6 +53,37 @@ export function oldestSessionMs(dbPath: string): number | null {
   }
 }
 
+// A user turn's text blocks, or null when the turn carries a tool_result
+// (those are tool plumbing, not something the user typed).
+export function userTextBlocks(content: readonly { type: string }[]): string[] | null {
+  const texts: string[] = [];
+  for (const b of content) {
+    if (b.type === "tool_result" || (b as any).tool_use_id) return null;
+    if (b.type === "text") texts.push((b as unknown as { text: string }).text);
+  }
+  return texts;
+}
+
+// Session-level cwd and start time, accumulated one transcript entry at a
+// time. The caller decides when to observe: corrections.ts feeds every entry
+// before processing any (so every entry sees the session's first cwd),
+// skills.ts feeds each entry as it streams past (so earlier entries see
+// only the cwd known so far).
+export interface SessionPrologue {
+  cwd: string;
+  startMs: number | null;
+}
+
+export function observeEntry(p: SessionPrologue, entry: { cwd?: unknown; timestamp?: string }): void {
+  // entry.cwd comes verbatim from parsed transcript JSON, so its declared
+  // `string` type isn't enforced at runtime.
+  if (!p.cwd && typeof entry.cwd === "string" && entry.cwd) p.cwd = entry.cwd;
+  if (p.startMs === null && entry.timestamp) {
+    const ts = Date.parse(entry.timestamp);
+    if (!isNaN(ts)) p.startMs = ts;
+  }
+}
+
 export interface ScanResult<T> {
   extracts: T[];
   sessions_scanned: number;
@@ -77,10 +99,10 @@ export interface ScanResult<T> {
 // each caller's extractSession is unchanged. Sessions are fetched one at a
 // time (not joined/batched) so peak memory stays proportional to one
 // transcript, not the whole ~149MB table.
-export function scanSessions<T>(
+export function scanSessions<T extends { sessionStartMs: number | null }>(
   dbPath: string,
   cutoffMs: number,
-  extractSession: (transcriptJsonl: string, projectDir: string | null) => { extract: T; sessionStartMs: number | null },
+  extractSession: (transcriptJsonl: string, projectDir: string | null) => T,
 ): ScanResult<T> {
   const result: ScanResult<T> = {
     extracts: [],
@@ -124,9 +146,10 @@ export function scanSessions<T>(
       // truncated/spliced record) must not abort every session queued
       // behind it in sessionRows.
       try {
-        const { extract, sessionStartMs } = extractSession(trow.transcript_jsonl, row.project_dir);
+        const extract = extractSession(trow.transcript_jsonl, row.project_dir);
         result.extracts.push(extract);
         result.sessions_scanned++;
+        const { sessionStartMs } = extract;
         if (sessionStartMs !== null) {
           if (result.oldest_session_ms === null || sessionStartMs < result.oldest_session_ms) {
             result.oldest_session_ms = sessionStartMs;
