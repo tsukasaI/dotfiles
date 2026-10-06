@@ -13,11 +13,55 @@ const status = atom({ plugin: 'dotfiles-mod', key: 'status' } as const, {})
 // running system, so an uncommitted edit there is not live.
 const NOT_LIVE = ['docs/', '.claude/', 'tests/', '.github/']
 
-export function isLivePath(path: string, home: string): boolean {
+// Every link_with_backup pair in setup.sh, as [path under $HOME, path under
+// ~/dotfiles] (keep in sync with setup.sh). A hooks module cannot import
+// node:fs, so these are explicit rather than resolved with realpath.
+const SYMLINKED: ReadonlyArray<readonly [link: string, target: string]> = [
+  ['.config/nvim', 'nvim'],
+  ['.config/ghostty', 'ghostty'],
+  ['.config/wezterm', 'wezterm'],
+  ['.config/mise/config.toml', 'mise/config.toml'],
+  ['.config/karabiner/karabiner.json', 'karabiner/karabiner.json'],
+  ['.zshrc', 'zsh/zshrc'],
+  ['.gitconfig', 'git/gitconfig'],
+  ['.config/git/ignore', 'git/ignore'],
+  ['.config/git/gitconfig-oss', 'git/gitconfig-oss'],
+  ['.config/shguard/config.toml', 'claude-code/shguard/config.toml'],
+  ['.ssh/config', 'ssh/config'],
+  ['.claude/skills', 'claude-code/skills'],
+  ['.claude/rules', 'claude-code/rules'],
+  ['.claude/agents', 'claude-code/agents'],
+  ['.claude/themes', 'claude-code/themes'],
+  ['.claude/settings.json', 'claude-code/settings.json'],
+  ['.claude/CLAUDE.md', 'claude-code/CLAUDE.md'],
+  ['.claude/shguard/config.toml', 'claude-code/shguard/config.toml'],
+]
+
+// The path inside ~/dotfiles that `path` is, or is symlinked to; undefined
+// when it is neither. A path with a `..` segment is never mapped through a link.
+export function resolveRepoPath(path: string, home: string): string | undefined {
   const root = `${home}/dotfiles/`
-  if (!path.startsWith(root)) return false
-  const rel = path.slice(root.length)
+  if (path.startsWith(root)) return path
+  if (!home || path.split('/').includes('..')) return undefined
+  for (const [link, target] of SYMLINKED) {
+    const from = `${home}/${link}`
+    if (path === from || path.startsWith(`${from}/`)) return `${root}${target}${path.slice(from.length)}`
+  }
+  return undefined
+}
+
+export function isLivePath(path: string, home: string): boolean {
+  const repoPath = resolveRepoPath(path, home)
+  if (repoPath === undefined) return false
+  const rel = repoPath.slice(`${home}/dotfiles/`.length)
   return !NOT_LIVE.some(prefix => rel.startsWith(prefix))
+}
+
+// Mirrors lib/home-path.ts abbreviateHome; the plugin cannot import outside mod/.
+function abbreviateHome(path: string, home: string): string {
+  if (!home) return path
+  if (path === home) return '~'
+  return path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path
 }
 
 function dirname(path: string): string {
@@ -25,11 +69,11 @@ function dirname(path: string): string {
   return i <= 0 ? '/' : path.slice(0, i)
 }
 
-async function statusOf($: EngineInterface, path: string): Promise<string> {
+async function statusOf($: EngineInterface, gitPath: string): Promise<string> {
   try {
     const { exitCode, stdout } = await $.process.run(
-      ['git', 'status', '--porcelain=v1', '--', path],
-      { cwd: dirname(path), timeoutMs: 5000 },
+      ['git', 'status', '--porcelain=v1', '--', gitPath],
+      { cwd: dirname(gitPath), timeoutMs: 5000 },
     )
     if (exitCode !== 0) return '-'
     const line = stdout.split('\n').find(l => l.length > 0)
@@ -42,7 +86,7 @@ async function statusOf($: EngineInterface, path: string): Promise<string> {
 async function refresh($: EngineInterface): Promise<void> {
   const list = await read($, edits)
   const next: Record<string, string> = {}
-  for (const { path } of list) next[path] = await statusOf($, path)
+  for (const { gitPath } of list) next[gitPath] = await statusOf($, gitPath)
   await update($, status, () => next)
 }
 
@@ -70,8 +114,9 @@ export function registerSessionEdits(on: On): void {
     if (path === undefined || ran.deny !== undefined || ran.isError === true) return ran
 
     const home = (await $.env.get('HOME')) ?? ''
-    const entry: EditEntry = { path, isLive: isLivePath(path, home) }
-    await update($, edits, list => [...list.filter(x => x.path !== path), entry])
+    const gitPath = resolveRepoPath(path, home) ?? path
+    const entry: EditEntry = { path, gitPath, isLive: isLivePath(path, home) }
+    await update($, edits, list => [...list.filter(x => x.gitPath !== gitPath), entry])
     return ran
   })
 
@@ -87,16 +132,16 @@ export function registerSessionEdits(on: On): void {
     const cwd = await $.session.cwd()
     const home = (await $.env.get('HOME')) ?? ''
     const show = (p: string) =>
-      p.startsWith(`${cwd}/`) ? p.slice(cwd.length + 1) : home && p.startsWith(home) ? `~${p.slice(home.length)}` : p
+      p.startsWith(`${cwd}/`) ? p.slice(cwd.length + 1) : abbreviateHome(p, home)
 
     return (
       <Box flexDirection="column">
         {list.length === 0 && <Text dimColor>No edits yet.</Text>}
-        {list.map(({ path, isLive }) => {
-          const code = codes[path] ?? '…'
+        {list.map(({ path, gitPath, isLive }) => {
+          const code = codes[gitPath] ?? '…'
           const isDirty = code !== 'ok' && code !== '-' && code !== '…'
           return (
-            <Box key={path}>
+            <Box key={gitPath}>
               <Text color={isDirty ? 'warning' : undefined} dimColor={!isDirty}>
                 {code.padEnd(3)}
               </Text>
