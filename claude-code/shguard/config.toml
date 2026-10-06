@@ -960,12 +960,6 @@ reason = "fd -x/-X/--exec/--exec-batch runs an arbitrary command per match (same
 command = "fd"
 required_flags = ["x|X|--exec|--exec-batch"]
 
-[[deny]]
-id = "dotfiles-code-rg-pre"
-reason = "rg --pre runs an arbitrary preprocessor command on every searched file"
-command = "rg"
-required_flags = ["--pre"]
-
 # =====================================================================
 # Credentials (push-to-turso.sh is intentionally manual)
 # =====================================================================

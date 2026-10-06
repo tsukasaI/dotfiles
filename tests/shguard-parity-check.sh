@@ -261,7 +261,8 @@ case_ "git switch -c (no -c false positive)" 'git switch -c feat/x'            a
 case_ "gh config get"                    'gh config get pager'                 allow
 case_ "gh workflow list"                 'gh workflow list'                    allow
 case_ "fd -x"                            'fd . -x rm {}'                       deny "fd is allow-listed; -x/--exec is xargs-equivalent"
-case_ "rg --pre"                         'rg --pre ./x foo'                    deny
+case_ "rg --pre"                         'rg --pre ./x foo'                    allow "rg runs sandboxed; rule removed to stop flooring rg foo \"\$X\""
+case_ "rg on \$TMPDIR path"              'rg foo "$TMPDIR/x.log"'              allow
 
 # ── Interpreter variants and positional-token gaps (deltas #26 round 4) ──
 case_ "node --eval"                      "node --eval '1'"                     deny
