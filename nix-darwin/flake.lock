@@ -8,11 +8,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789467124,
-        "narHash": "sha256-Uj0M/6io27L2KLlowhiC3+wOcLrifoEwAEBl446HjQM=",
+        "lastModified": 1791079760,
+        "narHash": "sha256-qb+ITUPwA9hdaU65BR9nFnZ6NJIziPwofwduXFwqM8g=",
         "owner": "tsukasaI",
         "repo": "ewc",
-        "rev": "e764ea0d6f71dc2e75238f738e091c41eb459d4c",
+        "rev": "ea12cd817d03667bfa2f27a7b8d4f87875220245",
         "type": "github"
       },
       "original": {
@@ -29,11 +29,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789556174,
-        "narHash": "sha256-7/csGcQN7lW8WMeWwrQswJw67HvCqrlTRATq99dHQMA=",
+        "lastModified": 1790033766,
+        "narHash": "sha256-CSDVyjLJiCoR7Zt0qL7UbB1g7qzBBJeQLFUm1HvzluQ=",
         "owner": "tsukasaI",
         "repo": "fini",
-        "rev": "be9cbac336cc10118d6dae471d87652aafaeab6a",
+        "rev": "b3217fc0746088e74ff493b8b796b44f533cf463",
         "type": "github"
       },
       "original": {
@@ -146,11 +146,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1789941062,
-        "narHash": "sha256-sA3+iw/Uy/at/O9lkQ0c8bBmThq5OIUoFy0Gwm801OI=",
+        "lastModified": 1791236783,
+        "narHash": "sha256-z1i72jg4QeR8+tQGaOalCT/jHxgbg3fTO9Y0EjWKWTQ=",
         "owner": "ogulcancelik",
         "repo": "herdr",
-        "rev": "95e97bff3ac090ffc71bf24174ccc2449e97bcc6",
+        "rev": "3d9d2b18dab139ba226ebc5a1c9a9f2c9c3ee4df",
         "type": "github"
       },
       "original": {
@@ -182,11 +182,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1789724158,
-        "narHash": "sha256-nlKgrm0dsVhOSopKheVBCcOpiIticufPPVLdVOI0euA=",
+        "lastModified": 1791191277,
+        "narHash": "sha256-i8KuaINOYLvB2oQikGvtRmdZRxATRxsI9Yad2pp7dEA=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "0a3468a402c449992505b6a9fc5b06580141b750",
+        "rev": "aa48d347080940b8a2b8d2f48228674e280a3514",
         "type": "github"
       },
       "original": {
@@ -235,11 +235,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789018126,
-        "narHash": "sha256-ivls+uMVyiPmZU6jWWSubIzUrm9U9uU1J4cVrxY946E=",
+        "lastModified": 1791206678,
+        "narHash": "sha256-6e9I3s6n5POnk+l5mnxUyV1Mxjrvx+OqcOGk6nKvUT0=",
         "owner": "tsukasaI",
         "repo": "shguard",
-        "rev": "a571a3038614a17ba8441bd1a31103d98fd66868",
+        "rev": "086cd4573dab852ce0c0d89bf30dd09cb0cec134",
         "type": "github"
       },
       "original": {
