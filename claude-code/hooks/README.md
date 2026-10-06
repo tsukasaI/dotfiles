@@ -49,9 +49,9 @@ guardrails stay here as settings hooks.
   sees a Bash command, so shguard checks the real target instead of denying
   an unresolved variable. Skipped inside single quotes, heredocs and
   `$(...)`/backquotes. shguard still decides.
-- **Blocked-command band**: when shguard denies a Bash call, the command
-  appears above the prompt as `! <command>` for the user to run, and the
-  model is told not to route around it. Cleared on the next prompt.
+- **shguard deny note**: when shguard denies a Bash call, the model is told
+  not to route around it and to repeat the command in a fenced block so the
+  user can `/copy` it (a tool-policy deny instead says to retry with fd/Glob).
 - **Rule guards**: deny an Agent call without `model:` (unless the agent
   definition pins one, or it is a fork); deny `git commit` on main/master
   outside `tsukasaI/dotfiles`/`ops`, and a `-m` message that isn't
