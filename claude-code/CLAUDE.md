@@ -48,7 +48,7 @@
 
   | Role | Model | Set in |
   |---|---|---|
-  | Main loop | `sonnet` | `settings.json` `model` — not this file; `claude --model <x>` overrides for one session |
+  | Main loop | see Set in (not repeated here) | `settings.json` `model`; `claude --model <x>` overrides for one session |
   | Subagents (Explore, web-researcher, Agent/Workflow `agent()`) | Cheapest model that can do the subtask; default `sonnet` | `model:` argument at call time |
   | Maintenance investigation agents (`/maintain-sweep`) | `opus` | `agents/*.md` frontmatter (deliberate exception to the 2-of-4 rule below); no `effort:` on purpose, so they inherit the session's effort |
   | Review (code-reviewer) | `fable` | `agents/code-reviewer.md` frontmatter |
