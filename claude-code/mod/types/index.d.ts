@@ -13,13 +13,6 @@ export type EditEntry = {
  */
 export type EditStatus = Record<string, string>
 
-/** A Bash call a settings PreToolUse hook (shguard) denied, for the user to run. */
-export type BlockedCommand = {
-  command: string
-  /** shguard rule id when the deny text names one, else "". */
-  rule: string
-}
-
 /** A PR this session opened and its code-reviewer state (a wording guess, display only). */
 export type PrReview = {
   url: string
@@ -35,7 +28,6 @@ declare module 'claude-code' {
     'dotfiles-mod': {
       edits: EditEntry[]
       status: EditStatus
-      blocked: BlockedCommand[]
       prs: PrReview[]
     }
   }

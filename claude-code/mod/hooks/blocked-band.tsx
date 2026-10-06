@@ -1,9 +1,6 @@
-import { atom, read, update } from 'claude-code'
+import { atom, read } from 'claude-code'
 import type { On } from 'claude-code'
 
-const KEEP = 3
-
-const blocked = atom({ plugin: 'dotfiles-mod', key: 'blocked' } as const, [])
 // Written by review-state.ts; read here so one hook draws the whole band.
 const prs = atom({ plugin: 'dotfiles-mod', key: 'prs' } as const, [])
 
@@ -22,12 +19,10 @@ const RULE = /rule "([^"]+)"/
 const TOOL_POLICY = /^dotfiles-tool-policy-/
 
 const NOTE =
-  'dotfiles-mod: this command is now shown to the user above the prompt as `! <command>`. ' +
-  'Do not route around the block with an equivalent shell command (`unlink` for `rm`, piping ' +
-  'around it). If a dedicated tool (Read, Grep, Glob, Edit, Write) does the job, use it; ' +
-  'otherwise stop and let the user run it. When you stop, repeat the blocked command verbatim in ' +
-  'a fenced bash code block in your reply: the band truncates long commands, and the user copies ' +
-  'from your reply with /copy.'
+  'dotfiles-mod: do not route around the block with an equivalent shell command (`unlink` for ' +
+  '`rm`, piping around it). If a dedicated tool (Read, Grep, Glob, Edit, Write) does the job, use ' +
+  'it; otherwise stop and let the user run it. When you stop, repeat the blocked command verbatim ' +
+  'in a fenced bash code block in your reply: the user copies it from there with /copy.'
 
 const TOOL_POLICY_NOTE =
   'dotfiles-mod: this is a tool-preference rule, not a safety block. Retry right away with ' +
@@ -38,33 +33,23 @@ export function parseShguardDeny(text: string | undefined): { rule: string } | u
   return { rule: RULE.exec(text)?.[1] ?? '' }
 }
 
-export function registerBlockedBand(on: On): void {
+export function registerDenyNote(on: On): void {
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     const ran = await next(e)
     if (ran.isError !== true) return ran
     const hit = parseShguardDeny(ran.text)
     if (hit === undefined) return ran
-    if (TOOL_POLICY.test(hit.rule)) return { ...ran, context: [...(ran.context ?? []), TOOL_POLICY_NOTE] }
-
-    await update($, blocked, list =>
-      [...list.filter(b => b.command !== e.command), { command: e.command, rule: hit.rule }].slice(-KEEP),
-    )
-    return { ...ran, context: [...(ran.context ?? []), NOTE] }
-  })
-
-  on('prompt.submit', async ($, e, next) => {
-    await update($, blocked, () => [])
-    return next(e)
+    const note = TOOL_POLICY.test(hit.rule) ? TOOL_POLICY_NOTE : NOTE
+    return { ...ran, context: [...(ran.context ?? []), note] }
   })
 }
 
 export function registerBand(on: On): void {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const list = await read($, blocked)
     const reviews = await read($, prs)
-    if (e.props.hasSurvey || (list.length === 0 && reviews.length === 0)) return next(e)
+    if (e.props.hasSurvey || reviews.length === 0) return next(e)
 
-    const { Box, Button, Code, Text } = $.ui.resolve(e)
+    const { Box, Text } = $.ui.resolve(e)
     return (
       <Box flexDirection="column">
         {reviews.map(p => (
@@ -73,15 +58,6 @@ export function registerBand(on: On): void {
             {p.reviewer ? ` (reviewer ${p.reviewer})` : ''}
           </Text>
         ))}
-        {list.map(b => (
-          <Box key={b.command} flexDirection="column">
-            <Text color="error">blocked{b.rule ? ` by ${b.rule}` : ''}: run it yourself if it is needed</Text>
-            <Code source={`! ${b.command}`} language="bash" />
-          </Box>
-        ))}
-        {list.length > 0 && (
-          <Button key="dismiss" label="Dismiss" role="dismiss" onPress={() => update($, blocked, () => [])} />
-        )}
       </Box>
     )
   })
