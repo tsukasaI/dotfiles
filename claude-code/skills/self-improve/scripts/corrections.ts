@@ -5,7 +5,7 @@ import { logsDbPath, expandHome as expandHomeShared, isNonPromptText, scanSessio
 
 const HOME = Bun.env.HOME;
 if (!HOME) {
-  console.error("[corrections.ts] HOME is not set; cannot locate claude-logs. Set HOME or CLAUDE_LOGS_DB.");
+  console.error("[corrections.ts] HOME is not set; cannot locate ~/.claude (CLAUDE.md) or expand ~ in transcript paths. Set HOME; CLAUDE_LOGS_DB only overrides the logs.db path.");
   process.exit(2);
 }
 const LOGS_DB_PATH = logsDbPath(HOME);

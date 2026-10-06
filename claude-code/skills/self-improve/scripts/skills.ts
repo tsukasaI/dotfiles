@@ -12,7 +12,7 @@ import { logsDbPath, expandHome as expandHomeShared, isNonPromptText, scanSessio
 
 const HOME = Bun.env.HOME;
 if (!HOME) {
-  console.error("[skills.ts] HOME is not set; cannot locate claude-logs. Set HOME or CLAUDE_LOGS_DB.");
+  console.error("[skills.ts] HOME is not set; cannot locate ~/.claude (user skills, agents). Set HOME; CLAUDE_LOGS_DB only overrides the logs.db path.");
   process.exit(2);
 }
 const LOGS_DB_PATH = logsDbPath(HOME);
@@ -101,6 +101,12 @@ function findGitRoot(start: string): string | null {
   return null;
 }
 
+const skillLoadErrors = new Set<string>();
+
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 function listSkillDirsForCwd(cwd: string): SkillRecord[] {
   const records: SkillRecord[] = [];
   const seen = new Set<string>();
@@ -111,14 +117,25 @@ function listSkillDirsForCwd(cwd: string): SkillRecord[] {
   // a project's .claude/skills/foo -> ../../shared/foo isn't silently
   // dropped.
   const collect = (skillsDir: string, scope: "user" | "project") => {
-    for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+    let entries;
+    try {
+      entries = readdirSync(skillsDir, { withFileTypes: true });
+    } catch (e) {
+      skillLoadErrors.add(`could not read ${scope} skills dir ${skillsDir}: ${errMsg(e)}`);
+      return;
+    }
+    for (const entry of entries) {
       if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
       const skillMd = join(skillsDir, entry.name, "SKILL.md");
-      if (!existsSync(skillMd)) continue;
-      const rec = loadSkill(entry.name, skillMd, scope);
-      if (seen.has(rec.path)) continue;
-      seen.add(rec.path);
-      records.push(rec);
+      try {
+        if (!existsSync(skillMd)) continue;
+        const rec = loadSkill(entry.name, skillMd, scope);
+        if (seen.has(rec.path)) continue;
+        seen.add(rec.path);
+        records.push(rec);
+      } catch (e) {
+        skillLoadErrors.add(`skipped ${scope} skill ${skillMd}: ${errMsg(e)}`);
+      }
     }
   };
 
@@ -129,11 +146,7 @@ function listSkillDirsForCwd(cwd: string): SkillRecord[] {
   let dir = cwd;
   for (let i = 0; i < 32; i++) {
     const skillsDir = join(dir, ".claude", "skills");
-    if (existsSync(skillsDir)) {
-      try {
-        collect(skillsDir, "project");
-      } catch {}
-    }
+    if (existsSync(skillsDir)) collect(skillsDir, "project");
     if (gitRoot && dir === gitRoot) break;
     const parent = dirname(dir);
     if (parent === dir) break;
@@ -695,6 +708,7 @@ try {
 
   const promptClusters = buildPromptClusters(scanResult.prompts);
   const metaClusters = buildMetaClusters(promptClusters);
+  const errors = [...scanResult.errors, ...skillLoadErrors];
 
   const out = {
     generated_at: new Date(NOW).toISOString(),
@@ -706,7 +720,7 @@ try {
       data_sufficient: dataSufficient,
       skills_found: skills.length,
       total_skill_invocations_in_window: scanResult.invocations.length,
-      errors: scanResult.errors,
+      errors,
     },
     available_skills: skills.map((s) => {
       const { frontmatter, ...body } = skillExcerpt(s, "body_first_500_chars");
@@ -725,7 +739,7 @@ try {
     skill_review_hints: buildSkillReviewHints(skills, listAvailableAgents()),
   };
 
-  for (const err of scanResult.errors) console.error(`[skills.ts] ${err}`);
+  for (const err of errors) console.error(`[skills.ts] ${err}`);
   console.log(JSON.stringify(out, null, 2));
   if (scanResult.db_unavailable) process.exit(2);
 } catch (e) {
