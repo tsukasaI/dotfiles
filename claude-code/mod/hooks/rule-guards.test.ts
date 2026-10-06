@@ -79,10 +79,23 @@ const COMMIT_FORMS: Array<[string, string, string | undefined]> = [
   ['newline-separated', "git add a.ts\ngit commit -m 'wip stuff'", 'wip stuff'],
   ['git -c global option', "git -c a=b commit -m 'bad'", 'bad'],
   ['git -C and --no-pager', "git --no-pager -C ../x commit -m 'bad'", 'bad'],
+  ['quoted -C path', `git -C "/p q" commit -m 'bad'`, 'bad'],
+  ['quoted -c value', `git -c "user.name=A B" commit -m 'bad'`, 'bad'],
+  ['--git-dir with a space', "git --git-dir .git commit -m 'bad'", 'bad'],
+  ['--work-tree with a space', "git --work-tree ../x commit -m 'bad'", 'bad'],
+  ['--namespace with a space', "git --namespace ns commit -m 'bad'", 'bad'],
   ['-am combined flag', "git commit -am 'wip stuff'", 'wip stuff'],
   ['-m"msg" attached', 'git commit -m"wip stuff"', 'wip stuff'],
-  ['--message=msg', 'git commit --message=\'wip stuff\'', 'wip stuff'],
+  ['-mwip unquoted attached', 'git commit -mwip', 'wip'],
+  ['single unquoted token', 'git commit -m wip', 'wip'],
+  ['unquoted --message', 'git commit --message wip', 'wip'],
+  ['--message=msg', "git commit --message='wip stuff'", 'wip stuff'],
+  ['--mess abbreviation', "git commit --mess 'wip stuff'", 'wip stuff'],
   ['&& chain', "git add x && git commit -m 'wip'", 'wip'],
+  ['-F - heredoc', "git commit -F - <<'EOF'\nwip stuff\nEOF", 'wip stuff'],
+  ['--file=- heredoc', "git commit --file=- <<EOF\nwip stuff\nEOF", 'wip stuff'],
+  ['repeated -m', "git commit -m 'feat: x' -m 'more'", 'feat: x\n\nmore'],
+  ['scoped past an earlier flag', "ls -lm 'x' && git commit -m 'wip'", 'wip'],
 ]
 
 for (const [name, command, message] of COMMIT_FORMS) {
@@ -90,11 +103,76 @@ for (const [name, command, message] of COMMIT_FORMS) {
     expect(commitMessage(command)).toBe(message)
     stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
     const ran = await $.tool.call({ tool: 'Bash', command })
-    expect(ran.deny).toMatch(/Conventional/)
+    if (messageProblem(message ?? '') !== undefined) expect(ran.deny).toMatch(/Conventional/)
   })
 }
 
-test('newline-separated cd and git -c commits skip the branch check, plain ones do not', async ($, on) => {
+test('every message is checked: a later Japanese -m is denied', async ($, on) => {
+  stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
+  const ran = await $.tool.call({ tool: 'Bash', command: "git commit -m 'feat: x' -m '背景'" })
+  expect(ran.deny).toMatch(/Japanese/)
+})
+
+test('a heredoc -m "$(cat <<EOF" message is read and checked', async ($, on) => {
+  stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
+  const command = `git commit -m "$(cat <<'EOF'\nupdate stuff\nEOF\n)"`
+  expect(commitMessage(command)).toBe('update stuff')
+  expect((await $.tool.call({ tool: 'Bash', command })).deny).toMatch(/Conventional/)
+})
+
+test('an unreadable message flag is denied (fail closed)', async ($, on) => {
+  stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
+  for (const command of [
+    'git commit -m "$SUBJECT"',
+    'git commit -m $SUBJECT',
+    'git commit --message',
+    'git commit -am "$(date)"',
+    'git commit -F -',
+    'cat m | git commit -F -',
+  ]) {
+    const ran = await $.tool.call({ tool: 'Bash', command })
+    expect(ran.deny, command).toMatch(/not readable; use -m/)
+  }
+})
+
+test('reusing or editing an existing message is not denied', async ($, on) => {
+  stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
+  for (const command of [
+    'git commit --amend --no-edit',
+    'git commit -F msg.txt',
+    'git commit -C HEAD',
+    'git commit -c HEAD',
+  ]) {
+    expect((await $.tool.call({ tool: 'Bash', command })).deny, command).toBeUndefined()
+  }
+})
+
+test('text that only looks like a commit does not trigger the guard', async ($, on) => {
+  stubGit(on, 'main', 'git@github.com:tsukasaI/app.git')
+  for (const command of [
+    `cat > x.md <<'EOF'\nRepro:\ngit commit -m "wip"\nEOF`,
+    "git commit-tree -m 'x' abc",
+    'git commit-graph write',
+  ]) {
+    expect((await $.tool.call({ tool: 'Bash', command })).deny, command).toBeUndefined()
+  }
+})
+
+test('an earlier -m flag is not read as the commit message', async ($, on) => {
+  stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
+  const command = `ls -lm 'x' && git commit -m "feat: y"`
+  expect(commitMessage(command)).toBe('feat: y')
+  expect((await $.tool.call({ tool: 'Bash', command })).deny).toBeUndefined()
+})
+
+test('a real commit after an unrelated heredoc is still checked', async ($, on) => {
+  stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
+  const command = `cat > x.md <<'EOF'\ngit commit -m "feat: ok"\nEOF\ngit commit -m "update"`
+  expect(commitMessage(command)).toBe('update')
+  expect((await $.tool.call({ tool: 'Bash', command })).deny).toMatch(/Conventional/)
+})
+
+test('a cd before a newline-separated commit skips the branch check; plain and -c commits do not', async ($, on) => {
   stubGit(on, 'main', 'git@github.com:tsukasaI/app.git')
   const cd = await $.tool.call({ tool: 'Bash', command: 'cd ../other\ngit commit -m "feat: x"' })
   expect(cd.deny).toBeUndefined()
