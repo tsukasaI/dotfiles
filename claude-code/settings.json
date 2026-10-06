@@ -93,6 +93,9 @@
       "Read(~/.npmrc)",
       "Read(~/.pypirc)",
       "Read(~/.config/gh/hosts.yml)",
+      "Read(~/.ssh/**)",
+      "Read(~/.pgpass)",
+      "Read(~/.config/gcloud/**)",
       "Read(~/.gnupg/private-keys-v1.d/**)",
       "Read(~/.gnupg/openpgp-revocs.d/**)"
     ],
@@ -267,6 +270,9 @@
         "~/.npmrc",
         "~/.pypirc",
         "~/.config/gh/hosts.yml",
+        "~/.ssh",
+        "~/.pgpass",
+        "~/.config/gcloud",
         "~/.gnupg/private-keys-v1.d",
         "~/.gnupg/openpgp-revocs.d"
       ]

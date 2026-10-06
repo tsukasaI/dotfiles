@@ -241,6 +241,14 @@ regex are **not** covered:
   `cat ./nested/dir/id_rsa`. This is a materially bigger gap than
   originally recorded — it's not limited to the `exact`-matched targets.
 
+Checked 2026-10-06 before removing these rules in favor of the sandbox: the
+Seatbelt read denylist only enforces literal paths (`~/.aws`, `~/.kube/config`
+were denied). Its `**/` glob entries (`**/id_ed25519`, `**/.env*`,
+`**/*.pem`, `**/*secret*`) did not stop a Bash read; `~/.ssh/id_ed25519` was
+readable. So the rules stay, and `~/.ssh`, `~/.pgpass` and
+`~/.config/gcloud` were added to `sandbox.filesystem.denyRead` as literal
+paths. A project `.env` is still only covered by these rules.
+
 ## 10. `--no-verify` on non-git commands
 
 The old rule (`*--no-verify*`) was a command-agnostic substring match —
