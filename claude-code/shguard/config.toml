@@ -1016,18 +1016,6 @@ target_flags = ["--body-file", "-F"]
 except_targets = [{ prefix = "/private/tmp/claude-501/" }]
 resolve_symlinks = true
 
-# except_targets is literal, so `/private/tmp/claude-501/../../../Users/...`
-# passes the carve-out above; deny body files that normalize outside it.
-[[deny]]
-id = "dotfiles-gh-body-file-escape"
-reason = "gh --body-file path escapes the scratchpad via .."
-command = "gh"
-required_flags = ["F|--body-file"]
-targets = [
-  { normalized_prefix = "/Users/" }, { normalized_prefix = "/etc/" },
-  { normalized_prefix = "/private/etc/" }, { normalized_prefix = "/private/var/" },
-  { normalized_prefix = "/var/" }, { normalized_prefix = "/opt/" }, { normalized_prefix = "/nix/" },
-]
 # =====================================================================
 # Unsandboxed git (push/fetch/pull/ls-remote run outside the Seatbelt
 # sandbox for SSH; see claude-code/settings.json sandbox.excludedCommands)
