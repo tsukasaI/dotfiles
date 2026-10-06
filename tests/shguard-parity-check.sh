@@ -59,7 +59,8 @@ case_ "plain rm -rf"                     'rm -rf foo'                          d
 case_ "git reset --hard"                 'git reset --hard'                    deny
 case_ "git reset soft"                   'git reset HEAD~1'                    allow
 case_ "plain rg"                         'rg foo'                              allow
-case_ "plain grep (tool policy)"         'grep foo bar.txt'                    deny
+case_ "plain grep"                       'grep foo bar.txt'                    allow
+case_ "plain find (tool policy)"         'find . -name x'                      deny
 
 # ── Privilege escalation ─────────────────────────────────────────────────
 case_ "doas (blanket, unaffected by unwrap)" 'doas whoami'                     deny
