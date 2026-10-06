@@ -9,19 +9,38 @@ const PR_CREATE = /\bgh\s+pr\s+create\b/
 const PR_MERGE = /\bgh\s+pr\s+merge\b/
 const PR_URL = /https:\/\/github\.com\/[^\s/]+\/[^\s/]+\/pull\/(\d+)/
 const AGENT_ID = /agentId:\s*([A-Za-z0-9_-]+)/
-const SEVERITY = /\b(critical|high)\b/gi
+// A critical/high that names a finding's severity: at the start of a line
+// (after a list marker or heading), in brackets, bold or parens, after
+// "severity", or as a dash-separated field. A rating that qualifies a
+// confidence ("high confidence", "confidence: **high**"), "high-level",
+// "critical path", or a zero count ("Critical: 0") is not a severity.
+const SEVERITY_NOTATION = new RegExp(
+  '(?:^\\s*(?:[-*>]\\s+|\\d+[.)]\\s+)*|[[(]|\\*\\*|#+\\s+|\\s[—–]\\s*|\\s-\\s+|severity[\\s*_:=|/—–-]*)' +
+    '(?<!confidence[\\s*_:=—–-]*\\**)' +
+    '(?:critical(?!\\s+path\\b)|high)\\b' +
+    '(?!-level\\b)(?!\\s+confidence\\b)(?!\\s*:?\\s*(?:0|none)\\b)',
+  'i',
+)
+const TABLE_ROW = /^\s*\|.*\|\s*$/
+const TABLE_RATING = /^[\s*_`]*(critical|high|medium|low)[\s*_`]*$/i
+
+function lineHasCriticalOrHigh(line: string): boolean {
+  if (TABLE_ROW.test(line)) {
+    // A severity column comes before the confidence column, so the first rating cell is the severity.
+    const rating = line.split('|').map(c => TABLE_RATING.exec(c)?.[1]).find(r => r !== undefined)
+    return rating !== undefined && /^(critical|high)$/i.test(rating)
+  }
+  return SEVERITY_NOTATION.test(line)
+}
 
 /**
- * Whether a code-reviewer report has a critical/high finding. The reviewer
- * also rates confidence high/medium/low, so a "high" right after
- * "confidence" doesn't count. A guess from wording: display only, never a gate.
+ * Whether a code-reviewer report has a critical/high finding, judged from
+ * severity notation only (the reviewer also rates confidence high/medium/low,
+ * and prose says "no critical or high findings"). A guess from wording:
+ * display only, never a gate.
  */
 export function hasCriticalOrHigh(report: string): boolean {
-  for (const m of report.matchAll(SEVERITY)) {
-    const before = report.slice(Math.max(0, m.index - 20), m.index)
-    if (!/confidence/i.test(before)) return true
-  }
-  return false
+  return report.split('\n').some(lineHasCriticalOrHigh)
 }
 
 export function mergedNumber(command: string): number | undefined {
@@ -42,9 +61,10 @@ export function registerReviewState(on: On): void {
       }
     } else if (PR_MERGE.test(e.command)) {
       const n = mergedNumber(e.command)
-      await update($, prs, list =>
-        n !== undefined ? list.filter(p => p.number !== n) : list.length === 1 ? [] : list,
-      )
+      await update($, prs, list => {
+        if (n !== undefined) return list.filter(p => p.number !== n)
+        return list.length === 1 ? [] : list
+      })
     }
     return ran
   })
