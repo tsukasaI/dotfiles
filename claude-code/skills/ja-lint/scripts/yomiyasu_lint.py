@@ -10,7 +10,7 @@ import sys
 import re
 import argparse
 import json
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Iterator, Tuple
 
 
 # 絵文字正規表現パターン（CJK統合漢字拡張などのサロゲートペア漢字を除外した厳密な絵文字範囲）
@@ -72,6 +72,15 @@ FILLER_PATTERNS = [
 # ネガティブパラレリズム（AではなくB）
 NEGATIVE_PARALLELISM_PATTERN = re.compile(r"([^。、]+)ではなく、?([^。、]+)")
 
+# 地の文でも語彙スキャンでも対象外にする行頭（表、画像、バッジ画像、HTMLタグ）。引用「>」は用途により別扱い
+NON_PROSE_PREFIXES = ("|", "![", "[![", "<")
+
+# コードフェンスの開始行頭
+FENCE_PREFIXES = ("```", "~~~")
+
+# 文末の種別。先頭から順に最初に一致したものを採る
+SENTENCE_ENDINGS = ("です", "ます", "でした", "ました", "である", "だ", "だろう")
+
 
 def get_frontmatter_line_count(lines: List[str]) -> int:
     """YAMLフロントマター（先頭の --- から 次の --- まで）の行数を返す"""
@@ -83,31 +92,34 @@ def get_frontmatter_line_count(lines: List[str]) -> int:
     return 0
 
 
-def extract_plain_sentences(text: str) -> List[Tuple[int, str]]:
-    """コードブロックや引用、箇条書きを除去し、地の文の段落文（行番号つき）を抽出する"""
-    lines = text.split("\n")
-    sentences = []
-    in_code_block = False
+def iter_body_lines(lines: List[str]) -> Iterator[Tuple[int, str]]:
+    """フロントマターとコードフェンス（``` / ~~~）の内側・フェンス行を除いた (行番号, 行) を返す"""
     fm_lines = get_frontmatter_line_count(lines)
-
+    fence_char = ""
     for idx, line in enumerate(lines, 1):
         if idx <= fm_lines:
             continue
         stripped = line.strip()
-        if stripped.startswith("```"):
-            in_code_block = not in_code_block
+        if fence_char:
+            if stripped.startswith(fence_char * 3):
+                fence_char = ""
             continue
-        if in_code_block:
+        if stripped.startswith(FENCE_PREFIXES):
+            fence_char = stripped[0]
             continue
+        yield idx, line
+
+
+def extract_plain_sentences(text: str) -> List[Tuple[int, str]]:
+    """コードブロックや引用、箇条書きを除去し、地の文の段落文（行番号つき）を抽出する"""
+    sentences = []
+
+    for idx, line in iter_body_lines(text.split("\n")):
+        stripped = line.strip()
         # 空行、見出し、表行、画像記法、HTMLタグ、引用行、箇条書き行、インデントされたリスト継続行は地の文から除外
         if (
             not stripped
-            or stripped.startswith("#")
-            or stripped.startswith("|")
-            or stripped.startswith("![")
-            or stripped.startswith("[![")
-            or stripped.startswith("<")
-            or stripped.startswith(">")
+            or stripped.startswith(NON_PROSE_PREFIXES + (">", "#"))
             or re.match(r"^[-*+]\s|^\d+\.\s", stripped)
             or line.startswith("  ")
             or line.startswith("\t")
@@ -131,21 +143,7 @@ def check_sentence_end_repetitions(sentences: List[Tuple[int, str]]) -> List[Dic
 
     for line_no, s in sentences:
         clean = re.sub(r"[。！？\s]+$", "", s)
-        end_type = "その他"
-        if clean.endswith("です"):
-            end_type = "です"
-        elif clean.endswith("ます"):
-            end_type = "ます"
-        elif clean.endswith("でした"):
-            end_type = "でした"
-        elif clean.endswith("ました"):
-            end_type = "ました"
-        elif clean.endswith("である"):
-            end_type = "である"
-        elif clean.endswith("だ"):
-            end_type = "だ"
-        elif clean.endswith("だろう"):
-            end_type = "だろう"
+        end_type = next((e for e in SENTENCE_ENDINGS if clean.endswith(e)), "その他")
         end_types.append((line_no, s, end_type))
 
     # 3連続チェック
@@ -172,18 +170,9 @@ def check_sentence_end_repetitions(sentences: List[Tuple[int, str]]) -> List[Dic
 
 def analyze_markdown_metrics(text: str) -> Dict[str, Any]:
     """太字頻度、箇条書き比率などの構造メトリクスを算出（引用文やコードブロックは除外）"""
-    lines = text.split("\n")
     plain_lines = []
-    in_code = False
-    fm_lines = get_frontmatter_line_count(lines)
-    for idx, l in enumerate(lines, 1):
-        if idx <= fm_lines:
-            continue
-        stripped = l.strip()
-        if stripped.startswith("```"):
-            in_code = not in_code
-            continue
-        if in_code or stripped.startswith(">") or stripped.startswith("|") or stripped.startswith("![") or stripped.startswith("[![") or stripped.startswith("<"):
+    for _, l in iter_body_lines(text.split("\n")):
+        if l.strip().startswith(NON_PROSE_PREFIXES + (">",)):
             continue
         plain_lines.append(l)
 
@@ -243,18 +232,8 @@ def lint_text(text: str) -> Dict[str, Any]:
     findings.extend(check_sentence_end_repetitions(sentences))
 
     # 3. 語彙・構文パターン検査
-    lines = text.split("\n")
-    in_code = False
-    fm_lines = get_frontmatter_line_count(lines)
-    for line_no, line in enumerate(lines, 1):
-        if line_no <= fm_lines:
-            continue
+    for line_no, line in iter_body_lines(text.split("\n")):
         stripped = line.strip()
-        if stripped.startswith("```") or stripped.startswith("~~~"):
-            in_code = not in_code
-            continue
-        if in_code:
-            continue
 
         # 絵文字検知（見出し・本文問わず禁止）
         emoji_matches = EMOJI_PATTERN.findall(line)
@@ -280,7 +259,7 @@ def lint_text(text: str) -> Dict[str, Any]:
             continue
 
         # 引用ブロック（>）やテーブル行（|）、画像、HTMLタグはアンチパターン例示等の可能性が高いため語彙スキャンをスキップ
-        if stripped.startswith(">") or stripped.startswith("|") or stripped.startswith("![") or stripped.startswith("[![") or stripped.startswith("<"):
+        if stripped.startswith(NON_PROSE_PREFIXES + (">",)):
             continue
 
         # インラインコード（`...`）を除去したテキストを作成
@@ -345,14 +324,13 @@ def lint_text(text: str) -> Dict[str, Any]:
 
         # ネガティブパラレリズム
         if NEGATIVE_PARALLELISM_PATTERN.search(plain_text):
-            if "ではなく、" in plain_text or "ではなく" in plain_text:
-                findings.append({
-                    "rule": "negative_parallelism",
-                    "line": line_no,
-                    "severity": "info",
-                    "message": "「AではなくB」構文が検出されました。否定を外しても主張が変わらない場合は肯定文を検討してください。ただし、誤解の訂正や見方の切り替えなど意味・比重を担っている否定なら、無理に肯定化せずそのまま残してください。",
-                    "snippet": line.strip()
-                })
+            findings.append({
+                "rule": "negative_parallelism",
+                "line": line_no,
+                "severity": "info",
+                "message": "「AではなくB」構文が検出されました。否定を外しても主張が変わらない場合は肯定文を検討してください。ただし、誤解の訂正や見方の切り替えなど意味・比重を担っている否定なら、無理に肯定化せずそのまま残してください。",
+                "snippet": line.strip()
+            })
 
     # スコア計算（100点満点からの減点方式: warn=5点, info=2点）
     penalty = sum(5 if f["severity"] in ("warn", "error") else 2 for f in findings)

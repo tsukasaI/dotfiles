@@ -36,9 +36,22 @@ the file, so an empty result means "no pattern hit", not "no AI slop".
 
 ## Provenance
 
-`scripts/yomiyasu_lint.py` is vendored unmodified from
-https://github.com/nanaism/yomiyasu (MIT, see `LICENSE`), pinned at commit
-`b14ee43c9b722cf4fd2bb1e893c6c386f1a362aa` (git blob
-`cc3d832d6ca7aba320e05cc1831bbdd7a19201b4`). Standard library only, no
-network or subprocess use. Renewal: when bumping, read the upstream diff,
-then update this SHA and blob id.
+`scripts/yomiyasu_lint.py` is vendored with local modifications from
+https://github.com/nanaism/yomiyasu (MIT, see `LICENSE`), based on upstream
+commit `b14ee43c9b722cf4fd2bb1e893c6c386f1a362aa`. Standard library only, no
+network or subprocess use. Because the file is modified, there is no blob pin
+to compare against.
+
+Local changes (#76); output is unchanged for documents without `~~~` fences:
+
+- `iter_body_lines()` replaces three copied frontmatter/fence loops, so
+  `~~~` fences are skipped by every rule (upstream handled them only in the
+  vocabulary scan) and a fence closes only on its own marker.
+- Sentence endings use the ordered `SENTENCE_ENDINGS` tuple instead of an
+  if/elif chain.
+- `NON_PROSE_PREFIXES` / `FENCE_PREFIXES` replace chained `startswith` calls.
+- The always-true inner `if` after the negative-parallelism match is gone.
+
+`scripts/test_yomiyasu_lint.py` covers these (`python3 -I` it). Renewal: when
+bumping, read the upstream diff, re-apply the local changes on top of the new
+upstream file, run the test, and update the commit SHA above.
