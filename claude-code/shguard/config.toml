@@ -990,31 +990,31 @@ command = "turso"
 # split it, so it no longer matches sandbox.excludedCommands) and gh then
 # fails on the keychain, so multi-line bodies must go through --body-file.
 # Only a file under the session scratchpad is allowed as the body source.
+# target_flags makes the body-file value the only candidate (issue/PR numbers
+# and URLs are positionals); resolve_symlinks stops a scratchpad symlink from
+# pointing it elsewhere. gh (pflag) has no long-option abbreviation, so the
+# two spellings listed are all of them.
 [[deny]]
 id = "dotfiles-gh-issue-body-file"
-reason = "gh issue create/comment --body-file uploads a local file; write the body under /private/tmp/claude-501/ first"
+reason = "gh issue --body-file uploads a local file; write the body under /private/tmp/claude-501/ first"
 command = "gh"
 required_tokens = ["issue"]
 required_flags = ["F|--body-file"]
 value_flags = ["t", "title", "b", "body", "R", "repo", "l", "label", "a", "assignee", "m", "milestone", "p", "project", "T", "template"]
-except_targets = [
-  { prefix = "/private/tmp/claude-501/" },
-  # subcommand positionals are candidate targets too
-  { exact = "issue" }, { exact = "create" }, { exact = "comment" }, { exact = "edit" },
-]
+target_flags = ["--body-file", "-F"]
+except_targets = [{ prefix = "/private/tmp/claude-501/" }]
+resolve_symlinks = true
 
 [[deny]]
 id = "dotfiles-gh-pr-body-file"
-reason = "gh pr create/comment --body-file uploads a local file; write the body under /private/tmp/claude-501/ first"
+reason = "gh pr --body-file uploads a local file; write the body under /private/tmp/claude-501/ first"
 command = "gh"
 required_tokens = ["pr"]
 required_flags = ["F|--body-file"]
 value_flags = ["t", "title", "b", "body", "R", "repo", "B", "base", "H", "head", "l", "label", "a", "assignee", "r", "reviewer", "m", "milestone", "p", "project", "T", "template"]
-except_targets = [
-  { prefix = "/private/tmp/claude-501/" },
-  # subcommand positionals are candidate targets too
-  { exact = "pr" }, { exact = "create" }, { exact = "comment" }, { exact = "edit" }, { exact = "review" },
-]
+target_flags = ["--body-file", "-F"]
+except_targets = [{ prefix = "/private/tmp/claude-501/" }]
+resolve_symlinks = true
 
 # except_targets is literal, so `/private/tmp/claude-501/../../../Users/...`
 # passes the carve-out above; deny body files that normalize outside it.

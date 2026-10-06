@@ -988,9 +988,13 @@ Fixes:
    longer matches `excludedCommands`, runs sandboxed, and gh fails on the
    keychain. `--body-file` is now allowed only from
    `/private/tmp/claude-501/`; a separate normalized rule denies `..`
-   escapes (`except_targets` only accepts literal prefixes). Known false
-   positive: numbered forms (`gh pr comment 3 --body-file <scratch>`) still
-   deny, since the number is a candidate target with no literal carve-out.
+   escapes (`except_targets` only accepts literal prefixes). Numbered forms
+   (`gh pr comment 3 --body-file <scratch>`) used to deny because the number
+   was a candidate target. Since shguard 0.8.0 the rules set
+   `target_flags = ["--body-file", "-F"]`, so only the body-file value
+   (glued `-F<path>` included) is a candidate, and `resolve_symlinks = true`,
+   so a scratchpad symlink or a missing file is not excepted
+   (shguard#581/#583).
 5. shguard#549 filed: resolve relative targets against the payload `cwd`,
    which would let self-protection catch `mv claude-code x` and relative
    `sed -i` on its own.
