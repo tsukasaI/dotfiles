@@ -118,8 +118,8 @@ There is no staging or deploy step (hooks apply on the next tool call,
   without confirming the pinned nix-darwin input actually regressed.
 - **Homebrew taps can't be content-pinned** — the exception to
   `rules/security.md`'s pin rule. The taps in `nix-darwin/flake.nix`
-  (`homebrew.taps`, the single list; `abue-ammar/tinycast` is a non-notarized
-  trial) have no content-hash mechanism, and `trusted = true`
+  (`homebrew.taps`, the single list; `abue-ammar/tinycast` is non-notarized)
+  have no content-hash mechanism, and `trusted = true`
   on each is not optional: Homebrew 5.1+ refuses to install third-party-tap
   formulae without it (confirmed live in commit `ad07cb8`). Renewal
   mechanism: re-justify each tap's necessity whenever the tap list changes,

@@ -29,6 +29,32 @@ test('hasCriticalOrHigh detects the severity notations the reviewer emits', asyn
   expect(hasCriticalOrHigh('1. [Low] a.ts:1 x, confidence: high')).toBe(false)
 })
 
+const CASES: [string, boolean][] = [
+  ['- **High** shguard/config.toml:12 `cat x | sh` bypasses', true],
+  ['- [High] hooks/x.sh:3 `a || b` short-circuits', true],
+  ['## High', true],
+  ['### Critical: hooks/x.sh:3 secret', true],
+  ['- a.ts:3 — high — confidence medium', true],
+  ['Severity — High', true],
+  ['- **Severity:** High', true],
+  ['| a.ts:3 | high | medium |', true],
+  ['High-severity: a.ts:3 injection', true],
+  ['- a.ts:3 **Medium** (high confidence): x', false],
+  ['High confidence that the change is safe.', false],
+  ['No findings. (high confidence)', false],
+  ['- a.ts:3 **Low**, confidence: **high**', false],
+  ['Critical path is unchanged.', false],
+  ['No critical or high findings. 1 medium.', false],
+  ['- Critical: 0', false],
+  ['- High: none', false],
+  ['The high-level design is fine. a.ts:3 severity: low', false],
+  ['| a.ts:3 | medium | high |', false],
+]
+
+test('hasCriticalOrHigh table of severity notations', async () => {
+  for (const [line, want] of CASES) expect([line, hasCriticalOrHigh(line)]).toEqual([line, want])
+})
+
 test('mergedNumber reads a number or URL argument', async () => {
   expect(mergedNumber('gh pr merge 12 --squash --delete-branch')).toBe(12)
   expect(mergedNumber(`gh pr merge ${PR} --squash`)).toBe(12)

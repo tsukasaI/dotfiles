@@ -10,14 +10,22 @@ const PR_MERGE = /\bgh\s+pr\s+merge\b/
 const PR_URL = /https:\/\/github\.com\/[^\s/]+\/[^\s/]+\/pull\/(\d+)/
 const AGENT_ID = /agentId:\s*([A-Za-z0-9_-]+)/
 // A critical/high that names a finding's severity: at the start of a line
-// (after a list marker), in brackets, bold or parens, or after "severity:".
-// "high-level" and "high confidence" are not severities.
-const SEVERITY_NOTATION =
-  /(?:^\s*(?:[-*>]\s+|\d+[.)]\s+)*|[[(]|\*\*|severity[\s*_:=|-]*)(critical|high)\b(?!-)/i
+// (after a list marker or heading), in brackets, bold or parens, after
+// "severity", or as a dash-separated field. A rating that qualifies a
+// confidence ("high confidence", "confidence: **high**"), "high-level",
+// "critical path", or a zero count ("Critical: 0") is not a severity.
+const SEVERITY_NOTATION = new RegExp(
+  '(?:^\\s*(?:[-*>]\\s+|\\d+[.)]\\s+)*|[[(]|\\*\\*|#+\\s+|\\s[—–]\\s*|\\s-\\s+|severity[\\s*_:=|/—–-]*)' +
+    '(?<!confidence[\\s*_:=—–-]*\\**)' +
+    '(?:critical(?!\\s+path\\b)|high)\\b' +
+    '(?!-level\\b)(?!\\s+confidence\\b)(?!\\s*:?\\s*(?:0|none)\\b)',
+  'i',
+)
+const TABLE_ROW = /^\s*\|.*\|\s*$/
 const TABLE_RATING = /^[\s*_`]*(critical|high|medium|low)[\s*_`]*$/i
 
 function lineHasCriticalOrHigh(line: string): boolean {
-  if (line.includes('|')) {
+  if (TABLE_ROW.test(line)) {
     // A severity column comes before the confidence column, so the first rating cell is the severity.
     const rating = line.split('|').map(c => TABLE_RATING.exec(c)?.[1]).find(r => r !== undefined)
     return rating !== undefined && /^(critical|high)$/i.test(rating)
