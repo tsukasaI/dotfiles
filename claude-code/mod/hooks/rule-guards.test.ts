@@ -75,6 +75,35 @@ test('a bad message is denied before anything runs', async ($, on) => {
   expect(ran.deny).toMatch(/Conventional/)
 })
 
+const COMMIT_FORMS: Array<[string, string, string | undefined]> = [
+  ['newline-separated', "git add a.ts\ngit commit -m 'wip stuff'", 'wip stuff'],
+  ['git -c global option', "git -c a=b commit -m 'bad'", 'bad'],
+  ['git -C and --no-pager', "git --no-pager -C ../x commit -m 'bad'", 'bad'],
+  ['-am combined flag', "git commit -am 'wip stuff'", 'wip stuff'],
+  ['-m"msg" attached', 'git commit -m"wip stuff"', 'wip stuff'],
+  ['--message=msg', 'git commit --message=\'wip stuff\'', 'wip stuff'],
+  ['&& chain', "git add x && git commit -m 'wip'", 'wip'],
+]
+
+for (const [name, command, message] of COMMIT_FORMS) {
+  test(`commit form: ${name}`, async ($, on) => {
+    expect(commitMessage(command)).toBe(message)
+    stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
+    const ran = await $.tool.call({ tool: 'Bash', command })
+    expect(ran.deny).toMatch(/Conventional/)
+  })
+}
+
+test('newline-separated cd and git -c commits skip the branch check, plain ones do not', async ($, on) => {
+  stubGit(on, 'main', 'git@github.com:tsukasaI/app.git')
+  const cd = await $.tool.call({ tool: 'Bash', command: 'cd ../other\ngit commit -m "feat: x"' })
+  expect(cd.deny).toBeUndefined()
+  const newline = await $.tool.call({ tool: 'Bash', command: 'git add a.ts\ngit commit -m "feat: x"' })
+  expect(newline.deny).toMatch(/branch \+ PR/)
+  const dashC = await $.tool.call({ tool: 'Bash', command: 'git -c a=b commit -m "feat: x"' })
+  expect(dashC.deny).toMatch(/branch \+ PR/)
+})
+
 test('cd/-C commits skip the branch check', async ($, on) => {
   stubGit(on, 'main', 'git@github.com:tsukasaI/app.git')
   expect((await $.tool.call({ tool: 'Bash', command: 'git -C ../other commit -m "feat: x"' })).deny).toBeUndefined()
