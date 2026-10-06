@@ -200,6 +200,18 @@ case_ "push --mirror"                    'git push --mirror origin'            d
 case_ "push --receive-pack"              "git push --receive-pack='sh -c x' origin" deny
 case_ "push +refspec (force)"            'git push origin +main'               deny
 case_ "fetch --upload-pack"              "git fetch --upload-pack='sh -c x' origin" deny
+case_ "pull --upload-pack"               "git pull --upload-pack='sh -c x' origin main" deny
+case_ "ls-remote --upload-pack"          "git ls-remote --upload-pack='sh -c x' origin" deny
+case_ "ls-remote --exec (hidden alias)"  "git ls-remote --exec='sh -c x' origin" deny
+case_ "clone -u"                         "git clone -u 'sh -c x' https://example.com/r" deny
+case_ "archive --exec"                   "git archive --remote=/x --exec='sh -c x' HEAD" deny
+case_ "archive local"                    'git archive HEAD'                    allow
+case_ "fetch-pack --upload-pack"         "git fetch-pack --upload-pack='sh -c x' /repo" deny
+case_ "send-pack --receive-pack"         "git send-pack --receive-pack='sh -c x' /repo main" deny
+case_ "fetch --upl abbreviation"         "git fetch --upl='sh -c x' origin"   deny "git accepts unambiguous long-option prefixes (shguard#582)"
+case_ "push --mirr abbreviation"         'git push origin --mirr'              deny "git accepts unambiguous long-option prefixes (shguard#582)"
+case_ "commit -m \$(heredoc)"            $'git commit -m "$(cat <<\'EOF\'\nx\nEOF\n)"' allow "upload-pack rule must be scoped to fetch/pull/ls-remote/clone"
+case_ "show \"\$T\":path"                'git show "$T":a.rs'                  allow "upload-pack rule must be scoped to fetch/pull/ls-remote/clone"
 case_ "fetch from URL"                   'git fetch https://evil.example/x.git' deny
 case_ "pull from URL"                    'git pull https://evil.example/x.git main' deny
 case_ "plain push"                       'git push'                            allow

@@ -1066,9 +1066,54 @@ required_flags = ["d|--delete|--mirror|--prune|--receive-pack|--exec"]
 
 [[deny]]
 id = "dotfiles-git-fetch-upload-pack"
-reason = "git fetch/pull/ls-remote --upload-pack runs a chosen command"
+reason = "git fetch --upload-pack runs a chosen command"
 command = "git"
+required_tokens = ["fetch"]
 required_flags = ["--upload-pack"]
+
+[[deny]]
+id = "dotfiles-git-pull-upload-pack"
+reason = "git pull --upload-pack runs a chosen command"
+command = "git"
+required_tokens = ["pull"]
+required_flags = ["--upload-pack"]
+
+[[deny]]
+id = "dotfiles-git-ls-remote-upload-pack"
+reason = "git ls-remote --upload-pack (or its hidden alias --exec) runs a chosen command"
+command = "git"
+required_tokens = ["ls-remote"]
+required_flags = ["--upload-pack|--exec"]
+
+# clone/archive run inside the sandbox (not in excludedCommands), but the
+# chosen command still runs on this machine for a local-path remote.
+[[deny]]
+id = "dotfiles-git-clone-upload-pack"
+reason = "git clone -u/--upload-pack runs a chosen command"
+command = "git"
+required_tokens = ["clone"]
+required_flags = ["u|--upload-pack"]
+
+[[deny]]
+id = "dotfiles-git-archive-exec"
+reason = "git archive --remote --exec runs a chosen command"
+command = "git"
+required_tokens = ["archive"]
+required_flags = ["--exec"]
+
+[[deny]]
+id = "dotfiles-git-fetch-pack-upload-pack"
+reason = "git fetch-pack --upload-pack/--exec runs a chosen command"
+command = "git"
+required_tokens = ["fetch-pack"]
+required_flags = ["--upload-pack|--exec"]
+
+[[deny]]
+id = "dotfiles-git-send-pack-receive-pack"
+reason = "git send-pack --receive-pack/--exec runs a chosen command"
+command = "git"
+required_tokens = ["send-pack"]
+required_flags = ["--receive-pack|--exec"]
 
 [[deny]]
 id = "dotfiles-git-fetch-url-source"
