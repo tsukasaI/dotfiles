@@ -172,6 +172,7 @@
           "font-plemol-jp-nf"
           "font-blex-mono-nerd-font"
           "abue-ammar/tinycast/tinycast"  # app launcher; self-signed/non-notarized
+          "raycast"  # not redundant with tinycast: fallback launcher; removing it zaps its settings
         ];
       };
 
