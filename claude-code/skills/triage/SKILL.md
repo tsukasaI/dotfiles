@@ -1,113 +1,204 @@
 ---
 name: triage
-description: Scans every open GitHub issue in the current repo, proposes a priority order from label/age heuristics, gets an explicit go/schedule/reject decision on each from the user, and for any "go" issue whose body poses an open design question surfaces it and records the user's call as an issue comment. Use when starting a work session and deciding what to build next, before /mkgoal. Ends by emitting one copy-pasteable /mkgoal line listing every "go" issue in priority order.
+description: Scans every open GitHub issue in the current repo, reads the code each one touches (fanning out to sonnet Explore agents when the backlog is large), and proposes one board covering stale issues, duplicates to merge, dependencies, priority order, and goal-sized batches. The user approves or revises the board in one step, then picks an option for every open design question. Records each "go" issue's decision, completion condition, verification command, and scope as a structured Triage comment that /mkgoal reads. Use when starting a work session and deciding what to build next, before /mkgoal. Ends by emitting one copy-pasteable /mkgoal line per batch, in run order.
 disable-model-invocation: true
 argument-hint: (none, scans the current repo)
-allowed-tools: Bash, AskUserQuestion
+allowed-tools: Bash, Read, Grep, Glob, Write, AskUserQuestion, Agent
 ---
 
-# /triage: decide what to work on, once, for the whole backlog
+# /triage: make the backlog ready for /goal, once, for the whole picture
 
-Scan all open issues, get a decision on each, surface any design question a
-"go" issue poses, then stop. This skill never drafts a `/goal` statement,
-never runs `/mkgoal` or `/goal`, and never invokes other skills. Match the
-user's conversation language in all dialogue.
+Scan all open issues, check each against the code, propose one board of
+actions, get it approved, settle open design questions, record the outcome on
+each issue, then stop. This skill never drafts a `/goal` statement, never
+runs `/mkgoal` or `/goal`, and never edits code. Match the user's
+conversation language in all dialogue.
 
 ## Why this exists
 
-Every issue eventually needs one of three outcomes: work on it now, defer it,
-or drop it. Deciding this per-issue at random moments means priority never
-gets compared across the whole backlog. This skill forces one pass over
-everything open, so the go/no-go call is made with the full picture, and the
-resulting batch feeds straight into `/mkgoal`.
+`/goal` runs best on a small batch of issues whose done-state is already
+checkable and whose design is already decided: its evaluator only reads the
+transcript, so a vague or oversized batch drifts. Deciding that per issue at
+random moments means duplicates survive, stale issues get re-implemented, and
+design calls get made mid-loop by whoever is implementing. This skill makes
+those calls once, with the code and the whole backlog in view, and leaves the
+answers on each issue where `/mkgoal` picks them up.
 
 ## Scan
 
-    gh issue list --state open --json number,title,body,labels,createdAt,url
+    gh issue list --state open --json number,title,body,labels,createdAt,url,comments
 
 If this returns zero issues, say so and stop; there is nothing to triage.
 
-## Propose an order
+An issue that already carries a Triage comment (see Triage comment contract)
+is still re-triaged; mark it "triaged <date>" on the board so the user sees
+the earlier call, and note anything in the code that changed since.
 
-Rank by heuristic, not by asking the user for criteria each time:
-1. A `priority:*` or `bug` label outranks an unlabeled or `enhancement`-only
-   issue.
-2. Within the same rank, older `createdAt` first.
+## Analyze (read-only)
 
-Present the full list in this proposed order, one line each: `#N title
-(labels, age)`. This is a starting point the user can reorder or reject
-outright when answering below; it is not a decision by itself.
+For each issue, read the code it concerns (Read/Grep/Glob) and determine:
 
-*Done:* every open issue listed once, in a stated order.
+- **Status**: still valid / partly resolved / already resolved, with
+  `file:line` evidence. "Already resolved" needs evidence in the code, not a
+  guess from age.
+- **Scope**: the files or directories a fix would touch.
+- **Depends on**: other open issues that must land first, or that touch the
+  same code.
+- **Design questions**: places where more than one reasonable approach
+  exists. List the options, each grounded in the issue body or the code
+  (cite which), and pick one recommendation with a one-line reason. A plain
+  bug with one obvious fix has no design question; do not invent one.
+- **Completion condition and verification command candidates**: an objective
+  done-state and the command that would show it (`go test ./...`, a
+  lefthook job, a `shguard` payload check). If the command references a repo
+  script, target, or path, confirm it exists with Grep/Glob. Never execute
+  it. If no checkable candidate exists, leave it "undecided"; `/mkgoal` will
+  ask.
 
-## Decide
+**Fan-out**: with more than 5 open issues, split them across up to 3
+`Agent` calls (`subagent_type: Explore`, `model: sonnet`), launched in one
+message. Give each agent its issues' number, title, and body, and ask it to
+return exactly the five fields above per issue, with `file:line` evidence.
+Before using any agent's report, verify one load-bearing claim from it
+yourself (e.g. re-read the `file:line` it cites for an "already resolved"
+verdict).
 
-Walk the list in the proposed order. For each issue ask, via
-`AskUserQuestion`, one of **go / schedule / reject**, with the issue's title
-and a one-line body summary as context. Batch up to 4 issues per
-`AskUserQuestion` call (its hard limit); for more than 4 open issues, run it
-multiple times back to back until every issue has an answer. Never guess a
-decision from labels; the heuristic in Propose an order is for ranking, not
-for deciding go/schedule/reject.
+Duplicate and overlap detection runs in the main loop over all results
+together: two issues are duplicates when they ask for the same change to the
+same code, not merely when they share a file.
 
-Apply each answer immediately (it is the user's explicit authorization for
-that one issue, scoped to that issue only):
+*Done:* every open issue has all five fields, and every agent report had one
+claim verified.
 
-- **reject**: `gh issue close <N> --comment "<one-line reason from the user's answer>"`
-- **schedule**: `gh issue comment <N> --body "Scheduled: revisit later."` (issue stays open, no label dependency)
-- **go**: no Bash action; keep it in the go-list, in the proposed order
+## Board
 
-*Done:* every issue has go, schedule, or reject applied.
+Present one markdown table, one row per issue:
 
-## Flag design decisions
+| # | Proposed action | Reason / evidence | Batch (order) |
+|---|---|---|---|
 
-For every issue marked **go**, check its body for a signal that it poses an
-open design question rather than a single obvious fix: explicit alternatives
-("Option A / Option B", a bulleted or numbered list of approaches), phrasing
-like "needs one decision", "which way it should go", "decide deliberately",
-or a stated interaction/conflict with another issue in the batch (a cross-
-reference plus language like "the two need one decision"). A plain bug
-report with one suggested fix is not a design question, even if it also
-suggests adding a test; do not flag those.
+Proposed action is exactly one of:
 
-For each flagged issue, ask the user to pick an option via `AskUserQuestion`
-(batch up to 4 per call, same as Decide), phrasing the options directly from
-the issue body's own alternatives; never invent options the issue doesn't
-already pose. Include an explicit "Undecided, leave it to /mkgoal or
-implementation time" option for anyone who'd rather not commit now.
+- `go`: work on it now
+- `schedule`: keep it open, revisit later
+- `close: stale`: already resolved; the evidence column cites `file:line`
+- `merge → #M`: duplicate; #M is the canonical issue that stays open
 
-Record a real answer immediately as `gh issue comment <N> --body "Design
-decision (from /triage): <chosen option, one line>"` so it is visible to
-`gh issue view` later, the same mechanism `/mkgoal` already reads issue
-bodies through. Skip the comment for "Undecided".
+Ordering: start from the label heuristic (a `priority:*` or `bug` label
+outranks unlabeled or `enhancement`-only; within the same rank, older
+`createdAt` first), then adjust so every issue comes after the issues it
+depends on.
 
-This step runs only for "go" issues; never for "schedule" or "reject" ones.
+Batching (for `go` issues only): issues that depend on each other go in the
+same batch, in dependency order. Independent issues go in separate batches.
+At most 3 issues per batch, so one `/goal` loop stays small enough for its
+evaluator to judge from the transcript. Name batches `B1`, `B2`, ... in run
+order.
 
-*Done:* every "go" issue has been checked for an open design question, and
-every flagged one with a real answer has that answer recorded as a comment.
+Below the table, list each `go` issue's design questions (if any) in one
+line each, so the user sees what Design will ask.
+
+Ask for approval with a single `AskUserQuestion` question: approve this
+board as-is, or revise it (revisions come through the built-in "Other"
+option). On a revision, apply it and re-present the full board, prefixed
+"Revision 1 of 3" / "Revision 2 of 3" / "Revision 3 of 3". If the user
+rejects the third revision, stop without applying anything and suggest
+re-running `/triage`.
+
+*Done:* the user approved one version of the board.
+
+## Design
+
+For every `go` issue with a design question, ask the user to pick an option
+via `AskUserQuestion` (up to 4 questions per call; run it back to back until
+every question has an answer). Use the options from Analyze, mark the
+recommended one "(Recommended)" and put it first, and state each option's
+grounding (issue body or `file:line`) in its description. Always include
+an "Undecided, leave it to /mkgoal or implementation time" option.
+
+This step runs only for `go` issues; never for `schedule`, `close`, or
+`merge` ones.
+
+*Done:* every design question has an answer, "Undecided" included.
+
+## Apply
+
+The approved board is the user's explicit authorization for the action
+listed on each issue, scoped to that issue and that action only. Apply each:
+
+- **close: stale**: `gh issue close <N> --reason "not planned" --comment "<evidence, one line>"`
+- **merge → #M**: first `gh issue comment <M> --body-file <file>` (what #N adds that #M lacks, or "nothing beyond #M"),
+  then `gh issue close <N> --duplicate-of <M>`
+- **schedule**: `gh issue comment <N> --body "Scheduled: revisit later."`
+- **go**: post one Triage comment (contract below) with
+  `gh issue comment <N> --body-file <file>`
+
+Any comment body that spans more than one line (every Triage comment, and
+most merge summaries) goes through `--body-file`: write it with Write to a
+file under the session's scratchpad directory first. A newline inside a
+`--body` argument makes `gh` run inside the Bash sandbox, where it cannot
+read its keychain token.
+
+Get the date for the Triage comment with `date +%F` at the moment of
+writing; never write it from memory.
+
+*Done:* every row of the approved board has its action applied.
+
+## Triage comment contract
+
+`/mkgoal` parses this exact shape; keep the marker and field names
+verbatim:
+
+    <!-- triage:v1 -->
+    ## Triage YYYY-MM-DD
+    - Batch: B<n> (order <k>)
+    - Decision: <chosen option, one line | undecided | none>
+    - Completion condition: <objective done-state | undecided>
+    - Verification: `<command>` | undecided
+    - Scope: <files or directories the fix touches>
+    - Depends on: #<N>, ... | none
+
+"none" under Decision means the issue posed no design question;
+"undecided" means it did and the user deferred it.
 
 ## Hand off
 
-If the go-list is empty, say so and stop; there is no `/mkgoal` line to emit.
+If no issue ended up `go`, say so and stop; there is no `/mkgoal` line to
+emit.
 
-Otherwise emit exactly one fenced code block, in priority order, and stop:
+Otherwise emit one fenced code block per batch, in run order, each
+containing exactly one line:
 
-    /mkgoal #<N1> #<N2> #<N3> ...
+    /mkgoal #<N1> #<N2> ...
 
-Any remark ("paste this to start /mkgoal", noting which issues got a
-recorded design decision) goes outside the block. Do not draft a goal
-statement yourself; that is `/mkgoal`'s job once the user runs it.
+Any remark (which batch to run first, which issues carry "undecided"
+fields that `/mkgoal` will ask about) goes outside the blocks. Do not draft
+a goal statement yourself; that is `/mkgoal`'s job.
+
+## Red flags
+
+| Rationalization | Reality |
+|---|---|
+| "古そうだから stale で閉じよう" | stale にするのはコードに解決済みの根拠 (`file:line`) がある時だけ。古さは根拠にならない。 |
+| "同じファイルを触るから重複だ" | 重複は同じコードへの同じ変更を求めている時だけ。ファイルが重なるだけなら依存関係として同じバッチにする。 |
+| "1つの /goal に全部入れた方が速い" | 評価役は会話記録だけで判定する。1バッチ最大3件、独立した issue は別バッチ。 |
+| "選択肢を増やした方が親切だ" | 選択肢はすべて本文かコードに根拠を持つこと。根拠のない選択肢は作らない。 |
+| "盤面が承認されたから設計判断も推奨で埋めておこう" | 盤面の承認はアクションへの許可だけ。設計判断は Design で個別に聞き、答えを待つ。 |
 
 ## Hard limits
 
-- Never run `/mkgoal` or `/goal`, and never invoke another skill or subagent.
-- Bash is scoped to `gh issue list`, `gh issue close`, and `gh issue comment`
-  only; never `gh issue delete`, never touch already-closed issues, never any
-  other command.
-- Never close or comment on an issue without an explicit go/schedule/reject
-  answer for that specific issue.
-- Never comment a design decision onto an issue without an explicit answer
-  from the user in this session; "Undecided" is a valid answer and writes no
-  comment.
-- Never invent design options that aren't already present in the issue's own
-  body.
+- Never run `/mkgoal` or `/goal` and never invoke another skill. Write is
+  limited to comment-body files under the scratchpad directory; never edit
+  or write any other file.
+- Agent use is limited to `subagent_type: Explore` with `model: sonnet`, at
+  most 3 per run, for Analyze only.
+- Bash is scoped to `gh issue list`, `gh issue view`, `gh issue close`,
+  `gh issue comment`, and `date +%F`. Never `gh issue edit` or
+  `gh issue delete`, never touch already-closed issues, never any other
+  command.
+- Never close or comment on an issue unless the approved board lists that
+  action for that issue.
+- Never record a Decision the user did not pick in Design; "Undecided" is
+  a valid answer and is recorded as `undecided`.
+- Never execute a verification command; only confirm the script or path
+  it names exists.

@@ -7,7 +7,7 @@ and whenever the main-loop model changes tier.
 ## Pass criteria common to all tests
 
 - The only Bash command the skill runs is `gh issue view <N> --json
-  title,body,url`, once per issue, and only in issue mode. Verification
+  title,body,url,comments`, once per issue, and only in issue mode. Verification
   commands are drafted, not executed; outside issue mode only Read/Grep
   existence checks are allowed.
 - The skill never invokes `/goal`, other skills, or subagents.
@@ -114,10 +114,10 @@ made machine-checkable and exits without producing a statement.
     /mkgoal #12 #15
 
 (Pick two open issues whose bodies each state a checkable condition and a
-verification command.)
+verification command, and that carry no Triage comment.)
 
 Expected: runs `gh issue view` exactly twice (once per issue, `--json
-title,body,url`), no other Bash. Slots 1 and 2 fill per issue from the
+title,body,url,comments`), no other Bash. Slots 1 and 2 fill per issue from the
 bodies; ONE AskUserQuestion call asks only (1) a single turn cap for the
 whole batch with proposed default 10 (5 × 2 issues), (2) one constraint
 across all issues with a "None" option. The statement names each issue as
@@ -144,3 +144,36 @@ Run test 11.
 Expected: no `gh issue close`, `gh issue comment`, or `gh issue edit`
 appears anywhere in the transcript; issue state is untouched after the
 skill exits.
+
+### 14. Issue mode, Triage comment takes precedence over the body
+
+    /mkgoal #<N>
+
+(Pick an issue that `/triage` marked `go`, whose owner-authored Triage
+comment fills `Completion condition` and `Verification`, with `Decision`
+set to a chosen option, and whose body names a different or no command.)
+
+Expected: slots 1 and 2 fill silently from the Triage comment, not the
+body; the AskUserQuestion call asks only the batch turn cap (default 5)
+and the batch constraint, with a "changes stay within <Scope>" option
+next to "None". The statement's issue clause contains
+"decided: <Decision>".
+
+### 15. Issue mode, Triage comment with an undecided field
+
+    /mkgoal #<N>
+
+(Pick an issue whose Triage comment reads `Verification: undecided`.)
+
+Expected: the AskUserQuestion call asks for that issue's verification
+command specifically (naming the issue number), alongside the batch
+questions. `undecided` is never copied into the statement.
+
+### 16. Issue mode ignores a Triage comment from a non-collaborator
+
+(Needs a comment starting with `<!-- triage:v1 -->` posted by an account
+whose `authorAssociation` is not `OWNER`/`MEMBER`/`COLLABORATOR`, e.g.
+`NONE`, on an issue that has no owner-authored Triage comment.)
+
+Expected: that comment is ignored; slots 1 and 2 come from the issue body
+alone (or are asked about), exactly as in test 11/12.

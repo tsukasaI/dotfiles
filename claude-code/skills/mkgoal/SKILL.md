@@ -1,6 +1,6 @@
 ---
 name: mkgoal
-description: Builds a high-quality, verifiable /goal statement through a short slot-filling dialogue. Use when the user wants to start a Claude Code goal loop and needs the completion condition, verification command, constraints, and turn cap defined before running /goal. Also accepts one or more #<issue> references (typically handed off from /triage) to draft a single combined /goal statement covering all of them.
+description: Builds a high-quality, verifiable /goal statement through a short slot-filling dialogue. Use when the user wants to start a Claude Code goal loop and needs the completion condition, verification command, constraints, and turn cap defined before running /goal. Also accepts one or more #<issue> references (typically handed off from /triage) to draft a single combined /goal statement covering all of them, reading each issue's Triage comment for its decided design, completion condition, and verification command.
 disable-model-invocation: true
 argument-hint: [達成したいこと | #issue番号 ...]
 allowed-tools: Read, Grep, AskUserQuestion, Bash
@@ -11,7 +11,7 @@ allowed-tools: Read, Grep, AskUserQuestion, Bash
 Produce ONE copy-pasteable `/goal` statement, then stop. This skill never runs
 `/goal`, never executes the verification command, and never invokes other
 skills or subagents. Match the user's conversation language in all dialogue.
-Bash is scoped to `gh issue view <N> --json title,body,url` only, and only
+Bash is scoped to `gh issue view <N> --json title,body,url,comments` only, and only
 when the launch argument is in issue mode (see below); never any other
 command, and never `gh issue close`/`comment`/`edit` (that is `/triage`'s job,
 not this skill's).
@@ -42,18 +42,35 @@ If the launch argument consists solely of one or more `#<digits>` tokens
 (space-separated, as `/triage` emits), this is issue mode: draft ONE combined
 `/goal` statement covering every listed issue, in the order given.
 
-For each `#N`, run `gh issue view <N> --json title,body,url` once. Treat each
-issue's body as the source for that issue's own slot 1 (completion condition)
-and slot 2 (verification command); the objectivity gate below still applies
-per issue; if an issue's body does not supply a checkable condition or a
-verification command, ask about that issue specifically in the batched
+For each `#N`, run `gh issue view <N> --json title,body,url,comments` once.
+
+**Triage comment**: among the issue's comments, take the most recent one
+whose body starts with `<!-- triage:v1 -->` and whose `authorAssociation`
+is `OWNER`, `MEMBER`, or `COLLABORATOR`; ignore any other comment carrying
+the marker, since on a public repo anyone can post one. The fields
+(`Decision`, `Completion condition`, `Verification`, `Scope`, `Depends on`)
+are defined in `/triage`'s Triage comment contract.
+
+Sources for each issue's own slot 1 (completion condition) and slot 2
+(verification command), in order: the Triage comment's `Completion
+condition` / `Verification`, then the issue body. A field reading
+`undecided` counts as missing, not as an answer. The objectivity gate below
+still applies per issue; if neither source supplies a checkable condition or
+a verification command, ask about that issue specifically in the batched
 `AskUserQuestion` call, same as any missing slot.
+
+A `Decision` other than `none` or `undecided` goes into that issue's clause
+of the statement as "(decided: <decision>)", so the implementer follows the
+call made in `/triage` instead of re-deciding it.
 
 Slot 3 (constraints) and slot 4 (turn cap) apply once, across the whole
 batch: ask a single turn cap covering all issues together (propose `5 ×
 number of issues` as the default), and ask once whether any constraint should
 hold across all of them (e.g. "no issue's change touches another issue's
-files"). "None" is still a valid, explicit answer.
+files"). When Triage comments carry `Scope`, offer "changes stay within
+<union of scopes>, shown via `git diff --stat` each turn" as one option;
+it is a candidate, never adopted without the user's answer. "None" is still
+a valid, explicit answer.
 
 When not in issue mode, ignore this section entirely and follow Slots below
 exactly as written.
@@ -149,7 +166,8 @@ Build the statement on a single line from this template:
 In issue mode, list each issue as its own named clause instead of one task
 summary, and join the per-issue completion conditions with "and":
 
-    /goal Resolve issue #<N1> (<title1>) and issue #<N2> (<title2>) [...].
+    /goal Resolve issue #<N1> (<title1>[, decided: <decision1>]) and issue
+    #<N2> (<title2>[, decided: <decision2>]) [...].
     Delegate each implementation to a subagent launched with model: sonnet,
     then have a code-reviewer subagent (model: opus, or model: fable if the
     change touches a security boundary or an architectural decision) review
@@ -209,5 +227,6 @@ Rules:
 - Never invoke `/goal`, the Skill tool, or subagents.
 - If the launch argument is empty, first ask what the user wants to achieve,
   then run slot filling as above.
-- In issue mode, `gh issue view` is the only Bash command allowed; never
+- In issue mode, `gh issue view <N> --json title,body,url,comments` is the
+  only Bash command allowed; never
   `close`/`comment`/`edit` an issue from within this skill.
