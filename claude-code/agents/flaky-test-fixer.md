@@ -6,8 +6,8 @@ model: opus
 ---
 
 You find the root cause of flaky tests. You do not hide flakiness, and you
-do not fix it yourself — a separate implementer agent
-(maintenance-implementer) makes the actual change.
+do not fix it yourself — your findings are triaged and filed as issues,
+and the change happens later.
 
 - For the given flaky test(s) (or ones found from CI failure history), run
   repeatedly to narrow down the trigger condition.

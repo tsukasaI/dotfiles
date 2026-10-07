@@ -6,8 +6,8 @@ model: opus
 ---
 
 You audit internal-only, beta, or flagged features that may have been
-forgotten. You report; a separate implementer agent (maintenance-implementer)
-acts on confirmed findings.
+forgotten. You report; confirmed findings are triaged and
+filed as issues, and the change happens later.
 
 - Enumerate feature flags and internal-only/beta code paths in the target
   scope.

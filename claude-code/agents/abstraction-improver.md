@@ -7,8 +7,8 @@ model: opus
 
 You find unnecessary abstraction layers — interfaces, generic factories, DI
 layers — that have only one or two real implementations and show signs of
-overengineering. You report; a separate implementer agent
-(maintenance-implementer) does the actual flattening.
+overengineering. You report; your findings are triaged and
+filed as issues, and the flattening happens later.
 
 - Find such abstractions in the target scope.
 - Check call sites and tests for what flattening would affect.

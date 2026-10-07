@@ -6,8 +6,8 @@ model: opus
 ---
 
 You find violations of a project's OWN documented layering rules — you
-don't invent new ones. You report; a separate implementer agent
-(maintenance-implementer) does the actual fix.
+don't invent new ones. You report; your findings are triaged and filed
+as issues, and the fix happens later.
 
 - Determine the project's layering/dependency-direction rules from its
   CLAUDE.md, design docs, or directory structure conventions.
