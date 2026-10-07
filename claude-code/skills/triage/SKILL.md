@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Scans every open GitHub issue in the current repo, reads the code each one touches (fanning out to sonnet Explore agents when the backlog is large), and proposes one board covering stale issues, duplicates to merge, dependencies, priority order, and goal-sized batches. The user approves or revises the board in one step, then picks an option for every open design question. Records each "go" issue's decision, completion condition, verification command, and scope as a structured Triage comment that /mkgoal reads. Use when starting a work session and deciding what to build next, before /mkgoal. Ends by emitting one copy-pasteable /mkgoal line per batch, in run order.
+description: Organizes the open GitHub issues in the current repo and settles their direction. Reads the code each issue touches (fanning out to sonnet Explore agents when the backlog is large) and proposes one board covering stale issues, duplicates to merge, dependency groups, and work order. The user approves or revises the board in one step, then picks an option for every open design question. Records each "go" issue's decision, completion condition, verification command, and scope as a structured Triage comment on the issue. Use when reviewing the backlog or deciding what to build next. Ends with the go issues in work order, grouped by dependency.
 disable-model-invocation: true
 argument-hint: (none, scans the current repo)
 allowed-tools: Bash, Read, Grep, Glob, Write, AskUserQuestion, Agent
@@ -16,13 +16,15 @@ conversation language in all dialogue.
 
 ## Why this exists
 
-`/goal` runs best on a small batch of issues whose done-state is already
-checkable and whose design is already decided: its evaluator only reads the
-transcript, so a vague or oversized batch drifts. Deciding that per issue at
-random moments means duplicates survive, stale issues get re-implemented, and
-design calls get made mid-loop by whoever is implementing. This skill makes
-those calls once, with the code and the whole backlog in view, and leaves the
-answers on each issue where `/mkgoal` picks them up.
+An issue is ready to work on when it is still valid, not duplicated, ordered
+after what it depends on, has a decided design, and has a checkable
+done-state. Deciding that per issue at random moments means duplicates
+survive, stale issues get re-implemented, and design calls get made mid-task
+by whoever is implementing. This skill makes those calls once, with the code
+and the whole backlog in view, and leaves the answers on each issue in
+GitHub, where any later step (`/mkgoal`, or a human picking an issue by
+hand) can read them. Sizing work into `/goal` loops is not this skill's
+concern; `/mkgoal` owns that.
 
 ## Scan
 
@@ -74,7 +76,7 @@ claim verified.
 
 Present one markdown table, one row per issue:
 
-| # | Proposed action | Reason / evidence | Batch (order) |
+| # | Proposed action | Reason / evidence | Group (order) |
 |---|---|---|---|
 
 Proposed action is exactly one of:
@@ -89,11 +91,11 @@ outranks unlabeled or `enhancement`-only; within the same rank, older
 `createdAt` first), then adjust so every issue comes after the issues it
 depends on.
 
-Batching (for `go` issues only): issues that depend on each other go in the
-same batch, in dependency order. Independent issues go in separate batches.
-At most 3 issues per batch, so one `/goal` loop stays small enough for its
-evaluator to judge from the transcript. Name batches `B1`, `B2`, ... in run
-order.
+Grouping (for `go` issues only): issues that depend on each other or touch
+the same code go in the same group, in dependency order, so they are worked
+on together. Independent issues each get their own group. Groups have no
+size cap here; how many issues one `/goal` loop takes is `/mkgoal`'s call.
+Name groups `G1`, `G2`, ... in work order.
 
 Below the table, list each `go` issue's design questions (if any) in one
 line each, so the user sees what Design will ask.
@@ -151,7 +153,7 @@ verbatim:
 
     <!-- triage:v1 -->
     ## Triage YYYY-MM-DD
-    - Batch: B<n> (order <k>)
+    - Group: G<n> (order <k>)
     - Decision: <chosen option, one line | undecided | none>
     - Completion condition: <objective done-state | undecided>
     - Verification: `<command>` | undecided
@@ -163,25 +165,26 @@ verbatim:
 
 ## Hand off
 
-If no issue ended up `go`, say so and stop; there is no `/mkgoal` line to
-emit.
+If no issue ended up `go`, say so and stop.
 
-Otherwise emit one fenced code block per batch, in run order, each
-containing exactly one line:
+Otherwise list the `go` issues in work order, one line per group:
 
-    /mkgoal #<N1> #<N2> ...
+    G1: #<N1> → #<N2>  (<one-line reason they belong together>)
+    G2: #<N3>
 
-Any remark (which batch to run first, which issues carry "undecided"
-fields that `/mkgoal` will ask about) goes outside the blocks. Do not draft
-a goal statement yourself; that is `/mkgoal`'s job.
+Mark any issue whose Triage comment carries an `undecided` field, so the
+user knows what is still open. Then add one closing line naming the usual
+next step (e.g. "`/mkgoal #<N1> #<N2>` turns G1 into a /goal statement");
+it is a pointer, not the skill's output. Do not draft a goal statement or
+decide how many issues one `/goal` takes; that is `/mkgoal`'s job.
 
 ## Red flags
 
 | Rationalization | Reality |
 |---|---|
 | "古そうだから stale で閉じよう" | stale にするのはコードに解決済みの根拠 (`file:line`) がある時だけ。古さは根拠にならない。 |
-| "同じファイルを触るから重複だ" | 重複は同じコードへの同じ変更を求めている時だけ。ファイルが重なるだけなら依存関係として同じバッチにする。 |
-| "1つの /goal に全部入れた方が速い" | 評価役は会話記録だけで判定する。1バッチ最大3件、独立した issue は別バッチ。 |
+| "同じファイルを触るから重複だ" | 重複は同じコードへの同じ変更を求めている時だけ。ファイルが重なるだけなら同じグループにまとめる。 |
+| "/goal に収まるようにグループを分割しておこう" | goal の大きさは /mkgoal が決める。triage は依存とコードの重なりだけでグループを作る。 |
 | "選択肢を増やした方が親切だ" | 選択肢はすべて本文かコードに根拠を持つこと。根拠のない選択肢は作らない。 |
 | "盤面が承認されたから設計判断も推奨で埋めておこう" | 盤面の承認はアクションへの許可だけ。設計判断は Design で個別に聞き、答えを待つ。 |
 

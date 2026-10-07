@@ -39,8 +39,18 @@ Launch argument: $ARGUMENTS
 ## Issue mode
 
 If the launch argument consists solely of one or more `#<digits>` tokens
-(space-separated, as `/triage` emits), this is issue mode: draft ONE combined
-`/goal` statement covering every listed issue, in the order given.
+(space-separated, as `/triage`'s closing pointer suggests), this is issue
+mode: draft ONE combined `/goal` statement covering every listed issue, in
+the order given.
+
+**Batch size**: one `/goal` loop takes at most 3 issues by default, because
+its evaluator judges every issue's condition from the transcript alone and
+a longer batch drifts. With more than 3 issues, before slot filling, ask via
+`AskUserQuestion`: (1) "Split (Recommended)": draft this statement for the
+first 3 issues in the given order (`/triage` already orders prerequisites
+first), and list the rest, in order and in groups of at most 3, outside the
+final code block as follow-up `/mkgoal #...` lines; or
+(2) "Keep all N in one goal". Never split silently.
 
 For each `#N`, run `gh issue view <N> --json title,body,url,comments` once.
 

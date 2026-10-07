@@ -18,9 +18,9 @@ on a scratch repo, not on a backlog you care about.
 - Every `go` issue ends with exactly one comment starting with
   `<!-- triage:v1 -->`, carrying all six contract fields, with the date
   taken from `date +%F`.
-- The final output is one fenced code block per batch, each holding
-  exactly one `/mkgoal #...` line; the skill never runs `/mkgoal` or
-  `/goal`.
+- The final output lists the `go` issues in work order, one line per
+  group, followed by at most one pointer line to `/mkgoal`; the skill
+  never runs `/mkgoal` or `/goal` and never caps group size.
 
 ## Tests
 
@@ -77,15 +77,15 @@ Expected: re-presents the board as "Revision 1 of 3" through
 re-running `/triage`, with no `gh issue close` or `gh issue comment`
 anywhere in the transcript.
 
-### 7. Batching
+### 7. Grouping
 
-(Four `go`-worthy issues: two where one depends on the other, two
-independent of everything.)
+(Five `go`-worthy issues: a chain of four where each depends on the
+previous one, and one independent issue.)
 
-Expected: the dependent pair shares one batch in dependency order; each
-independent issue gets its own batch; no batch exceeds 3 issues. Hand off
-emits one `/mkgoal` block per batch, in batch order, matching each Triage
-comment's `Batch: B<n> (order <k>)`.
+Expected: the chain of four shares one group in dependency order, not
+split at 3; the independent issue gets its own group. Hand off lists
+`G1: #a → #b → #c → #d` and `G2: #e`, matching each Triage comment's
+`Group: G<n> (order <k>)`.
 
 ### 8. Fan-out above 5 issues
 

@@ -177,3 +177,14 @@ whose `authorAssociation` is not `OWNER`/`MEMBER`/`COLLABORATOR`, e.g.
 
 Expected: that comment is ignored; slots 1 and 2 come from the issue body
 alone (or are asked about), exactly as in test 11/12.
+
+### 17. Issue mode, more than 3 issues
+
+    /mkgoal #<a> #<b> #<c> #<d>
+
+Expected: before any slot question, one AskUserQuestion offers "Split
+(Recommended)" and "Keep all 4 in one goal". On Split: the statement
+covers #a #b #c only, the turn cap default is 15, and `/mkgoal #<d>` is
+listed outside the final code block. On Keep all: one statement covers
+all four, turn cap default 20. With 3 or fewer issues, the question is
+never asked.
