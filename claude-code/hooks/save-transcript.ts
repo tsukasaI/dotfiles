@@ -5,47 +5,7 @@ import { readFileSync, mkdirSync, realpathSync, chmodSync, statSync, existsSync,
 import { join } from "path";
 import { abbreviateHome } from "../lib/home-path";
 import { redactTranscript } from "../lib/redact";
-
-// --- Types ---
-
-interface HookInput {
-  session_id: string;
-  transcript_path: string;
-  cwd: string;
-  hook_event_name: string;
-  reason?: string;
-}
-
-interface Usage {
-  input_tokens?: number;
-  cache_creation_input_tokens?: number;
-  cache_read_input_tokens?: number;
-  output_tokens?: number;
-}
-
-interface TranscriptLine {
-  type: string;
-  timestamp?: string;
-  version?: string;
-  gitBranch?: string;
-  message?: {
-    model?: string;
-    usage?: Usage;
-  };
-}
-
-interface SessionMeta {
-  model: string;
-  version: string;
-  gitBranch: string;
-  startedAt: string;
-  endedAt: string;
-  inputTokens: number;
-  outputTokens: number;
-  numUser: number;
-  numAssistant: number;
-  dayCounts: Map<string, number>;
-}
+import { parseTranscript, validateHookInput, type SessionMeta } from "../lib/transcript-parse";
 
 // --- Database ---
 
@@ -159,81 +119,6 @@ function redactHome(path: string): string {
   return abbreviateHome(path, Bun.env.HOME ?? "");
 }
 
-// --- Transcript parsing ---
-
-// ts is an ISO 8601 UTC timestamp; bucket by local calendar day so late-night/
-// early-morning sessions attribute to the day the user experienced, not the
-// UTC day.
-function localDay(ts: string): string {
-  const d = new Date(ts);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function sumTokens(usage: Usage): { input: number; output: number } {
-  return {
-    input:
-      (usage.input_tokens ?? 0) +
-      (usage.cache_creation_input_tokens ?? 0) +
-      (usage.cache_read_input_tokens ?? 0),
-    output: usage.output_tokens ?? 0,
-  };
-}
-
-function parseTranscript(lines: string[]): SessionMeta {
-  const meta: SessionMeta = {
-    model: "",
-    version: "",
-    gitBranch: "",
-    startedAt: "",
-    endedAt: "",
-    inputTokens: 0,
-    outputTokens: 0,
-    numUser: 0,
-    numAssistant: 0,
-    dayCounts: new Map(),
-  };
-
-  for (const line of lines) {
-    let entry: TranscriptLine;
-    try {
-      entry = JSON.parse(line);
-    } catch {
-      continue;
-    }
-
-    const ts = entry.timestamp ?? "";
-    if (!meta.startedAt && ts) meta.startedAt = ts;
-    if (ts) meta.endedAt = ts;
-
-    const isMessage = entry.type === "user" || entry.type === "assistant";
-    if (ts && isMessage) {
-      const day = localDay(ts);
-      meta.dayCounts.set(day, (meta.dayCounts.get(day) ?? 0) + 1);
-    }
-
-    switch (entry.type) {
-      case "user":
-        meta.numUser++;
-        meta.version ||= entry.version ?? "";
-        meta.gitBranch ||= entry.gitBranch ?? "";
-        break;
-
-      case "assistant":
-        meta.numAssistant++;
-        meta.model ||= entry.message?.model ?? "";
-        if (entry.message?.usage) {
-          const tokens = sumTokens(entry.message.usage);
-          meta.inputTokens += tokens.input;
-          meta.outputTokens += tokens.output;
-        }
-        break;
-    }
-  }
-
-  return meta;
-}
-
 // --- Persistence ---
 
 function saveSession(
@@ -294,22 +179,27 @@ function saveSessionDays(
 // --- Main ---
 
 try {
-  const input: HookInput = await Bun.stdin.json();
+  const checked = validateHookInput(await Bun.stdin.json());
+  if (!checked.ok) {
+    console.error(`[save-transcript] skipped: ${checked.error}`);
+    process.exit(0);
+  }
+  const input = checked.value;
 
   const claudeDir = join(Bun.env.HOME!, ".claude");
-  const resolved = realpathSync(input.transcript_path);
+  const resolved = realpathSync(input.transcriptPath);
   if (!resolved.startsWith(claudeDir + "/")) process.exit(0);
 
   const transcript = readFileSync(resolved, "utf-8");
   const lines = transcript.split("\n").filter((l) => l.trim());
   const meta = parseTranscript(lines);
 
-  const endReason = input.reason ?? input.hook_event_name;
+  const endReason = input.reason ?? input.hookEventName;
   const db = openDb();
   db.transaction(() => {
-    saveSession(db, input.session_id, redactHome(input.cwd), endReason, meta);
-    saveTranscript(db, input.session_id, redactTranscript(transcript));
-    saveSessionDays(db, input.session_id, meta.dayCounts);
+    saveSession(db, input.sessionId, redactHome(input.cwd), endReason, meta);
+    saveTranscript(db, input.sessionId, redactTranscript(transcript));
+    saveSessionDays(db, input.sessionId, meta.dayCounts);
   })();
   db.close();
   warnIfDbTooLarge();
