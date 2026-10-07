@@ -24,29 +24,46 @@ case "$PATH_TYPE" in
 esac
 [[ -z "$FILE_PATH" ]] && exit 0
 
+# Not normalized here: the suffix globs below would miss `hooks/./x`, `hooks//x`
+# or `mod/../mod/x`, and realpath fails on files that don't exist yet (Write).
+case "$FILE_PATH" in
+  /*) ;;
+  *) deny "PATH_FORM" "file_path must be absolute — failing closed" ;;
+esac
+case "$FILE_PATH/" in
+  *//* | */./* | */../*) deny "PATH_FORM" "file_path must be normalized (no //, ./ or ../ segments) — failing closed" ;;
+esac
+
 BASENAME=$(basename "$FILE_PATH")
 
-# Guardrail self-protection (#34): the files that define these guardrails
+# Guardrail self-protection (#34, #70): the files that define these guardrails
 # must not be editable by the agent they police — otherwise a single Edit
 # can disarm every rule. Matched on the full path (not basename) so
 # same-named files in other projects stay editable. Both path forms are
 # covered: the repo path (claude-code/hooks/) and the deployed symlink path
-# (.claude/hooks/). Changing these files is a manual, human action — see
-# the hooks-guardrails skill for the procedure.
+# (.claude/hooks/). Changing these files is a manual, human action.
+# Not all of claude-code/mod/: the band/pane modules stay editable by the
+# user's choice (#70). They also register tool.call hooks, so this is an
+# accepted risk, not a safe split.
 # Exception to full-path matching: lefthook config in any project (every
 # name/extension lefthook reads, plus its .lefthook*/ dirs), because git push
 # runs its pre-push hooks outside the Bash sandbox. Case-insensitive because
 # APFS is.
 shopt -s nocasematch
 case "$FILE_PATH" in
-  */claude-code/hooks/block-config-edit.sh | \
   */.claude/hooks/block-config-edit.sh | \
   */claude-code/hooks/* | \
+  */claude-code/mod/hooks/rule-guards.ts | \
+  */claude-code/mod/hooks/shell-canon.ts | \
+  */claude-code/mod/hooks/register.tsx | \
+  */claude-code/mod/hooks/hooks.json | \
+  */claude-code/mod/.claude-plugin/* | \
+  */claude-code/lib/* | \
   */claude-code/shguard/config.toml | \
   */.claude/shguard/config.toml | \
   */.config/shguard/config.toml | \
   */lefthook.* | */lefthook-local.* | */.lefthook*)
-    printf '[BLOCKED: GUARDRAIL_PROTECTION] "%s" defines the PreToolUse guardrails and must not be edited by Claude.\nAsk the user to change it manually (procedure: hooks-guardrails skill).\n' "$BASENAME" >&2
+    printf '[BLOCKED: GUARDRAIL_PROTECTION] "%s" defines the PreToolUse guardrails and must not be edited by Claude.\nAsk the user to apply the change manually (for shguard config.toml and this hook, the hooks-guardrails skill has the procedure).\n' "$BASENAME" >&2
     exit 2
     ;;
 esac
