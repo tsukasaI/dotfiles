@@ -8,11 +8,12 @@ import {
   existsSync,
 } from "fs";
 import { join, dirname } from "path";
-import { logsDbPath, expandHome as expandHomeShared, isNonPromptText, scanSessions, oldestSessionMs } from "./transcripts";
+import { expandHome } from "../../../lib/home-path";
+import { logsDbPath, isNonPromptText, scanSessions, oldestSessionMs, userTextBlocks, observeEntry } from "./transcripts";
 
 const HOME = Bun.env.HOME;
 if (!HOME) {
-  console.error("[skills.ts] HOME is not set; cannot locate claude-logs. Set HOME or CLAUDE_LOGS_DB.");
+  console.error("[skills.ts] HOME is not set; cannot locate ~/.claude (user skills, agents). Set HOME; CLAUDE_LOGS_DB only overrides the logs.db path.");
   process.exit(2);
 }
 const LOGS_DB_PATH = logsDbPath(HOME);
@@ -101,6 +102,12 @@ function findGitRoot(start: string): string | null {
   return null;
 }
 
+const skillLoadErrors = new Set<string>();
+
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 function listSkillDirsForCwd(cwd: string): SkillRecord[] {
   const records: SkillRecord[] = [];
   const seen = new Set<string>();
@@ -111,14 +118,25 @@ function listSkillDirsForCwd(cwd: string): SkillRecord[] {
   // a project's .claude/skills/foo -> ../../shared/foo isn't silently
   // dropped.
   const collect = (skillsDir: string, scope: "user" | "project") => {
-    for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+    let entries;
+    try {
+      entries = readdirSync(skillsDir, { withFileTypes: true });
+    } catch (e) {
+      skillLoadErrors.add(`could not read ${scope} skills dir ${skillsDir}: ${errMsg(e)}`);
+      return;
+    }
+    for (const entry of entries) {
       if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
       const skillMd = join(skillsDir, entry.name, "SKILL.md");
-      if (!existsSync(skillMd)) continue;
-      const rec = loadSkill(entry.name, skillMd, scope);
-      if (seen.has(rec.path)) continue;
-      seen.add(rec.path);
-      records.push(rec);
+      try {
+        if (!existsSync(skillMd)) continue;
+        const rec = loadSkill(entry.name, skillMd, scope);
+        if (seen.has(rec.path)) continue;
+        seen.add(rec.path);
+        records.push(rec);
+      } catch (e) {
+        skillLoadErrors.add(`skipped ${scope} skill ${skillMd}: ${errMsg(e)}`);
+      }
     }
   };
 
@@ -129,11 +147,7 @@ function listSkillDirsForCwd(cwd: string): SkillRecord[] {
   let dir = cwd;
   for (let i = 0; i < 32; i++) {
     const skillsDir = join(dir, ".claude", "skills");
-    if (existsSync(skillsDir)) {
-      try {
-        collect(skillsDir, "project");
-      } catch {}
-    }
+    if (existsSync(skillsDir)) collect(skillsDir, "project");
     if (gitRoot && dir === gitRoot) break;
     const parent = dirname(dir);
     if (parent === dir) break;
@@ -199,52 +213,56 @@ function parseFrontmatter(raw: string): { name?: string; description?: string } 
     // or "|" instead of the real text.
     const scalarMatch = rest.match(/^([|>])[+-]?\d*\s*$/);
     if (scalarMatch) {
-      const style = scalarMatch[1];
-      const bodyLines: string[] = [];
-      let indent: number | null = null;
-      let j = i + 1;
-      for (; j < lines.length; j++) {
-        const l = lines[j];
-        if (l.trim() === "") {
-          bodyLines.push("");
-          continue;
-        }
-        const lineIndent = l.length - l.trimStart().length;
-        if (indent === null) {
-          if (lineIndent === 0) break; // not indented -> not part of this block scalar
-          indent = lineIndent;
-        }
-        if (lineIndent < indent) break;
-        bodyLines.push(l.slice(indent));
-      }
-      while (bodyLines.length > 0 && bodyLines[bodyLines.length - 1] === "") bodyLines.pop();
-
-      if (style === ">") {
-        // Folded: blank lines become a newline; consecutive non-blank lines
-        // join with a space (simplified YAML folding, good enough for a
-        // hand-rolled parser with no YAML dependency).
-        const parts: string[] = [];
-        let para: string[] = [];
-        for (const bl of bodyLines) {
-          if (bl === "") {
-            if (para.length) { parts.push(para.join(" ")); para = []; }
-            parts.push("");
-          } else {
-            para.push(bl);
-          }
-        }
-        if (para.length) parts.push(para.join(" "));
-        out[key] = parts.join("\n");
-      } else {
-        out[key] = bodyLines.join("\n");
-      }
-      i = j - 1;
+      const { value, next } = parseBlockScalar(lines, i + 1, scalarMatch[1] === ">");
+      out[key] = value;
+      i = next - 1;
       continue;
     }
 
     out[key] = rest;
   }
   return out;
+}
+
+// Consumes the more-indented lines starting at `start`; `next` is the index of
+// the first line that is not part of the scalar.
+function parseBlockScalar(lines: string[], start: number, folded: boolean): { value: string; next: number } {
+  const bodyLines: string[] = [];
+  let indent: number | null = null;
+  let next = start;
+  for (; next < lines.length; next++) {
+    const l = lines[next];
+    if (l.trim() === "") {
+      bodyLines.push("");
+      continue;
+    }
+    const lineIndent = l.length - l.trimStart().length;
+    if (indent === null) {
+      if (lineIndent === 0) break; // not indented -> not part of this block scalar
+      indent = lineIndent;
+    }
+    if (lineIndent < indent) break;
+    bodyLines.push(l.slice(indent));
+  }
+  while (bodyLines.length > 0 && bodyLines[bodyLines.length - 1] === "") bodyLines.pop();
+
+  if (!folded) return { value: bodyLines.join("\n"), next };
+
+  // Folded: blank lines become a newline; consecutive non-blank lines
+  // join with a space (simplified YAML folding, good enough for a
+  // hand-rolled parser with no YAML dependency).
+  const parts: string[] = [];
+  let para: string[] = [];
+  for (const bl of bodyLines) {
+    if (bl === "") {
+      if (para.length) { parts.push(para.join(" ")); para = []; }
+      parts.push("");
+    } else {
+      para.push(bl);
+    }
+  }
+  if (para.length) parts.push(para.join(" "));
+  return { value: parts.join("\n"), next };
 }
 
 function stripFrontmatter(raw: string): string {
@@ -282,15 +300,8 @@ interface SessionExtract {
   sessionStartMs: number | null;
 }
 
-function expandHome(p: string | null | undefined): string {
-  return expandHomeShared(p, HOME);
-}
-
 function scan(): ScanResult {
-  const s = scanSessions(LOGS_DB_PATH, CUTOFF_MS, (jsonl, projectDir) => {
-    const extract = extractSession(jsonl, projectDir);
-    return { extract, sessionStartMs: extract.sessionStartMs };
-  });
+  const s = scanSessions(LOGS_DB_PATH, CUTOFF_MS, extractSession);
   const result: ScanResult = {
     invocations: [],
     prompts: [],
@@ -308,8 +319,9 @@ function scan(): ScanResult {
 
 function extractSession(transcriptJsonl: string, projectDir: string | null): SessionExtract {
   const extract: SessionExtract = { invocations: [], prompts: [], sessionStartMs: null };
-  let sessionCwd: string | null = expandHome(projectDir) || null;
-  let sessionStartMs: number | null = null;
+  // Entries are observed as they stream past, so a prompt only sees the cwd
+  // known up to its own entry.
+  const prologue = { cwd: expandHome(projectDir, HOME), startMs: null as number | null };
 
   for (const line of transcriptJsonl.split("\n")) {
     if (!line) continue;
@@ -319,13 +331,9 @@ function extractSession(transcriptJsonl: string, projectDir: string | null): Ses
     } catch {
       continue;
     }
-    // entry.cwd comes verbatim from parsed transcript JSON, so its declared
-    // `string` type isn't enforced at runtime; coerce here so every
-    // downstream consumer (path.join, findGitRoot, etc.) can trust it.
-    if (typeof entry.cwd === "string" && entry.cwd && !sessionCwd) sessionCwd = entry.cwd;
+    observeEntry(prologue, entry);
+    const sessionCwd = prologue.cwd || null;
     const tsStr = entry.timestamp;
-    const tsMs = tsStr ? Date.parse(tsStr) : NaN;
-    if (!isNaN(tsMs) && sessionStartMs === null) sessionStartMs = tsMs;
 
     if (entry.isSidechain === true) continue;
 
@@ -353,22 +361,12 @@ function extractSession(transcriptJsonl: string, projectDir: string | null): Ses
         }
       }
     } else if (entry.type === "user") {
-      let skip = false;
-      for (const block of content) {
-        if (block.type === "tool_result" || (block as any).tool_use_id) {
-          skip = true;
-          break;
-        }
-      }
-      if (skip) continue;
-      for (const block of content) {
-        if (block.type !== "text") continue;
-        const text = (block as TextBlock).text;
+      for (const text of userTextBlocks(content) ?? []) {
         recordPrompt(text, tsStr, sessionCwd, entry.isMeta === true, extract);
       }
     }
   }
-  extract.sessionStartMs = sessionStartMs;
+  extract.sessionStartMs = prologue.startMs;
   return extract;
 }
 
@@ -695,6 +693,7 @@ try {
 
   const promptClusters = buildPromptClusters(scanResult.prompts);
   const metaClusters = buildMetaClusters(promptClusters);
+  const errors = [...scanResult.errors, ...skillLoadErrors];
 
   const out = {
     generated_at: new Date(NOW).toISOString(),
@@ -706,7 +705,7 @@ try {
       data_sufficient: dataSufficient,
       skills_found: skills.length,
       total_skill_invocations_in_window: scanResult.invocations.length,
-      errors: scanResult.errors,
+      errors,
     },
     available_skills: skills.map((s) => {
       const { frontmatter, ...body } = skillExcerpt(s, "body_first_500_chars");
@@ -725,7 +724,7 @@ try {
     skill_review_hints: buildSkillReviewHints(skills, listAvailableAgents()),
   };
 
-  for (const err of scanResult.errors) console.error(`[skills.ts] ${err}`);
+  for (const err of errors) console.error(`[skills.ts] ${err}`);
   console.log(JSON.stringify(out, null, 2));
   if (scanResult.db_unavailable) process.exit(2);
 } catch (e) {

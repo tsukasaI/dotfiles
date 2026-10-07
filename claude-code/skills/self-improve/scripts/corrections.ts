@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
 
 import { join, extname, relative } from "path";
-import { logsDbPath, expandHome as expandHomeShared, isNonPromptText, scanSessions } from "./transcripts";
+import { expandHome } from "../../../lib/home-path";
+import { logsDbPath, isNonPromptText, scanSessions, userTextBlocks, observeEntry } from "./transcripts";
 
 const HOME = Bun.env.HOME;
 if (!HOME) {
-  console.error("[corrections.ts] HOME is not set; cannot locate claude-logs. Set HOME or CLAUDE_LOGS_DB.");
+  console.error("[corrections.ts] HOME is not set; cannot locate ~/.claude (CLAUDE.md) or expand ~ in transcript paths. Set HOME; CLAUDE_LOGS_DB only overrides the logs.db path.");
   process.exit(2);
 }
 const LOGS_DB_PATH = logsDbPath(HOME);
@@ -49,6 +50,11 @@ const CORRECTION_PHRASES_JA = [
 ];
 
 const PROMPT_MAX_CHARS_FOR_CORRECTION = 400;
+
+const KIND_RANK = new Map([
+  ["failure_loop", 0],
+  ["interrupt", 1],
+]);
 
 interface ToolUse {
   type: "tool_use";
@@ -174,10 +180,6 @@ interface SessionExtract {
   sessionStartMs: number | null;
 }
 
-function expandHome(p: string | null | undefined): string {
-  return expandHomeShared(p, HOME);
-}
-
 // entry.cwd comes verbatim from parsed transcript JSON, so its declared
 // `string` type isn't enforced at runtime; coerce here so every downstream
 // consumer (path.join, path.relative, etc.) can trust the result.
@@ -186,10 +188,7 @@ function entryCwd(cwd: unknown, fallback: string): string {
 }
 
 function scan(): ScanResult {
-  const s = scanSessions(LOGS_DB_PATH, CUTOFF_MS, (jsonl, projectDir) => {
-    const extract = extractSession(jsonl, projectDir);
-    return { extract, sessionStartMs: extract.sessionStartMs };
-  });
+  const s = scanSessions(LOGS_DB_PATH, CUTOFF_MS, extractSession);
   const result: ScanResult = {
     pairs: [],
     sessions_scanned: s.sessions_scanned,
@@ -217,14 +216,12 @@ function extractSession(transcriptJsonl: string, projectDir: string | null): Ses
     } catch {}
   }
 
-  let sessionCwd = expandHome(projectDir);
-  let sessionStartMs: number | null = null;
-  for (const e of entries) {
-    if (!sessionCwd) sessionCwd = entryCwd(e.cwd, sessionCwd);
-    const ts = e.timestamp ? Date.parse(e.timestamp) : NaN;
-    if (!isNaN(ts) && sessionStartMs === null) sessionStartMs = ts;
-  }
-  extract.sessionStartMs = sessionStartMs;
+  // Every entry is observed before any is processed, so each one falls back
+  // to the session's first cwd.
+  const prologue = { cwd: expandHome(projectDir, HOME), startMs: null as number | null };
+  for (const e of entries) observeEntry(prologue, e);
+  const sessionCwd = prologue.cwd;
+  extract.sessionStartMs = prologue.startMs;
 
   // Build tool_use timeline and tool_result map for failure_loop detection.
   const toolUseTimeline: ToolUseEvent[] = [];
@@ -265,20 +262,8 @@ function extractSession(transcriptJsonl: string, projectDir: string | null): Ses
     if (e.type !== "user") continue;
     const content = e.message?.content;
     if (!content) continue;
-    let texts: string[] = [];
-    let hasToolResult = false;
-    if (typeof content === "string") {
-      texts.push(content);
-    } else {
-      for (const b of content) {
-        if (b.type === "tool_result" || (b as any).tool_use_id) {
-          hasToolResult = true;
-          break;
-        }
-        if (b.type === "text") texts.push((b as TextBlock).text);
-      }
-    }
-    if (hasToolResult) continue;
+    const texts = typeof content === "string" ? [content] : userTextBlocks(content);
+    if (!texts) continue;
 
     for (const t of texts) {
       const trimmed = t.trim();
@@ -444,9 +429,7 @@ function buildClusters(pairs: Pair[]) {
     const cwds = [...v.cwds];
     const scope: "project" | "user" = cwds.length <= 1 ? "project" : "user";
     const scope_target =
-      scope === "project" && typeof cwds[0] === "string" && cwds[0]
-        ? join(cwds[0], ".claude", "CLAUDE.md")
-        : join(HOME, ".claude", "CLAUDE.md");
+      cwds.length === 1 ? join(cwds[0], ".claude", "CLAUDE.md") : join(HOME, ".claude", "CLAUDE.md");
     const path_hint = v.exts.size === 1 ? [...v.exts][0] : null;
     const entry: any = {
       kind: v.kind,
@@ -466,7 +449,7 @@ function buildClusters(pairs: Pair[]) {
     out.push(entry);
   }
   // sort: failure_loop > interrupt > correction, then by count desc within kind
-  const kindRank = (k: string) => (k === "failure_loop" ? 0 : k === "interrupt" ? 1 : 2);
+  const kindRank = (k: string) => KIND_RANK.get(k) ?? 2;
   out.sort((a, b) => {
     const k = kindRank(a.kind) - kindRank(b.kind);
     if (k !== 0) return k;

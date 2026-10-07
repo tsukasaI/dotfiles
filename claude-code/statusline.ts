@@ -50,7 +50,7 @@ function readGitBranch(start: string): { branch: string; isWorktree: boolean } |
       if (isWorktree) {
         const m = readFileSync(gitPath, "utf-8").trim().match(/^gitdir:\s*(.+)$/);
         if (!m) return null;
-        // A relative gitdir is relative to the directory holding the .git file.
+        // git resolves a relative gitdir against the .git file's directory, not cwd.
         gitDir = resolve(dir, m[1]);
       }
       let head: string;
