@@ -26,22 +26,32 @@ esac
 
 BASENAME=$(basename "$FILE_PATH")
 
-# Guardrail self-protection (#34): the files that define these guardrails
+# Guardrail self-protection (#34, #70): the files that define these guardrails
 # must not be editable by the agent they police — otherwise a single Edit
 # can disarm every rule. Matched on the full path (not basename) so
 # same-named files in other projects stay editable. Both path forms are
 # covered: the repo path (claude-code/hooks/) and the deployed symlink path
 # (.claude/hooks/). Changing these files is a manual, human action — see
 # the hooks-guardrails skill for the procedure.
+# claude-code/mod/hooks/ is protected only for the files that act as
+# tool.call guards or register them: rule-guards.ts, shell-canon.ts,
+# register.tsx (registration order) and hooks.json (module list). UI-only
+# band/pane files stay editable so daily mod development is not blocked.
+# claude-code/lib/ is protected in full: its helpers are imported by the
+# SessionEnd hook and the statusline.
 # Exception to full-path matching: lefthook config in any project (every
 # name/extension lefthook reads, plus its .lefthook*/ dirs), because git push
 # runs its pre-push hooks outside the Bash sandbox. Case-insensitive because
 # APFS is.
 shopt -s nocasematch
 case "$FILE_PATH" in
-  */claude-code/hooks/block-config-edit.sh | \
   */.claude/hooks/block-config-edit.sh | \
   */claude-code/hooks/* | \
+  */claude-code/mod/hooks/rule-guards.ts | \
+  */claude-code/mod/hooks/shell-canon.ts | \
+  */claude-code/mod/hooks/register.tsx | \
+  */claude-code/mod/hooks/hooks.json | \
+  */claude-code/lib/* | \
   */claude-code/shguard/config.toml | \
   */.claude/shguard/config.toml | \
   */.config/shguard/config.toml | \
