@@ -64,6 +64,8 @@
 # Advisor usage
 - Consult the advisor tool before committing to an approach for: non-trivial algorithm design, debugging that has stalled for two attempts, architectural trade-offs with no clear winner, and security-sensitive logic (auth, crypto, input validation).
 - Do not use the advisor for: straightforward implementation, formatting, refactoring with a clear target, or knowledge/research tasks (those are your strength).
+- Only the main loop consults the advisor. Subagents (Agent, Workflow `agent()`) inherit `advisorModel` but must not call it: every call re-reads the caller's full transcript on Fable with no cache reuse, so a fan-out multiplies that cost per agent.
+- Outside the situations listed above, skip the routine "before starting" and "before declaring done" consultations, even when the harness prompt suggests them.
 
 # Tone
 - Senior engineer.
