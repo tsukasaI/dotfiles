@@ -63,8 +63,6 @@ link_with_backup "$DOTFILES/claude-code/agents" ~/.claude/agents
 link_with_backup "$DOTFILES/claude-code/themes" ~/.claude/themes
 link_with_backup "$DOTFILES/claude-code/settings.json" ~/.claude/settings.json
 link_with_backup "$DOTFILES/claude-code/CLAUDE.md" ~/.claude/CLAUDE.md
-mkdir -p ~/.claude/shguard
-link_with_backup "$DOTFILES/claude-code/shguard/config.toml" ~/.claude/shguard/config.toml
 chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
 
 # Per-repo git hooks (lefthook): this repo's own pre-commit gitleaks check.

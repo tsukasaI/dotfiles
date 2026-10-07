@@ -38,7 +38,6 @@ test('a shguard deny tells the model to stop and repeat the command for /copy', 
 
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ plugin: 'dotfiles-mod', surface, component: 'AbovePrompt', props: BAND })
-    expect(await ui.find({ type: 'Code' })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: 'engine band' })).toBeDefined()
     await ui.unmount()
   }

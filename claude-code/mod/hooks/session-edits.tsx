@@ -34,7 +34,6 @@ const SYMLINKED: ReadonlyArray<readonly [link: string, target: string]> = [
   ['.claude/themes', 'claude-code/themes'],
   ['.claude/settings.json', 'claude-code/settings.json'],
   ['.claude/CLAUDE.md', 'claude-code/CLAUDE.md'],
-  ['.claude/shguard/config.toml', 'claude-code/shguard/config.toml'],
 ]
 
 // The path inside ~/dotfiles that `path` is, or is symlinked to; undefined
