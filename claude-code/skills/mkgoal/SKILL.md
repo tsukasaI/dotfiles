@@ -124,9 +124,10 @@ included:
 - Delegate the implementation to a subagent launched with `model: sonnet`.
   `/goal` never switches the model, so naming the model only in prose would
   bind nothing; the Agent tool's `model` argument does.
-- Review with a **fable**-model `code-reviewer` subagent before completion
-  counts.
-- On fable's approval, the PR is pre-authorized to squash-merge via
+- Review with a `code-reviewer` subagent before completion counts, launched
+  with `model: opus`, or `model: fable` when the change touches a security
+  boundary or makes an architectural decision (global CLAUDE.md Review gate).
+- On the reviewer's approval, the PR is pre-authorized to squash-merge via
   `gh pr merge --squash --delete-branch` without asking again. This is the
   standing exception to the usual "merge only when I say so" rule, scoped
   strictly to goals launched through this skill.
@@ -137,11 +138,12 @@ Build the statement on a single line from this template:
 
     /goal <task summary drawn from the user's stated goal>. Delegate the
     implementation to a subagent launched with model: sonnet, then have a
-    fable-model code-reviewer subagent review
+    code-reviewer subagent (model: opus, or model: fable if the change touches
+    a security boundary or an architectural decision) review
     the change; run `<verification command>` and show its full output in the
     conversation each turn; the goal is met when that output confirms
-    <objective condition>, while <constraints> holds; once fable approves the
-    review, squash-merge the PR via `gh pr merge --squash --delete-branch`
+    <objective condition>, while <constraints> holds; once the reviewer
+    approves, squash-merge the PR via `gh pr merge --squash --delete-branch`
     without asking again; or stop after <N> turns.
 
 In issue mode, list each issue as its own named clause instead of one task
@@ -149,11 +151,13 @@ summary, and join the per-issue completion conditions with "and":
 
     /goal Resolve issue #<N1> (<title1>) and issue #<N2> (<title2>) [...].
     Delegate each implementation to a subagent launched with model: sonnet,
-    then have a fable-model code-reviewer subagent review each change; for #<N1>, run `<verification command 1>`;
+    then have a code-reviewer subagent (model: opus, or model: fable if the
+    change touches a security boundary or an architectural decision) review
+    each change; for #<N1>, run `<verification command 1>`;
     for #<N2>, run `<verification command 2>` [...]; show full output each
     turn. The goal is met when every issue's output confirms its own
-    condition, while <batch constraints> holds; once fable approves a PR's
-    review, squash-merge it via `gh pr merge --squash --delete-branch` without
+    condition, while <batch constraints> holds; once the reviewer approves a
+    PR, squash-merge it via `gh pr merge --squash --delete-branch` without
     asking again; or stop after <N> turns.
 
 Rules:
@@ -168,7 +172,7 @@ Rules:
   and instruct showing its output each turn too.
 - The task summary states what to achieve. The statement doubles as Claude's
   first-turn directive.
-- The sonnet/fable/squash-merge clauses from Standing implementation pattern
+- The sonnet/reviewer/squash-merge clauses from Standing implementation pattern
   above are always included verbatim in intent, regardless of repo. Never
   drop them for brevity.
 
