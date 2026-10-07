@@ -4,6 +4,7 @@ import { Database } from "bun:sqlite";
 import { readFileSync, mkdirSync, realpathSync, chmodSync, statSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
 import { abbreviateHome } from "../lib/home-path";
+import { redactTranscript } from "../lib/redact";
 
 // --- Types ---
 
@@ -143,68 +144,6 @@ function openDb(): Database {
   db.exec("PRAGMA busy_timeout=5000");
   db.exec(SCHEMA);
   return db;
-}
-
-// --- Redaction (#4) ---
-// The transcript is stored locally and may later be pushed verbatim to
-// Turso (push-to-turso.sh), so mask well-known credential formats before
-// they ever reach the DB. Regex-based on purpose: running gitleaks at
-// SessionEnd would add process-spawn latency to every session close.
-// Patterns are prefix-identifiable formats only — generic entropy
-// heuristics would mangle ordinary code discussion in the transcript.
-// Replacements contain no quotes/backslashes, so JSONL stays parseable.
-
-const REDACTIONS: Array<[RegExp, string]> = [
-  [
-    // Bounded on purpose: this runs over the whole concatenated transcript,
-    // not per JSONL record. `[\s\S]*?` matched raw newlines, so an
-    // unterminated BEGIN could lazily expand across many records to find an
-    // END anywhere later in the file, splicing unrelated records into one
-    // redacted token (and, for unterminated markers, degrading to O(n*k)).
-    // A real pasted key has its newlines as literal `\n` JSON escapes inside
-    // one record, never a raw newline, so restricting to `[^\n]` still
-    // matches genuine keys while making a cross-record match impossible.
-    // The `{0,16384}` cap bounds worst-case work per start position; it is
-    // comfortably larger than an escaped RSA-8192 PEM body (~13KB) but is a
-    // fail-open bound in principle — re-measure if key sizes grow.
-    /-----BEGIN [A-Z ]*PRIVATE KEY-----[^\n]{0,16384}?-----END [A-Z ]*PRIVATE KEY-----/g,
-    "[REDACTED:private-key]",
-  ],
-  [/\bsk-ant-[A-Za-z0-9_-]{20,}/g, "[REDACTED:anthropic-key]"],
-  [/\bsk-[A-Za-z0-9_-]{20,}/g, "[REDACTED:api-key]"],
-  [/\bgh[pousr]_[A-Za-z0-9]{20,}/g, "[REDACTED:github-token]"],
-  [/\bgithub_pat_[A-Za-z0-9_]{20,}/g, "[REDACTED:github-token]"],
-  [/\bxox[baprs]-[A-Za-z0-9-]{10,}/g, "[REDACTED:slack-token]"],
-  [/\b(?:AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16}\b/g, "[REDACTED:aws-key-id]"],
-  [/\bAIza[0-9A-Za-z_-]{35}/g, "[REDACTED:google-key]"],
-  [
-    /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
-    "[REDACTED:jwt]",
-  ],
-  [/\bBearer\s+[A-Za-z0-9._~+/=-]{20,}/g, "Bearer [REDACTED:token]"],
-  [/\b[rs]k_(?:live|test)_[A-Za-z0-9]{16,}/g, "[REDACTED:stripe-key]"],
-  [/\bnpm_[A-Za-z0-9]{36}\b/g, "[REDACTED:npm-token]"],
-  [/\bglpat-[A-Za-z0-9_-]{20,}/g, "[REDACTED:gitlab-token]"],
-  [
-    // The secret key has no prefix of its own, so only the assignment form is
-    // recognizable. Quote/backslash runs are allowed around the separator
-    // because the text is JSON-escaped (`\"aws_secret_access_key\": \"...`).
-    /\b(aws_secret_access_key["'\\\s]*[=:]["'\\\s]*)[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+])/gi,
-    "$1[REDACTED:aws-secret-key]",
-  ],
-  [
-    // user:password@ in a URL. `"` and `\` are excluded so a match can't span
-    // a JSON string boundary; a `/` before the `@` (path, port-then-path)
-    // means it isn't userinfo.
-    /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/:@"\\]+:[^\s/@"\\]+@/gi,
-    "$1[REDACTED:url-creds]@",
-  ],
-];
-
-function redactSecrets(text: string): string {
-  let out = text;
-  for (const [re, label] of REDACTIONS) out = out.replace(re, label);
-  return out;
 }
 
 // project_dir may end up pushed to a shared store (see push-to-turso.sh) — an
@@ -369,7 +308,7 @@ try {
   const db = openDb();
   db.transaction(() => {
     saveSession(db, input.session_id, redactHome(input.cwd), endReason, meta);
-    saveTranscript(db, input.session_id, redactSecrets(transcript));
+    saveTranscript(db, input.session_id, redactTranscript(transcript));
     saveSessionDays(db, input.session_id, meta.dayCounts);
   })();
   db.close();
