@@ -1,4 +1,4 @@
-"""Regression tests for the locally modified yomiyasu_lint.py (issue #76).
+"""Regression tests for the vendored yomiyasu_lint.py's fence handling (issue #76).
 
 Run: python3 -I claude-code/skills/ja-lint/scripts/test_yomiyasu_lint.py
 """
@@ -61,30 +61,8 @@ class FenceTests(unittest.TestCase):
     def test_frontmatter_skipped(self):
         self.assertEqual(rules("---\ntitle: " + TRIGGER + "---\n"), set())
 
-    def test_iter_body_lines_numbers(self):
-        lines = ["---", "a: b", "---", "x", "```", "y", "```", "z", "~~~", "w", "~~~", "v"]
-        self.assertEqual(
-            list(y.iter_body_lines(lines)), [(4, "x"), (8, "z"), (12, "v")]
-        )
-
 
 class SentenceEndingTests(unittest.TestCase):
-    def test_endings(self):
-        cases = {
-            "これはペンです。": "です",
-            "走ります。": "ます",
-            "晴れでした。": "でした",
-            "走りました。": "ました",
-            "それは本である。": "である",
-            "今日は晴れだ。": "だ",
-            "明日は雨だろう。": "だろう",
-            "どうなるか。": "その他",
-        }
-        for sent, expected in cases.items():
-            clean = y.re.sub(r"[。！？\s]+$", "", sent)
-            got = next((e for e in y.SENTENCE_ENDINGS if clean.endswith(e)), "その他")
-            self.assertEqual(got, expected, sent)
-
     def test_three_in_a_row_flagged(self):
         text = "今日は晴れだ。明日は雨だ。明後日は曇りだ。\n"
         self.assertIn("sentence_end_repetition", rules(text))

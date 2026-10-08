@@ -1,6 +1,6 @@
 ---
 name: ja-lint
-description: Lints Japanese prose for AI-slop patterns (metaphor verbs, filler openers, slop vocabulary, emoji, excess bold/bullets, repeated sentence endings) with a deterministic script, and reports findings without editing anything. Use after writing or changing Japanese documents such as 職務経歴書, 自己PR, README, blog posts or specs, and when the user asks to check, lint or de-slop (AI臭さを確認して) Japanese text. Never rewrites; the user decides every fix.
+description: Lints Japanese prose for AI-slop patterns (metaphor verbs, filler openers, slop vocabulary, emoji, excess or unrendered bold, excess bullets, repeated sentence endings, trailing colons, redundant brackets) with a deterministic script, and reports findings without editing anything. Use after writing or changing Japanese documents such as 職務経歴書, 自己PR, README, blog posts or specs, and when the user asks to check, lint or de-slop (AI臭さを確認して) Japanese text. Never rewrites; the user decides every fix.
 argument-hint: <file path>
 allowed-tools: Bash(python3 *), Read
 ---
@@ -36,22 +36,17 @@ the file, so an empty result means "no pattern hit", not "no AI slop".
 
 ## Provenance
 
-`scripts/yomiyasu_lint.py` is vendored with local modifications from
-https://github.com/nanaism/yomiyasu (MIT, see `LICENSE`), based on upstream
-commit `b14ee43c9b722cf4fd2bb1e893c6c386f1a362aa`. Standard library only, no
-network or subprocess use. Because the file is modified, there is no blob pin
-to compare against.
+`scripts/yomiyasu_lint.py` and `scripts/markdown_visibility.py` (which the
+linter imports) are vendored unmodified from
+https://github.com/nanaism/yomiyasu (MIT, see `LICENSE`; Unicode-derived
+emoji data, see `UNICODE-LICENSE.txt`) at release `v1.1.0`, commit
+`0df47749139dfd64ad3d55e7d53d3839e5874848`. Standard library only, no
+network or subprocess use. Blob pins (`git hash-object <file>`):
 
-Local changes (#76); output is unchanged for documents without `~~~` fences:
+- `scripts/yomiyasu_lint.py`: `bdd0783b87581a05cc7a4c70f608112438cf320c`
+- `scripts/markdown_visibility.py`: `3f355ac66dceb756214e7a0e86bcbbde811a88ac`
 
-- `iter_body_lines()` replaces three copied frontmatter/fence loops, so
-  `~~~` fences are skipped by every rule (upstream handled them only in the
-  vocabulary scan) and a fence closes only on its own marker.
-- Sentence endings use the ordered `SENTENCE_ENDINGS` tuple instead of an
-  if/elif chain.
-- `NON_PROSE_PREFIXES` / `FENCE_PREFIXES` replace chained `startswith` calls.
-- The always-true inner `if` after the negative-parallelism match is gone.
-
-`scripts/test_yomiyasu_lint.py` covers these (`python3 -I` it). Renewal: when
-bumping, read the upstream diff, re-apply the local changes on top of the new
-upstream file, run the test, and update the commit SHA above.
+`scripts/test_yomiyasu_lint.py` pins the fence/frontmatter behavior this
+skill relies on (`python3 -I` it). Renewal: when bumping, read the upstream
+diff, copy both files unmodified, run the test, and update the release,
+commit and blob SHAs above.
