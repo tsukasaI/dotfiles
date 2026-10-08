@@ -60,6 +60,10 @@
       "mcp__claude_ai_cc-memory__upsert_summary",
       "mcp__claude_ai_cc-memory__update_hot_facts",
       "mcp__claude_ai_cc-memory__record_retro_run",
+      "mcp__claude_ai_cc-memory__draft_learning",
+      "mcp__claude_ai_cc-memory__sweep_learning_drafts",
+      "mcp__cc-memory__draft_learning",
+      "mcp__cc-memory__sweep_learning_drafts",
       "mcp__claude_ai_staygreen__*"
     ],
     "deny": [

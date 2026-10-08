@@ -37,6 +37,7 @@
 - Use subagents to keep the main context window clean. Test: "Do I need the tool output again, or just the conclusion?" If just the conclusion → subagent. Good for: verifying results against a spec, exploring other codebases, writing docs from a git diff.
 - Delegation triggers: exploration likely to exceed ~10 tool calls, or 3+ independent subtasks (e.g. multiple unrelated issues) → fan out to subagents instead of serial main-loop work. Once delegated, do NOT duplicate the same reads in the main loop — wait, then verify the conclusions.
 - Verify one load-bearing claim from every subagent report before acting on it — this habit has caught real false positives; keep it.
+- Record a durable learning (gotcha, tool quirk, decision rationale, perf finding) the moment you notice it: call cc-memory's `draft_learning` with `source_session_id` = `$CLAUDE_CODE_SESSION_ID` and `project` = the git remote's `owner/repo` (`local:<basename>` when there is no remote). Don't batch them for later; `/dream` sweeps the queue. When the cc-memory tools aren't available (e.g. in a subagent), skip silently.
 
 # Truthfulness
 - Ground every factual claim about my content (career, history, prior work, file contents) in something you just read — read the source first. When you can't ground a claim, ask (see *Clarify before acting*) or mark it "推測" / "unverified" so I can confirm before it lands in a file.
