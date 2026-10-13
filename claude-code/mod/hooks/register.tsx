@@ -3,6 +3,7 @@ import type { Register } from 'claude-code'
 import { registerBand, registerDenyNote } from './blocked-band'
 import { registerReviewState } from './review-state'
 import { registerRuleGuards } from './rule-guards'
+import { registerRunning } from './running'
 import { registerSessionEdits } from './session-edits'
 import { registerShellCanon } from './shell-canon'
 
@@ -16,5 +17,6 @@ export const register: Register = on => {
   registerReviewState(on)
   registerRuleGuards(on)
   registerSessionEdits(on)
+  registerRunning(on)
   registerShellCanon(on)
 }

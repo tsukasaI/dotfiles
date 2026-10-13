@@ -25,12 +25,37 @@ export type PrReview = {
   reviewer: string
 }
 
+/** A subagent or a Bash command the /running pane tracks. */
+export type RunEntry = {
+  kind: 'agent' | 'bash'
+  /** agentId, a background task id, or the Bash call's tool_use_id until it is backgrounded. */
+  id: string
+  label: string
+  model?: string
+  /** The agent whose loop spawned it; absent when the main loop did. */
+  parentId?: string
+  background: boolean
+  /** Epoch ms from `$.clock.now()`: the API gives no start time. */
+  startedAt: number
+  endedAt?: number
+  outcome?: 'ok' | 'failed' | 'killed'
+}
+
+/** What is in flight, and the last few that ended (newest first). */
+export type RunState = {
+  running: RunEntry[]
+  finished: RunEntry[]
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'dotfiles-mod': {
       edits: EditEntry[]
       status: EditStatus
       prs: PrReview[]
+      runs: RunState
+      /** Whether the /running pane's one-second timer is armed. */
+      ticking: boolean
     }
   }
 }

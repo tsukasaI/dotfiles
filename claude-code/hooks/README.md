@@ -44,6 +44,9 @@ guardrails stay here as settings hooks.
   `.github/`) is flagged `LIVE`. Replaces the former `mark-session-edit.sh` +
   `warn-uncommitted.sh` Stop reminder, which mostly produced extra
   "not committing because..." turns.
+- **Running pane** (`/running`, manual only): the subagent tree and running
+  Bash commands with elapsed time (a foreground Bash shows from 10s, a
+  background one from its start), plus the last 3 finished.
 - **Shell canonicalization**: rewrites `$TMPDIR` (to the sandbox's
   `/private/tmp/claude-<uid>`) and `$HOME` to literal paths before shguard
   sees a Bash command, so shguard checks the real target instead of denying
