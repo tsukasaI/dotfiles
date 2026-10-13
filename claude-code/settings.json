@@ -306,7 +306,6 @@
   "autoMemoryEnabled": false,
   "skipWorkflowUsageWarning": true,
   "theme": "custom:dark-ansi-readable",
-  "verbose": true,
   "preferredNotifChannel": "ghostty",
   "switchModelsOnFlag": false,
   "autoContinueAtUsageLimit": true,
