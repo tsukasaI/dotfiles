@@ -183,7 +183,7 @@
     }
   },
   "outputStyle": "Concise",
-  "viewMode": "verbose",
+  "viewMode": "default",
   "sandbox": {
     "enabled": true,
     "allowUnsandboxedCommands": false,
