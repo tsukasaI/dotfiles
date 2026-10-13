@@ -151,6 +151,9 @@ included:
 - Delegate the implementation to a subagent launched with `model: sonnet`.
   `/goal` never switches the model, so naming the model only in prose would
   bind nothing; the Agent tool's `model` argument does.
+- Fixups for the reviewer's findings go to a `model: sonnet` subagent too.
+  The main loop never runs Edit/Write on code itself; it keeps branch,
+  commit, PR, verification runs, and the merge.
 - Review with a `code-reviewer` subagent before completion counts, launched
   with `model: opus`, or `model: fable` when the change touches a security
   boundary or makes an architectural decision (global CLAUDE.md Review gate).
@@ -167,7 +170,8 @@ Build the statement on a single line from this template:
     implementation to a subagent launched with model: sonnet, then have a
     code-reviewer subagent (model: opus, or model: fable if the change touches
     a security boundary or an architectural decision) review
-    the change; run `<verification command>` and show its full output in the
+    the change; send any review fixups to a model: sonnet subagent as well,
+    and never Edit/Write code in the main loop; run `<verification command>` and show its full output in the
     conversation each turn; the goal is met when that output confirms
     <objective condition>, while <constraints> holds; once the reviewer
     approves, squash-merge the PR via `gh pr merge --squash --delete-branch`
@@ -181,7 +185,8 @@ summary, and join the per-issue completion conditions with "and":
     Delegate each implementation to a subagent launched with model: sonnet,
     then have a code-reviewer subagent (model: opus, or model: fable if the
     change touches a security boundary or an architectural decision) review
-    each change; for #<N1>, run `<verification command 1>`;
+    each change; send any review fixups to a model: sonnet subagent as well,
+    and never Edit/Write code in the main loop; for #<N1>, run `<verification command 1>`;
     for #<N2>, run `<verification command 2>` [...]; show full output each
     turn. The goal is met when every issue's output confirms its own
     condition, while <batch constraints> holds; once the reviewer approves a

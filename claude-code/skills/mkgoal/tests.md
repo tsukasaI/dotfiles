@@ -21,7 +21,8 @@ and whenever the main-loop model changes tier.
   clause and instructs showing the verification command's full output each
   turn.
 - The assembled statement always contains the standing implementation
-  pattern: delegate the implementation to a `model: sonnet` subagent,
+  pattern: delegate the implementation and any review fixups to a
+  `model: sonnet` subagent with no code Edit/Write in the main loop,
   review with a `code-reviewer` subagent (`model: opus`, or `model: fable`
   for a security-boundary or architectural change), and squash-merge via
   `gh pr merge --squash --delete-branch` once the reviewer approves. It is never
