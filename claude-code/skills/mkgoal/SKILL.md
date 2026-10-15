@@ -1,7 +1,6 @@
 ---
 name: mkgoal
-description: Builds a high-quality, verifiable /goal statement through a short slot-filling dialogue. Use when the user wants to start a Claude Code goal loop and needs the completion condition, verification command, constraints, and turn cap defined before running /goal. Also accepts one or more #<issue> references (typically handed off from /triage) to draft a single combined /goal statement covering all of them, reading each issue's Triage comment for its decided design, completion condition, and verification command.
-disable-model-invocation: true
+description: Builds a high-quality, verifiable /goal statement through a short slot-filling dialogue. Use when the user wants to start a Claude Code goal loop and needs the completion condition, verification command, constraints, and turn cap defined before running /goal. Also accepts one or more #<issue> references (typically handed off from /triage) to draft a single combined /goal statement covering all of them, reading each issue's Triage comment for its decided design, completion condition, and verification command. Claude may invoke it after /triage has finished, when the user asks to turn a triage group into a goal (e.g. "G1をgoalにして"), passing that group's issues as `#<N> ...` arguments. Not for running /goal itself, and never invoked from inside /triage or a subagent.
 argument-hint: [達成したいこと | #issue番号 ...]
 allowed-tools: Read, Grep, AskUserQuestion, Bash
 ---
