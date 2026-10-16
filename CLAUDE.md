@@ -100,6 +100,12 @@ There is no staging or deploy step (hooks apply on the next tool call,
   rewrite the worktree (`stash`, `checkout <branch>`, `merge`) fail on those
   paths, and `git log --show-signature` can't verify inside the sandbox;
   both are expected, not a broken sandbox.
+- **Sandboxed Bash can read the Keychain.** The sandbox profile allows
+  `com.apple.SecurityServer`, so `security find-generic-password -w` returns
+  any item whose ACL trusts `/usr/bin/security` (the default for items
+  created with `security add-*`) without a prompt. `gh`'s keyring failure in
+  the sandbox is a different mechanism. shguard denies the direct calls; a
+  script file calling `security` is not caught.
 - **shguard is the PreToolUse Bash enforcer.** `claude-code/settings.json`
   calls the `shguard` binary directly (`shguard || exit 2`, so a PATH-miss or
   crash blocks; `SHGUARD_STRICT_CONFIG=1` so a missing/malformed config
