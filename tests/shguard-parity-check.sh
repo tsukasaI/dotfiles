@@ -228,6 +228,13 @@ case_ "gh api -F @file"                  'gh api x -F k=@/x/.netrc'            d
 case_ "gh gist create"                   'gh gist create /x/.netrc'            deny
 case_ "gh auth token"                    'gh auth token'                       deny
 case_ "turso"                            'turso db shell x'                    deny
+case_ "pi-factory"                       'pi-factory -p hi'                    deny "spends the factory API key"
+case_ "pi-factory by path"               '/Users/inouetsukasa/.local/bin/pi-factory --version' deny
+case_ "keychain find-generic-password"   'security find-generic-password -s other -g' deny "sandboxed Bash can read the Keychain"
+case_ "keychain claude-factory item"     'security delete-generic-password -s claude-factory' deny
+case_ "security list-keychains"          'security list-keychains'             allow
+case_ "bare pi"                          'pi --version'                        allow "no key in env without the wrapper"
+case_ "pi-factory in commit message"     'git commit -m "fix pi-factory claude-factory"' allow
 case_ "gh redirect into lefthook.yaml"   'gh api x > lefthook.yaml'            deny "redirects on excluded commands run unsandboxed"
 case_ "gh redirect into hooks/"          'gh api x > claude-code/hooks/x.ts'   deny
 case_ "gh redirect to scratch"           'gh api x > /private/tmp/claude-501/x.json' allow

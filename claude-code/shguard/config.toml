@@ -1372,3 +1372,25 @@ id = "dotfiles-rename-protected-ancestor-ditto"
 reason = "ditto onto .git/.claude/claude-code recreates a directory holding protected files"
 command = "ditto"
 targets = [{ normalized_basename = ".git" }, { normalized_basename = ".claude" }, { normalized_basename = "claude-code" }]
+
+# =====================================================================
+# Pi factory API key (pi/pi-factory). Claude's Bash sandbox can read the
+# Keychain, so these keep the key and its spend user-only.
+# =====================================================================
+
+[[deny]]
+id = "dotfiles-pi-factory"
+reason = "pi-factory spends the factory API key; the user runs it (! pi-factory ...)"
+command = "pi-factory"
+
+[[deny]]
+id = "dotfiles-keychain-find-generic-password"
+reason = "security find-generic-password can print Keychain secrets (e.g. the claude-factory API key)"
+command = "security"
+required_tokens = ["find-generic-password"]
+
+[[deny]]
+id = "dotfiles-keychain-claude-factory"
+reason = "the claude-factory Keychain item holds the factory API key and is user-only"
+command = "security"
+targets = [{ exact = "claude-factory" }]
