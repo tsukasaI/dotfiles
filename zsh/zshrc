@@ -39,6 +39,10 @@ _cached_eval mise-activate "mise activate zsh"
 
 [[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
+# GnuPG: start the daemons up front. Claude Code's Bash sandbox can't write
+# ~/.gnupg, so gpg there can't autostart them and commit signing fails.
+(( $+commands[gpgconf] )) && { gpgconf --launch keyboxd; gpgconf --launch gpg-agent; } >/dev/null 2>&1 &!
+
 # ============================================
 # History
 # ============================================
