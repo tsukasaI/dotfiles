@@ -360,13 +360,15 @@ command = "printenv"
 # =====================================================================
 # Shell escape / code injection
 #
-# Shell interpreters get BLANKET rules (no required_flags): shguard
-# unwraps `<shell> -c '<string>'` for every interpreter it knows
-# (bash/sh/zsh/dash/ash/ksh/fish/tcsh/csh) and judges the inner command
-# itself, so a `required_flags = ["c"]` rule can never fire. Bare
-# `<shell> script.sh` is NOT recursed into (shguard doesn't read the
-# file), so the blanket rule is what covers it. See
-# docs/shguard-migration-deltas.md #12/#16.
+# Shell interpreters get BLANKET deny rules (no required_flags): every
+# invocation is denied, both `<shell> script.sh` (shguard doesn't read the
+# file) and `<shell> -c '<string>'`. Since shguard #695 a user deny on an
+# interpreter or eval is honored even though shguard also recurses into the
+# -c/eval string; before that, the recursion's early return skipped the deny
+# and `bash -c`/`eval` were silently allowed. Don't narrow these to
+# script-only: the rule schema can't say "unless -c", and `targets` can't
+# match an arbitrary script path. See docs/shguard-migration-deltas.md
+# #12/#16.
 # =====================================================================
 
 [[deny]]
@@ -376,47 +378,47 @@ command = "eval"
 
 [[deny]]
 id = "dotfiles-code-bash"
-reason = "bash script.sh executes an unreviewed script file; bash -c is handled by shguard's own recursion into the inner command"
+reason = "bash runs an unreviewed script file or an inline -c string; run the inner command directly instead"
 command = "bash"
 
 [[deny]]
 id = "dotfiles-code-sh"
-reason = "sh script.sh executes an unreviewed script file; sh -c is handled by shguard's own recursion into the inner command"
+reason = "sh runs an unreviewed script file or an inline -c string; run the inner command directly instead"
 command = "sh"
 
 [[deny]]
 id = "dotfiles-code-zsh"
-reason = "zsh script.sh executes an unreviewed script file; zsh -c is handled by shguard's own recursion into the inner command"
+reason = "zsh runs an unreviewed script file or an inline -c string; run the inner command directly instead"
 command = "zsh"
 
 [[deny]]
 id = "dotfiles-code-dash"
-reason = "dash script.sh executes an unreviewed script file; dash -c is handled by shguard's own recursion into the inner command"
+reason = "dash runs an unreviewed script file or an inline -c string; run the inner command directly instead"
 command = "dash"
 
 [[deny]]
 id = "dotfiles-code-ksh"
-reason = "ksh script.sh executes an unreviewed script file; ksh -c is handled by shguard's own recursion into the inner command"
+reason = "ksh runs an unreviewed script file or an inline -c string; run the inner command directly instead"
 command = "ksh"
 
 [[deny]]
 id = "dotfiles-code-fish"
-reason = "fish script.fish executes an unreviewed script file; fish -c/-C is handled by shguard's own recursion into the inner command"
+reason = "fish runs an unreviewed script file or an inline -c/-C string; run the inner command directly instead"
 command = "fish"
 
 [[deny]]
 id = "dotfiles-code-tcsh"
-reason = "tcsh script.sh executes an unreviewed script file; tcsh -c is handled by shguard's own recursion into the inner command"
+reason = "tcsh runs an unreviewed script file or an inline -c string; run the inner command directly instead"
 command = "tcsh"
 
 [[deny]]
 id = "dotfiles-code-csh"
-reason = "csh script.sh executes an unreviewed script file; csh -c is handled by shguard's own recursion into the inner command"
+reason = "csh runs an unreviewed script file or an inline -c string; run the inner command directly instead"
 command = "csh"
 
 [[deny]]
 id = "dotfiles-code-ash"
-reason = "ash script.sh executes an unreviewed script file; ash -c is handled by shguard's own recursion into the inner command"
+reason = "ash runs an unreviewed script file or an inline -c string; run the inner command directly instead"
 command = "ash"
 
 [[deny]]

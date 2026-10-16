@@ -41,7 +41,7 @@ weakening, documented so it isn't mistaken for a bug later.
 | 9 | Secret-file readers: extension-suffix / nested paths | **`.env` case resolved**: shguard added a `normalized_basename` target matcher; this repo's 9 secret-read rules now use `{ normalized_basename = ".env" }` instead of `{ prefix = ".env" }, { prefix = "~/.env" }`, confirmed live 2026-09-06 (`cat foo/.env.local` now denies). Bare extension-suffix (`id_rsa.bak`) remains a pre-existing hole, not a regression, and this change doesn't touch it | [shguard#427](https://github.com/tsukasaI/shguard/issues/427) closed |
 | 10 | `--no-verify` on non-git commands | gap (permanent, minor) | not expressible |
 | 11 | `sudo`/`doas`/`su`/`pkexec`/`run0` privilege escalation | **resolved** — `escalation_floor = "deny"` | [shguard#35](https://github.com/tsukasaI/shguard/issues/35) closed, v0.3.0 |
-| 12 | `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion | design change (net improvement) | n/a |
+| 12 | `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion | **superseded**: since shguard #695 the blanket `dotfiles-code-*` interpreter denies also deny every `-c` (kept deliberately, 2026-10-16) | [shguard#695](https://github.com/tsukasaI/shguard/issues/695) fixed via [shguard#697](https://github.com/tsukasaI/shguard/pull/697) |
 | 13 | Symlinked config: Bash-write self-protection | **resolved** (ticket bookkeeping still open, fix merged) | [shguard#31](https://github.com/tsukasaI/shguard/issues/31) fixed, v0.3.0 |
 | 14 | Command-position variable expansion → Ask | design change (more cautious) | n/a |
 | 15 | `git commit -uno` false positive (built-in short-flag clustering) | gap (permanent, minor) | shguard's own documented limitation |
@@ -311,33 +311,37 @@ specifically), just not in the way originally described. Kept in
 `config.toml` anyway (harmless, and documents intent), rather than
 removed.
 
-## 12. `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion (net improvement, not a gap)
+## 12. `bash`/`sh`/`zsh`/`dash -c` unwrap-recursion (superseded by the blanket denies)
 
-Same unwrap-recursion mechanism as #11, but here it's a strict improvement
-over the old hook for the `-c` case specifically, not a regression: the old
-hook blanket-blocked **every** `bash -c`/`sh -c`/`zsh -c`/`dash -c`
-regardless of content (it had no way to statically verify what was
-inside). shguard actually parses and judges the inner command — confirmed
-`bash -c 'rm -rf /'` → deny (via the built-in rm-rf rule), `bash -c 'grep
-foo bar'` → deny (via `dotfiles-tool-policy-grep`, i.e. **user** rules
-apply recursively too, not just built-ins), `bash -c 'echo hi'` → allow
-(where the old hook denied unconditionally).
+shguard unwraps `<shell> -c '<string>'` and judges the inner command:
+`bash -c 'rm -rf /'` → deny via the built-in rm-rf rule, and **user** rules
+apply recursively too (`bash -c 'grep foo bar'` → deny via
+`dotfiles-tool-policy-grep`).
 
-`config.toml`'s `dotfiles-code-{bash,sh,zsh,dash}` rules are **blanket**
-(no `required_flags = ["c"]`), not `-c`-scoped — an earlier draft of this
-port had `-c`-scoped versions and reasoned the whole category was
-unreachable dead code, which was wrong: the `-c` shape is superseded by
-recursion (a `required_flags=["c"]` rule genuinely never fires), but bare
-`bash script.sh` (a script *file* reference, no inline content to recurse
-into) is a different shape that recursion does **not** cover — shguard
-doesn't read the referenced file. That shape was silently uncovered until
-the parity check caught it (`ba'sh' script.sh` → allow). The blanket rule
-fixes that without breaking `-c` recursion (verified: `bash -c 'echo hi'`
-still allows with the blanket rule present) and, as a side effect, closes
-dotfiles issue #44 — see #16 below. `ksh -c`/`fish -c` are **not** unwrapped
-(brush-parser doesn't parse those dialects), so `dotfiles-code-ksh-c`/
-`dotfiles-code-fish-c` keep their narrower `-c`-scoped form and work as
-plain rules.
+`config.toml`'s `dotfiles-code-{bash,sh,zsh,dash,ksh,fish,tcsh,csh,ash}`
+rules are **blanket** (no `required_flags = ["c"]`). A `-c`-scoped rule
+never fires, because recursion takes over the `-c` shape. Bare
+`bash script.sh` (a script *file* reference, with no inline content to
+recurse into) is a shape recursion does **not** cover, since shguard doesn't
+read the referenced file. That shape was silently uncovered until the parity
+check caught it (`ba'sh' script.sh` → allow). The blanket rule closes it,
+and as a side effect closes dotfiles issue #44 (see #16 below).
+
+**Changed in shguard #695 ([PR #697](https://github.com/tsukasaI/shguard/pull/697)).**
+This section used to record `bash -c 'echo hi'` → allow with the blanket rule
+present. That was a shguard bug, not a design property:
+- The rule 6a/6c recursion returned early and skipped user deny rules on the
+  interpreter or `eval`.
+- The same entry written as `[[ask]]` still asked, so a deny was weaker than
+  an ask.
+- The cwd-composition path re-applied the deny only when the hook payload
+  carried a cwd.
+
+Since #695 the blanket rule fires on every invocation: `bash -c 'echo hi'` →
+deny, matching the old hook's blanket block of every `-c`. This is kept
+deliberately (decided 2026-10-16). The rule schema can't express "deny
+unless `-c`", and `targets` can't match an arbitrary script path, so a
+script-only rule isn't writable. The same applies to `dotfiles-code-eval`.
 
 ## 13. Symlinked config: Bash-write self-protection gap — resolved
 
