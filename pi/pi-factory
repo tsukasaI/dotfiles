@@ -42,11 +42,12 @@ if [[ "${1:-}" == "--container" ]]; then
   tty_args=()
   [[ -t 0 && -t 1 ]] && tty_args=(-t)
   # Not -e ANTHROPIC_API_KEY=<value>: a value in argv shows up in `ps`.
-  exec container run --rm -i "${tty_args[@]}" \
+  # ${a[@]+...}: /bin/bash 3.2 treats an empty array as unbound under set -u.
+  exec container run --rm -i ${tty_args[@]+"${tty_args[@]}"} \
     -e ANTHROPIC_API_KEY -e PI_TELEMETRY -e PI_SKIP_VERSION_CHECK \
     -v "$PWD:/workspace" \
     -v pi-agent-home:/root/.pi/agent \
-    "$IMAGE" "${model_args[@]}" "$@"
+    "$IMAGE" ${model_args[@]+"${model_args[@]}"} "$@"
 fi
 
 command -v pi >/dev/null || die "pi not found (run darwin-rebuild switch)"
