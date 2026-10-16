@@ -13,9 +13,12 @@ die() { echo "pi-factory: $*" >&2; exit 1; }
 
 # Not just "env wins": Pi prefers a stored auth.json credential over
 # ANTHROPIC_API_KEY, so a stray /login would silently move billing off the
-# factory key.
+# factory key. Not a bare existence check: Pi recreates an empty {} on every
+# start. Unparseable counts as non-empty.
 auth_json="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/auth.json"
-[[ -e "$auth_json" ]] && die "$auth_json exists; remove it (/logout) so the factory key is used"
+if [[ -e "$auth_json" ]] && ! jq -e 'type == "object" and length == 0' "$auth_json" >/dev/null 2>&1; then
+  die "$auth_json holds a stored credential; remove it (/logout) so the factory key is used"
+fi
 
 readonly KEYCHAIN_SERVICE="claude-factory"
 key="$(security find-generic-password -a "$USER" -s "$KEYCHAIN_SERVICE" -w 2>/dev/null)" \
