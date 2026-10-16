@@ -26,6 +26,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | `setup.sh` | First-time symlink installer; also runs `lefthook install` (warns if lefthook isn't on PATH yet). |
 | `docs/` | Investigation memos specific to this repo's own subject matter (e.g. `turso-investigation.md`); not a knowledge-management store — see the Personal knowledge store bullet in Concepts for the cc-memory/docs boundary. |
 | `ghostty/`, `wezterm/` | Terminals: ghostty primary, wezterm fallback, deliberately identical theme/font. |
+| `pi/` | Pi coding agent on API-key billing, kept off Claude Code's subscription. `pi-factory` (→ `~/.local/bin`) reads the key from Keychain service `claude-factory` and exports it to that process only; `--container` runs the `pi-sandbox` image built from `Dockerfile.pi` under apple/container (Homebrew `container`), mounting only `$PWD`. `settings.json` → `~/.pi/agent/settings.json`. The `pi` binary itself comes from nixpkgs (`pi-coding-agent`). |
 | `karabiner/`, `ssh/`, `mise/` | Small configs. `mise/config.toml` is near-empty on purpose — toolchains come from Nix. |
 
 ## Commands

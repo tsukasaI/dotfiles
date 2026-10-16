@@ -65,6 +65,11 @@ link_with_backup "$DOTFILES/claude-code/settings.json" ~/.claude/settings.json
 link_with_backup "$DOTFILES/claude-code/CLAUDE.md" ~/.claude/CLAUDE.md
 chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
 
+# Pi coding agent (API-key billing, separate from Claude Code)
+mkdir -p ~/.local/bin ~/.pi/agent
+link_with_backup "$DOTFILES/pi/pi-factory" ~/.local/bin/pi-factory
+link_with_backup "$DOTFILES/pi/settings.json" ~/.pi/agent/settings.json
+
 # Per-repo git hooks (lefthook): this repo's own pre-commit gitleaks check.
 # On a fresh machine setup.sh runs before darwin-rebuild switch, so lefthook
 # may not be on PATH yet — warn loudly instead of silently leaving the hook

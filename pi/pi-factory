@@ -1,0 +1,50 @@
+#!/bin/bash
+# Runs Pi with the factory-workspace Anthropic API key, exported to this
+# process only. Key lives in the macOS Keychain (service "claude-factory").
+#   pi-factory [pi args...]            host
+#   pi-factory --container [pi args...]   pi-sandbox via apple/container, $PWD at /workspace
+
+set -euo pipefail
+
+readonly DEFAULT_MODEL="claude-sonnet-5-5"
+readonly IMAGE="pi-sandbox"
+
+die() { echo "pi-factory: $*" >&2; exit 1; }
+
+# Not just "env wins": Pi prefers a stored auth.json credential over
+# ANTHROPIC_API_KEY, so a stray /login would silently move billing off the
+# factory key.
+auth_json="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/auth.json"
+[[ -e "$auth_json" ]] && die "$auth_json exists; remove it (/logout) so the factory key is used"
+
+readonly KEYCHAIN_SERVICE="claude-factory"
+key="$(security find-generic-password -a "$USER" -s "$KEYCHAIN_SERVICE" -w 2>/dev/null)" \
+  || die "no Keychain item for service $KEYCHAIN_SERVICE (account $USER)"
+[[ -n "$key" ]] || die "Keychain item $KEYCHAIN_SERVICE is empty"
+
+unset ANTHROPIC_AUTH_TOKEN ANTHROPIC_OAUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN
+export ANTHROPIC_API_KEY="$key"
+unset key
+export PI_TELEMETRY=0 PI_SKIP_VERSION_CHECK=1
+
+if [[ "${1:-}" == "--container" ]]; then
+  shift
+  command -v container >/dev/null || die "container not found (apple/container; run darwin-rebuild switch)"
+  container volume inspect pi-agent-home >/dev/null 2>&1 \
+    || container volume create pi-agent-home >/dev/null
+  model_args=(--model "$DEFAULT_MODEL")
+  for arg in "$@"; do
+    [[ "$arg" == --model || "$arg" == --model=* ]] && model_args=()
+  done
+  tty_args=()
+  [[ -t 0 && -t 1 ]] && tty_args=(-t)
+  # Not -e ANTHROPIC_API_KEY=<value>: a value in argv shows up in `ps`.
+  exec container run --rm -i "${tty_args[@]}" \
+    -e ANTHROPIC_API_KEY -e PI_TELEMETRY -e PI_SKIP_VERSION_CHECK \
+    -v "$PWD:/workspace" \
+    -v pi-agent-home:/root/.pi/agent \
+    "$IMAGE" "${model_args[@]}" "$@"
+fi
+
+command -v pi >/dev/null || die "pi not found (run darwin-rebuild switch)"
+exec pi "$@"

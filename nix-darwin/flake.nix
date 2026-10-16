@@ -104,6 +104,7 @@
         bun
         nodejs
         pnpm
+        pi-coding-agent # run via ~/.local/bin/pi-factory, not bare `pi`
 
         # Go (LSP, formatters, debugger for nvim-dap-go)
         # go_latest tracks nixpkgs' newest go_1_XX; plain `go` lags behind on
@@ -158,6 +159,7 @@
           "mise"
           "yt-dlp"
           "apw"  # Apple Passwords CLI
+          "container"  # apple/container: per-container VMs, used by pi-factory --container
           "tursodatabase/tap/turso"  # libSQL/Turso cloud CLI (core "turso" is a different DB engine)
           "ariga/tap/atlas"  # Atlas DB schema migration tool
           "charmbracelet/tap/freeze"  # generate code screenshots as images
