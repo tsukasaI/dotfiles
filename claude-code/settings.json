@@ -129,6 +129,16 @@
         ]
       },
       {
+        "matcher": "mcp__agent-browser__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "bun --config=/dev/null $HOME/dotfiles/claude-code/hooks/agent-browser-guard.ts || exit 2"
+          }
+        ]
+      },
+      {
         "matcher": "Edit|Write",
         "hooks": [
           {
