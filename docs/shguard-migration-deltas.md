@@ -1028,7 +1028,8 @@ Read/Grep/Glob tools) and `sandbox.filesystem.denyRead` (for sandboxed
 Bash). The docs describe these as separate layers; this Claude Code build
 also copied `Read()` denies into the sandbox read policy, but listing both
 doesn't depend on that. `~/.gnupg` as a whole stays readable because sandboxed signing
-needs it; `logs.db` stays readable because self-improve reads it.
+needs it; `logs.db` was left readable for the self-improve skill, which
+has since been removed (2026-10-17).
 
 Sandbox escape: `sandbox.allowUnsandboxedCommands: false`, so a
 `dangerouslyDisableSandbox` retry is refused instead of classifier-gated,

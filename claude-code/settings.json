@@ -171,17 +171,6 @@
     "type": "command",
     "command": "bun --config=/dev/null $HOME/dotfiles/claude-code/statusline.ts"
   },
-  "enabledPlugins": {
-    "eli5@claude-community": true
-  },
-  "extraKnownMarketplaces": {
-    "claude-community": {
-      "source": {
-        "source": "github",
-        "repo": "anthropics/claude-plugins-community"
-      }
-    }
-  },
   "outputStyle": "Concise",
   "viewMode": "default",
   "sandbox": {
@@ -304,6 +293,7 @@
     "mode": "hold"
   },
   "autoMemoryEnabled": false,
+  "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "custom:dark-ansi-readable",
   "preferredNotifChannel": "ghostty",
@@ -337,6 +327,5 @@
       "Sensitive data locations & audiences (tsukasaI/ops repo, paths relative to repo root): `notes/study-work/go/runtime-secret.md`, `notes/study-work/kubernetes/{helm-commands,helm-vs-kustomize,network-policy-cni-troubleshooting,rbac,cka-imperative-commands-cheatsheet,cka-mock-exam-1}.md`, and anything under `career/` (personal career/job-search data) and `private/` (repo-root dir, gitignored — not the macOS `/private/`) — share only with audiences cleared at the [named+specifics] bar"
     ]
   },
-  "copyOnSelect": false,
-  "skipDangerousModePermissionPrompt": true
+  "copyOnSelect": false
 }
