@@ -22,3 +22,6 @@ pre-push:
       run: bash tests/shellcheck.sh
     shguard-parity-check:
       run: bash tests/shguard-parity-check.sh
+    bun-test:
+      glob: "claude-code/{hooks,lib}/*.ts"
+      run: bun test claude-code/hooks claude-code/lib
