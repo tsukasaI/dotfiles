@@ -1394,3 +1394,15 @@ id = "dotfiles-keychain-claude-factory"
 reason = "the claude-factory Keychain item holds the factory API key and is user-only"
 command = "security"
 targets = [{ exact = "claude-factory" }]
+
+[[deny]]
+id = "dotfiles-keychain-find-internet-password"
+reason = "security find-internet-password can print Keychain secrets"
+command = "security"
+required_tokens = ["find-internet-password"]
+
+[[deny]]
+id = "dotfiles-keychain-dump-keychain"
+reason = "security dump-keychain lists every item and, with -d, prints their secrets"
+command = "security"
+required_tokens = ["dump-keychain"]

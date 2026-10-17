@@ -232,6 +232,8 @@ case_ "pi-factory"                       'pi-factory -p hi'                    d
 case_ "pi-factory by path"               '/Users/inouetsukasa/.local/bin/pi-factory --version' deny
 case_ "keychain find-generic-password"   'security find-generic-password -s other -g' deny "sandboxed Bash can read the Keychain"
 case_ "keychain claude-factory item"     'security delete-generic-password -s claude-factory' deny
+case_ "keychain find-internet-password"  'security find-internet-password -s github.com -w' deny
+case_ "keychain dump-keychain -d"        'security dump-keychain -d'           deny "prints every item's secret"
 case_ "security list-keychains"          'security list-keychains'             allow
 case_ "bare pi"                          'pi --version'                        allow "no key in env without the wrapper"
 case_ "pi-factory in commit message"     'git commit -m "fix pi-factory claude-factory"' allow
