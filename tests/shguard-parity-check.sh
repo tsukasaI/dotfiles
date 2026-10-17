@@ -185,7 +185,7 @@ case_ "commit msg mentioning --no-verify" 'git commit -m "use --no-verify for em
 
 # ── bare interpreter script-file execution + issue #44 ──────────────────────
 case_ "bash script.sh single-line"       'bash script.sh'                      deny
-case_ "bash -c benign"                   "bash -c 'echo hi'"                   allow "shguard recurses into the -c argument itself instead of blanket-blocking bash -c"
+case_ "bash -c benign"                   "bash -c 'echo hi'"                   deny "since shguard #695 the blanket dotfiles-code-bash deny holds for -c too"
 case_ "bash -c dangerous still deny"     "bash -c 'rm -rf /'"                  deny
 case_ "multi-line bash (issue #44)"      "$(printf 'echo setup\nbash script.sh')" deny "shguard's real parser treats the newline as a command separator"
 
