@@ -105,6 +105,7 @@
         nodejs
         pnpm
         pi-coding-agent # run via ~/.local/bin/pi-factory, not bare `pi`
+        agent-browser # run as a user-scope MCP server, not from Bash: Chromium can't launch in the Bash sandbox
 
         # Go (LSP, formatters, debugger for nvim-dap-go)
         # go_latest tracks nixpkgs' newest go_1_XX; plain `go` lags behind on
