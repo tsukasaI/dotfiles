@@ -1,10 +1,17 @@
 # Workflow
 - Commit messages must be in English, regardless of conversation language.
 - Use plain `git add` / `git commit` / `git status` inside the current project — the cwd is already the repo. Reserve `-C <path>` for a genuinely different repository.
-- `git push/fetch/pull/ls-remote` and `gh` run outside the Bash sandbox (`sandbox.excludedCommands` in `settings.json`): inside it, SSH remotes can't resolve `github.com` and `gh` can't read the keychain. Only the bare form or `origin` named right after the subcommand is excluded (`git push`, `git push origin <branch>`, `git push -u origin <branch>`, `git pull --rebase origin main`); any other form, and any line with a redirect or pipe, runs sandboxed and fails SSH, so put other flags after `origin`. Every other git command, `git commit` included, runs sandboxed (GPG reaches its agent via `sandbox.network.allowUnixSockets`). Run excluded commands standalone, not chained after `cd`/`&&`, because every command in a chain must match the exclusion or the whole line runs sandboxed. A newline inside an argument splits the line the same way, so a multi-line `gh pr create -b`/`gh issue create -b` fails on the keychain: write the body to a file under the scratchpad (`/private/tmp/claude-501/...`) and pass `--body-file`; shguard allows `--body-file` only from there. If `gh auth status` inside the sandbox reports an invalid keyring token, that is the sandbox, not a broken login; never run `gh auth refresh` for it.
+- `git push/fetch/pull/ls-remote` and `gh` run outside the Bash sandbox (`sandbox.excludedCommands` in `settings.json`): inside it, SSH remotes can't resolve `github.com` and `gh` can't read the keychain.
+  - Only the bare form or `origin` named right after the subcommand is excluded (`git push`, `git push origin <branch>`, `git push -u origin <branch>`, `git pull --rebase origin main`); any other form, and any line with a redirect or pipe, runs sandboxed and fails SSH, so put other flags after `origin`.
+  - Every other git command, `git commit` included, runs sandboxed (GPG reaches its agent via `sandbox.network.allowUnixSockets`).
+  - Run excluded commands standalone, not chained after `cd`/`&&`, because every command in a chain must match the exclusion or the whole line runs sandboxed.
+  - A newline inside an argument splits the line the same way, so a multi-line `gh pr create -b`/`gh issue create -b` fails on the keychain: write the body to a file under the scratchpad (`/private/tmp/claude-501/...`) and pass `--body-file`; shguard allows `--body-file` only from there.
+  - If `gh auth status` inside the sandbox reports an invalid keyring token, that is the sandbox, not a broken login; never run `gh auth refresh` for it.
 - "commitして" with no scope = commit ONLY files changed in this session. If the working tree has unrelated changes mixed in, list them and confirm instead of guessing.
 - Commit after each completed subtask; never start the next subtask while pre-commit fails — fix the check first. Bypass flags (`--no-verify`, `git push --force`) are hook-blocked; use `--force-with-lease` when force is genuinely needed.
-- Git workflow by repo: `dotfiles` and `ops` → commit directly to main and push once a subtask is complete, no explicit "commit" instruction needed. Every other repo → NEVER commit to main: create a branch (`<type>/<short-slug>`), open a PR. Merge via `gh pr merge --squash --delete-branch` once the `code-reviewer` review approves (see Review gate); if no review ran, or it did not approve, stop and wait for me to say so.
+- Git workflow by repo:
+  - `dotfiles` and `ops` → commit directly to main and push once a subtask is complete, no explicit "commit" instruction needed.
+  - Every other repo → NEVER commit to main: create a branch (`<type>/<short-slug>`), open a PR. Merge via `gh pr merge --squash --delete-branch` once the `code-reviewer` review approves (see Review gate); if no review ran, or it did not approve, stop and wait for me to say so.
 - Commit message format (Contextual Commits = Conventional Commits + structured body):
   ```
   <type>(<scope>): <description>
@@ -19,7 +26,10 @@
     - `constraint(scope)`: hard limits shaping implementation
     - `learned(scope)`: discovered quirks / gotchas
 - Editor: nvim
-- When a Bash command is blocked by a PreToolUse hook, never retry with an equivalent shell command (`unlink` for `rm`, piping around a block, etc.); repeat it verbatim in a fenced bash block so I can `/copy` it. A dedicated tool (Read, Grep, Glob, Edit, Write) that does the job is fine to use; otherwise just stop. Exception: `dotfiles-tool-policy-*` rules (`find`) are tool preferences, not safety blocks, so retry immediately with the named replacement (`fd`/Glob). A blocked Edit/Write still needs presenting by you. Before setup work that ends in a hook-protected action (editing linter/formatter configs, destructive git ops), check the protection first — don't discover it after installing/initializing.
+- When a Bash command is blocked by a PreToolUse hook, never retry with an equivalent shell command (`unlink` for `rm`, piping around a block, etc.); repeat it verbatim in a fenced bash block so I can `/copy` it. A dedicated tool (Read, Grep, Glob, Edit, Write) that does the job is fine to use; otherwise just stop.
+  - Exception: `dotfiles-tool-policy-*` rules (`find`) are tool preferences, not safety blocks, so retry immediately with the named replacement (`fd`/Glob).
+  - A blocked Edit/Write still needs presenting by you.
+- Before setup work that ends in a hook-protected action (editing linter/formatter configs, destructive git ops), check the protection first — don't discover it after installing/initializing.
 - Enter plan mode when the change spans multiple files/subsystems or involves an architectural decision; single-file fixes don't need a plan. I'll ask when I want more than this default. If the approach breaks down mid-task, stop and re-plan.
 
 # Clarify before acting
@@ -49,10 +59,8 @@
 
   | Role | Model | Set in |
   |---|---|---|
-  | Main loop | see Set in (not repeated here) | `settings.json` `model`; `claude --model <x>` overrides for one session |
   | Subagents (Explore, web-researcher, Agent/Workflow `agent()`) | Cheapest model that can do the subtask; default `sonnet` | `model:` argument at call time |
   | Maintenance investigation agents (`/maintain-sweep`) | `opus` | `agents/*.md` frontmatter (deliberate exception to the 2-of-4 rule below); no `effort:` on purpose, so they inherit the session's effort |
-  | Advisor | `fable` | `settings.json` `advisorModel` |
 
 - When delegating to Agent or Workflow `agent()`, pass `model:` explicitly (default `sonnet`) — don't rely on inheritance from the main loop. Escalate above the default only when the subtask meets ≥2 of: (a) no existing pattern in this codebase to imitate, (b) a security/auth/crypto boundary, (c) multiple valid approaches with a real trade-off, (d) it already failed once at the default tier.
   - Example (escalate): "design a cache-invalidation strategy for this service" — no precedent, real trade-offs.
@@ -79,6 +87,3 @@
 # Maintaining this file
 - Add a rule when: Claude makes the same mistake twice, a review catches something Claude should have known, or I've typed the same correction twice.
 - Delete or merge a rule when: Claude isn't following it (likely a conflict or too long), or the info is inferable from code.
-- Keep this file under 200 lines. Split details into `rules/*.md` or `@imports`.
-- Check for conflicts across this file and `rules/*.md` before adding. Contradictions → Claude picks arbitrarily.
-- `rules/*.md` support a `paths:` frontmatter for conditional loading — loaded only when matching files are in context (e.g. `rules/rust.md` loads for `**/*.rs`).

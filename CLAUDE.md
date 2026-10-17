@@ -19,13 +19,12 @@ There is no staging or deploy step (hooks apply on the next tool call,
 |---|---|
 | `nix-darwin/flake.nix` | Source of truth for packages, Homebrew, and macOS defaults. Single host config; `system.primaryUser` must equal `whoami`. |
 | `claude-code/` | The user's **global** Claude Code config. Symlinked by `setup.sh`: `CLAUDE.md`, `settings.json`, `rules/`, `skills/`, `agents/`, `themes/` into `~/.claude/`, and `shguard/config.toml` into `~/.config/shguard/` (the path shguard reads). Referenced from `settings.json` by absolute `$HOME/dotfiles/...` path instead: `hooks/`, `statusline.ts` (`~/.claude/hooks` is herdr's own directory), and `mod/` (the `dotfiles-mod` plugin, via `env.CLAUDE_CODE_PLUGIN_DIRS`; see `hooks/README.md`). |
-| `.claude/` | Project-scoped Claude state for *this repo only* (plans, memory, local settings). Not the same thing as `claude-code/`. |
-| `nvim/` | lazy.nvim config: one file per plugin in `lua/plugins/` with that plugin's keymaps inside its spec; global options/keymaps in `init.lua`; LSP servers in `lsp/<name>.lua`, enabled at the bottom of `init.lua`. |
-| `zsh/zshrc` | Hand-written, no framework. `_cached_eval` caches slow init output (mise/zoxide/fzf). Custom prompt. |
+| `.claude/` | Project-scoped Claude state for *this repo only* (plans, memory, local settings, skills, rules, worktrees). Not the same thing as `claude-code/`. |
+| `nvim/` | lazy.nvim: a plugin's keymaps live inside its own spec in `lua/plugins/`, not in `init.lua`. |
 | `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks (see Pitfalls). |
 | `docs/` | Investigation memos specific to this repo (see Personal knowledge store in Concepts). |
 | `ghostty/`, `wezterm/` | Terminals: ghostty primary, wezterm fallback, deliberately identical theme/font. |
-| `pi/` | Pi coding agent on API-key billing, kept off Claude Code's subscription. `pi-factory` (→ `~/.local/bin`) reads the key from Keychain service `claude-factory` and exports it to that process only; `--build` builds `pi-sandbox:<host pi --version>` from `Dockerfile.pi` (the host's nixpkgs Pi is the only version source); `--container` runs that tag under apple/container (Homebrew `container`), mounting only `$PWD`, and refuses if the tag is missing. `settings.json` → `~/.pi/agent/settings.json`. The `pi` binary itself comes from nixpkgs (`pi-coding-agent`). |
+| `pi/` | Pi coding agent on API-key billing, kept off Claude Code's subscription (details: `.claude/rules/pi.md`, loaded when working under `pi/`). |
 | `karabiner/`, `ssh/`, `mise/` | Small configs. `mise/config.toml` is near-empty on purpose — toolchains come from Nix. |
 
 ## Commands
@@ -81,8 +80,9 @@ There is no staging or deploy step (hooks apply on the next tool call,
   with reality, reality wins; update the doc.
 - **Live config is write-protected from Bash.** `sandbox.filesystem.denyWrite`
   in `claude-code/settings.json` covers every path an unsandboxed process
-  runs or evaluates (lefthook config, `tests/`, `git/`, `ssh/`, `zsh/`,
-  `nvim/`, `nix-darwin/`, `claude-code/hooks` and more; see
+  runs or evaluates (lefthook config, `setup.sh`, `tests/`, `git/`, `ssh/`,
+  `zsh/`, `nvim/`, the terminal/karabiner/mise configs, `nix-darwin/`, all
+  of `claude-code/` and `.claude/`; see
   `docs/shguard-migration-deltas.md` #26). Edit these with the Edit/Write
   tools, never `sed -i`/`mv`/redirects. Sandboxed git operations that
   rewrite the worktree (`stash`, `checkout <branch>`, `merge`) fail on those
