@@ -63,7 +63,3 @@ tooled.
   goes in the commit body or a PR/issue comment.
 - Re-explain an issue inline; a bare pointer (`issue #52`) is enough.
 - Say the same fact in more than one place; write it once at the most-likely-to-be-read site.
-
-## Test
-"If this comment is deleted, will someone reintroduce the rejected alternative?" If no, delete
-it. If yes, keep only the sentence that prevents that.

@@ -21,10 +21,9 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | `claude-code/` | The user's **global** Claude Code config. Symlinked by `setup.sh`: `CLAUDE.md`, `settings.json`, `rules/`, `skills/`, `agents/`, `themes/` into `~/.claude/`, and `shguard/config.toml` into `~/.config/shguard/` (the path shguard reads). Referenced from `settings.json` by absolute `$HOME/dotfiles/...` path instead: `hooks/`, `statusline.ts` (`~/.claude/hooks` is herdr's own directory), and `mod/` (the `dotfiles-mod` plugin, via `env.CLAUDE_CODE_PLUGIN_DIRS`; see `hooks/README.md`). |
 | `.claude/` | Project-scoped Claude state for *this repo only* (plans, memory, local settings). Not the same thing as `claude-code/`. |
 | `nvim/` | lazy.nvim config: one file per plugin in `lua/plugins/` with that plugin's keymaps inside its spec; global options/keymaps in `init.lua`; LSP servers in `lsp/<name>.lua`, enabled at the bottom of `init.lua`. |
-| `zsh/zshrc` | Hand-written, no framework. `_cached_eval` caches slow init output (mise/zoxide/fzf). Custom prompt — starship was removed. |
-| `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks — `core.hooksPath` was retired (see Pitfalls); this repo's own pre-commit/pre-push checks live in the root `lefthook.yaml`, installed per-repo via `lefthook install` (see `setup.sh`). |
-| `setup.sh` | First-time symlink installer; also runs `lefthook install` (warns if lefthook isn't on PATH yet). |
-| `docs/` | Investigation memos specific to this repo's own subject matter (e.g. `turso-investigation.md`); not a knowledge-management store — see the Personal knowledge store bullet in Concepts for the cc-memory/docs boundary. |
+| `zsh/zshrc` | Hand-written, no framework. `_cached_eval` caches slow init output (mise/zoxide/fzf). Custom prompt. |
+| `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks (see Pitfalls). |
+| `docs/` | Investigation memos specific to this repo (see Personal knowledge store in Concepts). |
 | `ghostty/`, `wezterm/` | Terminals: ghostty primary, wezterm fallback, deliberately identical theme/font. |
 | `pi/` | Pi coding agent on API-key billing, kept off Claude Code's subscription. `pi-factory` (→ `~/.local/bin`) reads the key from Keychain service `claude-factory` and exports it to that process only; `--container` runs the `pi-sandbox` image built from `Dockerfile.pi` under apple/container (Homebrew `container`), mounting only `$PWD`. `settings.json` → `~/.pi/agent/settings.json`. The `pi` binary itself comes from nixpkgs (`pi-coding-agent`). |
 | `karabiner/`, `ssh/`, `mise/` | Small configs. `mise/config.toml` is near-empty on purpose — toolchains come from Nix. |
@@ -44,13 +43,10 @@ There is no staging or deploy step (hooks apply on the next tool call,
   and check `.hookSpecificOutput.permissionDecision` (`allow`/`ask`/`deny`).
 - CI: see `.github/workflows/ci.yaml` and `flake-check.yaml`. CI is a
   backstop, not the only loop — re-run `lefthook install` after pulling
-  changes to hooks or lefthook config. No linter config for other file types.
+  changes to hooks or lefthook config.
 
 ## Concepts
 
-- **Contextual Commits**: the commit-body format (see global CLAUDE.md) is
-  used by `rules/comments.md` as the home for bug-hunt narrative that must
-  stay out of source.
 - **ewc / fini / herdr**: personal tools installed as flake inputs. `fini` is
   the formatter the PostToolUse hook runs on every Edit/Write. `herdr`
   supplies the SessionStart hook (`~/.claude/hooks/`, outside this repo).
@@ -61,21 +57,15 @@ There is no staging or deploy step (hooks apply on the next tool call,
   deliberately kept out of Claude's process tree.
 - **Personal knowledge store**: cc-memory (MCP) is the sole store for
   personal-life facts, Claude-Code session learnings, and article-idea
-  candidates (`blog_candidate: true`). The Obsidian vault and the `kb`/`note`
-  skills were retired — their content was migrated into cc-memory. A repo's
-  own `docs/` still holds investigations specific to that repo's own subject
+  candidates (`blog_candidate: true`). A repo's own `docs/` holds investigations specific to that repo's own subject
   matter (e.g. `docs/turso-investigation.md` here), separate from
   cc-memory's personal-knowledge scope. One store per finding — don't
   duplicate across them.
 
 ## Pitfalls
 
-- **The hooks police this session too.** `find`/`ssh`/`scp`, `curl` to
-  non-localhost hosts, and more are denied for you by `shguard`. A "matches
-  blocklist rule ..." result is policy, not a flaky tool; surface the
-  command to the user instead of routing around it. `block-config-edit.sh`
-  likewise hard-blocks Edit/Write on linter/formatter configs in any
-  project.
+- **`block-config-edit.sh` hard-blocks Edit/Write** on linter/formatter
+  configs in any project, and on the guard files themselves.
 - **Skills run live through the `~/.claude/skills` symlink**: an edit is in
   production immediately, committed or not. Check `git status` before assuming
   committed state equals running state.
@@ -83,14 +73,12 @@ There is no staging or deploy step (hooks apply on the next tool call,
   chain into each repo's own lefthook config, but lefthook (and Python
   `pre-commit`) refuse to `install` while a global hooksPath is set — a
   structural conflict with normal `lefthook install` usage, not a one-off
-  bug. Every repo, including language-less ones like this one, now carries
-  its own `lefthook.yaml` with at least a gitleaks pre-commit check,
+  bug. Every repo now carries its own `lefthook.yaml` with at least a gitleaks pre-commit check,
   installed via `lefthook install` (see `setup.sh`). Don't reintroduce a
   global `core.hooksPath` — it will silently break `lefthook install` in
   every other repo on this machine again.
-- **Trust files over docs.** Parts of `hooks/README.md` are known-stale.
-  When any doc — including this one — disagrees with reality, reality wins;
-  update the doc.
+- **Trust files over docs.** When any doc — including this one — disagrees
+  with reality, reality wins; update the doc.
 - **Live config is write-protected from Bash.** `sandbox.filesystem.denyWrite`
   in `claude-code/settings.json` covers every path an unsandboxed process
   runs or evaluates (lefthook config, `tests/`, `git/`, `ssh/`, `zsh/`,
@@ -110,19 +98,15 @@ There is no staging or deploy step (hooks apply on the next tool call,
   calls the `shguard` binary directly (`shguard || exit 2`, so a PATH-miss or
   crash blocks; `SHGUARD_STRICT_CONFIG=1` so a missing/malformed config
   denies instead of asking) against `claude-code/shguard/config.toml`, with
-  no separate wrapper script. `block-dangerous.sh`, `shguard-gate.sh`, and
-  `shguard-shadow.sh` are deleted; historical gaps found during the
-  migration are tracked in `docs/shguard-migration-deltas.md`. `config.toml`
+  no separate wrapper script. `config.toml`
   is Claude-edit-blocked like the other guard files. `ask` verdicts are not
   a reliable control once a session runs under `bypassPermissions` mode
   (see that doc's "Cutover caveat" section); re-audit before switching.
 - **flake.nix specifics**: the unfree allowlist contains only `terraform`
   (any other unfree package fails eval until added). Homebrew
-  `cleanup = "zap"` uninstalls anything not declared in the flake, and
-  nix-darwin's own homebrew module already emits `--zap --force-cleanup`
-  for that setting (PR #1789, merged 2026-06-17, landed in the pinned
-  input), so no `extraFlags` workaround is needed; don't re-add one
-  without confirming the pinned nix-darwin input actually regressed.
+  `cleanup = "zap"` uninstalls anything not declared in the flake;
+  nix-darwin already passes `--zap --force-cleanup` for it, so no
+  `extraFlags` is needed.
 - **Homebrew taps can't be content-pinned** — the exception to
   `rules/security.md`'s pin rule. The taps in `nix-darwin/flake.nix`
   (`homebrew.taps`, the single list; `abue-ammar/tinycast` is non-notarized)

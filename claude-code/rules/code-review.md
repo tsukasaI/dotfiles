@@ -27,8 +27,6 @@ paths:
 Apply this checklist to your own diff before declaring a task complete — you are reviewer #1.
 Source: distilled from [google/eng-practices](https://github.com/google/eng-practices).
 
-Three faces of review, not one: this file is self-review, applied automatically to your own diff; `/code-review` reviews your working diff on demand (`--fix`/`--comment`); the `code-reviewer` agent gives an independent, read-only pass.
-
 ## Self-review checklist
 - **Design**: Does the change fit the existing architecture? Right pieces in the right places?
 - **Tests**: Cover edges and concurrency. Confirm the test would actually fail if the code broke.
@@ -45,7 +43,6 @@ Three faces of review, not one: this file is self-review, applied automatically 
 ## PR / commit description content
 (Format itself follows the Contextual Commits spec in CLAUDE.md.)
 - Subject line: imperative, complete sentence (`feat(rpc): delete the FizzBuzz RPC`, not `Deleting...` or `Deleted...`).
-- Body explains *why* and trade-offs — the diff already shows *what*.
 - Vague subjects (`Fix bug`, `Update code`, `Move things`) are not acceptable.
 
 ## Reader confusion = code defect
