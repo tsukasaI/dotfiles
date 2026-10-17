@@ -25,7 +25,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks (see Pitfalls). |
 | `docs/` | Investigation memos specific to this repo (see Personal knowledge store in Concepts). |
 | `ghostty/`, `wezterm/` | Terminals: ghostty primary, wezterm fallback, deliberately identical theme/font. |
-| `pi/` | Pi coding agent on API-key billing, kept off Claude Code's subscription. `pi-factory` (→ `~/.local/bin`) reads the key from Keychain service `claude-factory` and exports it to that process only; `--container` runs the `pi-sandbox` image built from `Dockerfile.pi` under apple/container (Homebrew `container`), mounting only `$PWD`. `settings.json` → `~/.pi/agent/settings.json`. The `pi` binary itself comes from nixpkgs (`pi-coding-agent`). |
+| `pi/` | Pi coding agent on API-key billing, kept off Claude Code's subscription. `pi-factory` (→ `~/.local/bin`) reads the key from Keychain service `claude-factory` and exports it to that process only; `--build` builds `pi-sandbox:<host pi --version>` from `Dockerfile.pi` (the host's nixpkgs Pi is the only version source); `--container` runs that tag under apple/container (Homebrew `container`), mounting only `$PWD`, and refuses if the tag is missing. `settings.json` → `~/.pi/agent/settings.json`. The `pi` binary itself comes from nixpkgs (`pi-coding-agent`). |
 | `karabiner/`, `ssh/`, `mise/` | Small configs. `mise/config.toml` is near-empty on purpose — toolchains come from Nix. |
 
 ## Commands

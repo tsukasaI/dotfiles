@@ -3,6 +3,7 @@
 # process only. Key lives in the macOS Keychain (service "claude-factory").
 #   pi-factory [pi args...]            host
 #   pi-factory --container [pi args...]   pi-sandbox via apple/container, $PWD at /workspace
+#   pi-factory --build                 build pi-sandbox:<host pi version> (no key needed)
 
 set -euo pipefail
 
@@ -10,6 +11,35 @@ readonly DEFAULT_MODEL="claude-sonnet-5-5"
 readonly IMAGE="pi-sandbox"
 
 die() { echo "pi-factory: $*" >&2; exit 1; }
+
+host_pi_version() {
+  command -v pi >/dev/null || die "pi not found (run darwin-rebuild switch)"
+  local v
+  v="$(pi --version 2>&1)" || die "pi --version failed"
+  # Not echoing v: it is untrusted output and ends up in build args and an image tag.
+  [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "unexpected pi --version output"
+  echo "$v"
+}
+
+if [[ "${1:-}" == "--build" ]]; then
+  version="$(host_pi_version)"
+  dir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+  command -v container >/dev/null || die "container not found (apple/container; run darwin-rebuild switch)"
+  exec container build -t "$IMAGE:$version" --build-arg "PI_VERSION=$version" \
+    -f "$dir/Dockerfile.pi" "$dir"
+fi
+
+if [[ "${1:-}" == "--container" ]]; then
+  shift
+  command -v container >/dev/null || die "container not found (apple/container; run darwin-rebuild switch)"
+  version="$(host_pi_version)"
+  # Before the Keychain read: a stale image must fail without touching the key.
+  container image inspect "$IMAGE:$version" >/dev/null 2>&1 \
+    || die "image $IMAGE:$version not found; run: pi-factory --build"
+  mode=container
+else
+  mode=host
+fi
 
 # Not just "env wins": Pi prefers a stored auth.json credential over
 # ANTHROPIC_API_KEY, so a stray /login would silently move billing off the
@@ -30,9 +60,7 @@ export ANTHROPIC_API_KEY="$key"
 unset key
 export PI_TELEMETRY=0 PI_SKIP_VERSION_CHECK=1
 
-if [[ "${1:-}" == "--container" ]]; then
-  shift
-  command -v container >/dev/null || die "container not found (apple/container; run darwin-rebuild switch)"
+if [[ "$mode" == container ]]; then
   container volume inspect pi-agent-home >/dev/null 2>&1 \
     || container volume create pi-agent-home >/dev/null
   model_args=(--model "$DEFAULT_MODEL")
@@ -47,7 +75,7 @@ if [[ "${1:-}" == "--container" ]]; then
     -e ANTHROPIC_API_KEY -e PI_TELEMETRY -e PI_SKIP_VERSION_CHECK \
     -v "$PWD:/workspace" \
     -v pi-agent-home:/root/.pi/agent \
-    "$IMAGE" ${model_args[@]+"${model_args[@]}"} "$@"
+    "$IMAGE:$version" ${model_args[@]+"${model_args[@]}"} "$@"
 fi
 
 command -v pi >/dev/null || die "pi not found (run darwin-rebuild switch)"

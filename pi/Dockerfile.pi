@@ -1,9 +1,11 @@
 # Based on https://pi.dev/docs/latest/containerization; adds golang-go and
-# pins the base image and Pi version (host Pi comes from nixpkgs).
+# pins the base image. The Pi version comes from the host's `pi --version`
+# (nixpkgs, locked in flake.lock) via `pi-factory --build`, not from this file.
 FROM node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5
 RUN apt-get update \
   && apt-get install -y --no-install-recommends bash ca-certificates git ripgrep golang-go \
   && rm -rf /var/lib/apt/lists/*
-RUN npm install -g --ignore-scripts @earendil-works/pi-coding-agent@1.2.0
+ARG PI_VERSION
+RUN test -n "$PI_VERSION" && npm install -g --ignore-scripts "@earendil-works/pi-coding-agent@${PI_VERSION}"
 WORKDIR /workspace
 ENTRYPOINT ["pi"]
