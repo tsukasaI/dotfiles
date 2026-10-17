@@ -11,6 +11,7 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 | (inline) `shguard` | `Bash` | Deny dangerous shell commands per `claude-code/shguard/config.toml`. `SHGUARD_STRICT_CONFIG=1` (set in `settings.json`'s top-level `env`) makes a missing/malformed config deny instead of ask; see `docs/shguard-migration-deltas.md` |
 | `block-config-edit.sh` | `Edit\|Write` | Block edits to linter/formatter config files |
 | `slop-guard.ts` | `Edit\|Write` | Deny prose edits (`.md`/`.mdx`/`.txt`) that newly introduce an em dash or a cliché phrase from `slop-phrases.conf`; only the net-new count vs. the pre-edit text is checked, never the whole file. `SLOP_GUARD_DISABLE=1` disables it. |
+| `agent-browser-guard.ts` | `mcp__agent-browser__.*` | Fail-closed argument guard for the unsandboxed agent-browser MCP: tool allowlist, forbidden launch/state keys, `path`/`output`/`baseline` confined to `/private/tmp/claude-501/`, http(s)/about:blank URLs only. |
 
 ### PostToolUse
 
