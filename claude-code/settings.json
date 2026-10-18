@@ -4,7 +4,13 @@
   "env": {
     "EDITOR": "nvim",
     "SHGUARD_STRICT_CONFIG": "1",
-    "CLAUDE_CODE_PLUGIN_DIRS": "~/dotfiles/claude-code/mod"
+    "CLAUDE_CODE_PLUGIN_DIRS": "~/dotfiles/claude-code/mod",
+    "HOMEBREW_NO_ANALYTICS": "1",
+    "npm_config_cache": "/Users/inouetsukasa/.cache/claude-sandbox/npm",
+    "BUN_INSTALL_CACHE_DIR": "/Users/inouetsukasa/.cache/claude-sandbox/bun",
+    "GOCACHE": "/Users/inouetsukasa/.cache/claude-sandbox/go-build",
+    "GOMODCACHE": "/Users/inouetsukasa/.cache/claude-sandbox/go-mod",
+    "UV_CACHE_DIR": "/Users/inouetsukasa/.cache/claude-sandbox/uv"
   },
   "attribution": {
     "commit": "",
@@ -78,17 +84,7 @@
       "Read(**/*.key)",
       "Read(**/*.p12)",
       "Read(**/*.pfx)",
-      "Read(**/node_modules/**)",
       "Read(**/.wrangler/**)",
-      "Read(**/dist/**)",
-      "Read(**/build/**)",
-      "Read(**/venv/**)",
-      "Read(**/.venv/**)",
-      "Read(**/target/**)",
-      "Read(**/.next/**)",
-      "Read(**/.turbo/**)",
-      "Read(**/__pycache__/**)",
-      "Read(**/.pytest_cache/**)",
       "Read(~/Library/Application Support/turso/**)",
       "Read(~/.kube/config)",
       "Read(~/.aws/**)",
@@ -219,6 +215,13 @@
         "code.claude.com",
         "registry.terraform.io",
         "www.npmjs.com",
+        "registry.npmjs.org",
+        "index.crates.io",
+        "static.crates.io",
+        "pypi.org",
+        "files.pythonhosted.org",
+        "proxy.golang.org",
+        "sum.golang.org",
         "arxiv.org",
         "ai.google.dev"
       ],
@@ -229,6 +232,9 @@
       ]
     },
     "filesystem": {
+      "allowWrite": [
+        "~/.cache/claude-sandbox"
+      ],
       "denyWrite": [
         "~/dotfiles/lefthook.yaml",
         "~/dotfiles/lefthook-local.yaml",
@@ -291,7 +297,10 @@
       "git pull origin:*",
       "git pull --rebase origin:*",
       "git ls-remote origin:*",
-      "gh:*"
+      "gh:*",
+      "go mod download:*",
+      "go mod tidy:*",
+      "go get:*"
     ]
   },
   "advisorModel": "fable",
