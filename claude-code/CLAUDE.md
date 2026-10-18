@@ -47,7 +47,11 @@
 - Use subagents to keep the main context window clean. Test: "Do I need the tool output again, or just the conclusion?" If just the conclusion → subagent. Good for: verifying results against a spec, exploring other codebases, writing docs from a git diff.
 - Delegation triggers: exploration likely to exceed ~10 tool calls, or 3+ independent subtasks (e.g. multiple unrelated issues) → fan out to subagents instead of serial main-loop work. Once delegated, do NOT duplicate the same reads in the main loop — wait, then verify the conclusions.
 - Verify one load-bearing claim from every subagent report before acting on it — this habit has caught real false positives; keep it.
-- Record a durable learning (gotcha, tool quirk, decision rationale, perf finding) the moment you notice it: call cc-memory's `draft_learning` with `source_session_id` = `$CLAUDE_CODE_SESSION_ID` and `project` = the git remote's `owner/repo` (`local:<basename>` when there is no remote). Don't batch them for later; `/dream` (in the `ops` repo) sweeps the queue. When the cc-memory tools aren't available (e.g. in a subagent), skip silently.
+- cc-memory holds memory about me only: facts, my own learnings, projects I'm working on, and discussion outcomes. Claude Code's own learnings (gotchas, tool quirks) never go there. Decision record: `ops/memory/cc-memory-curation-decisions.md`.
+  - Autonomous runs (`/goal`, `/loop`, subagents, Workflow `agent()`) never write to cc-memory. The one exception is `/dream` (in the `ops` repo) posting capped candidates to inbox, which `/retro` approves or discards.
+  - Interactive sessions: when something about me surfaces, ask "記憶しますか？" and write only after I approve. Same for updating a fact you notice is stale. Ask only for findings about me, so the question doesn't become noise.
+  - A pitfall found mid-task is never recorded silently anywhere. Propose it on the spot as a rules change: repo-specific → `<repo>/.claude/rules/`, cross-repo → `dotfiles/claude-code/rules/` (not CLAUDE.md itself).
+  - For work involving me (職務経歴書, project consultations) you may read cc-memory without asking. Personal info read this way never goes into files, commits, or PRs in any repo other than `ops`.
 
 # Truthfulness
 - Ground every factual claim about my content (career, history, prior work, file contents) in something you just read — read the source first. When you can't ground a claim, ask (see *Clarify before acting*) or mark it "推測" / "unverified" so I can confirm before it lands in a file.

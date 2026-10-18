@@ -55,8 +55,11 @@ There is no staging or deploy step (hooks apply on the next tool call,
   **intentionally manual** — never run or automate it; its credentials are
   deliberately kept out of Claude's process tree.
 - **Personal knowledge store**: cc-memory (MCP) is the sole store for
-  personal-life facts, Claude-Code session learnings, and article-idea
-  candidates (`blog_candidate: true`). A repo's own `docs/` holds investigations specific to that repo's own subject
+  memory about the owner: personal facts, the owner's own learnings,
+  and article-idea candidates (`blog_candidate: true`). Pitfalls Claude
+  Code finds while working go to rules instead (see global CLAUDE.md;
+  decision record: `ops/memory/cc-memory-curation-decisions.md`).
+  A repo's own `docs/` holds investigations specific to that repo's own subject
   matter (e.g. `docs/turso-investigation.md` here), separate from
   cc-memory's personal-knowledge scope. One store per finding — don't
   duplicate across them.
