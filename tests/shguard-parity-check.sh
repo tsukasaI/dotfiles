@@ -306,8 +306,7 @@ case_ "gh api -X Delete"                 'gh api -X Delete repos/a/b'          d
 # claude-code/settings.json's PreToolUse/Bash hook sets SHGUARD_STRICT_CONFIG=1
 # so a missing/malformed config denies instead of asking (shguard#440/#441).
 # PATH-miss/crash (the other half of #440) can't be exercised through the
-# shguard binary itself, and settings.json runs bare `shguard` with no
-# wrapper, so that path is currently uncovered (see
+# shguard binary itself; settings.json's `shguard || exit 2` covers it (see
 # docs/shguard-migration-deltas.md #26).
 total=$((total + 1))
 bad_config=$(mktemp "${TMPDIR:-/tmp}/shguard-parity.XXXXXX") || {

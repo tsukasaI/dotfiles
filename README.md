@@ -98,13 +98,13 @@ claude-code/
 ### How the hook works
 
 `claude-code/settings.json`'s `PreToolUse`/`Bash` hook calls the `shguard` binary directly
-(bare `shguard` command, no wrapper script), with `SHGUARD_STRICT_CONFIG=1` set in the
+(`shguard || exit 2`, no wrapper script), with `SHGUARD_STRICT_CONFIG=1` set in the
 `env` block so a missing or malformed config denies instead of asking. `shguard` evaluates
 the command against `claude-code/shguard/config.toml` (resolved via the
 `~/.config/shguard/config.toml` symlink `setup.sh` creates) and its own built-in rules, and
-returns `allow`, `ask`, or `deny`. There is no fail-closed wrapper for the PATH-miss/crash
-case: if `shguard` itself can't be found or crashes, empty output reads as an implicit
-allow (tracked as an accepted residual risk in `docs/shguard-migration-deltas.md` gap #26).
+returns `allow`, `ask`, or `deny`. If `shguard` itself can't be found or crashes, `|| exit 2`
+blocks the call instead of letting empty output read as an implicit allow
+(`docs/shguard-migration-deltas.md` gap #26).
 
 ### Managing the ruleset
 

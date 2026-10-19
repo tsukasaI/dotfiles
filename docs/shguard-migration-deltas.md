@@ -2,8 +2,9 @@
 
 **Cutover complete (2026-09-06).** `block-dangerous.sh` (plus
 `blocklist.conf`/`allowlist.conf`) is deleted. `shguard`, invoked directly
-from `claude-code/settings.json`'s PreToolUse/Bash hook (inline command,
-`SHGUARD_STRICT_CONFIG=1`, no wrapper script), is now the sole enforcer.
+from `claude-code/settings.json`'s PreToolUse/Bash hook (inline command
+`shguard || exit 2`, `SHGUARD_STRICT_CONFIG=1`, no wrapper script), is now
+the sole enforcer.
 This file stays as the historical record of every place shguard's behavior
 was found not to reproduce `block-dangerous.sh` exactly, per
 `claude-code/rules/security.md`'s "a weakened control must be visible, not
@@ -55,7 +56,7 @@ weakening, documented so it isn't mistaken for a bug later.
 | 23 | curl userinfo-URL bypass (`localhost:` as userinfo, not port) + rsync bare-relative-path over-block | **userinfo bypass resolved** (`url_host` matcher replaces `exact`/`prefix` in `except_targets`, fable-reviewed 2026-08-24 — pending manual apply, `config.toml` is Claude-edit-blocked); rsync sub-gap still friction only, not fixable from `config.toml` | [shguard#147](https://github.com/tsukasaI/shguard/issues/147) open upstream (P2, real fix path via `url_host` now exists — this repo just needs to apply it); rsync sub-gap not filed |
 | 24 | `if`/background job (`&`)/`[[ ]]`/`!` hit the same parse-failure-bypasses-rule-engine path as #20 — #75's fix didn't cover them | **resolved** — confirmed both by the closed ticket and live: zero "unsupported construct" parse failures in the shadow log (`~/.local/share/shguard-shadow/shadow.jsonl`) since the 2026-08-23 `darwin-rebuild switch` onto shguard 0.6.0, vs. 5+ occurrences of "if clause" alone before that switch | [shguard#191](https://github.com/tsukasaI/shguard/issues/191) closed 2026-08-15 |
 | 25 | curl glued proxy flag (`-xhttp://evil.com`) bypasses the localhost-only rule entirely | **resolved** — `attached_value_flags = ["x"]` applied | [dotfiles#49](https://github.com/tsukasaI/dotfiles/issues/49) fixed, pending manual close |
-| 26 | Caller must wrap the binary to fail closed: PATH-miss/crash yields empty stdout (read as allow); missing/malformed config yielded `ask` not `deny` | **config-load half resolved**: `SHGUARD_STRICT_CONFIG=1` is now set in `claude-code/settings.json`'s `env` block, making config-load failure `deny`, confirmed live 2026-09-05 on v0.6.4. **PATH-miss/crash half stays open, accepted as residual risk**: the PreToolUse `command` in `settings.json` is a bare `shguard` invocation with no caller-side wrapper, so a PATH-miss or crash still yields empty stdout, read as an implicit allow. Per upstream, "the caller-side wrapper every hook registration needs regardless of this new variable" would have to live in `settings.json` itself; none was added | [shguard#440](https://github.com/tsukasaI/shguard/issues/440) closed via [shguard#441](https://github.com/tsukasaI/shguard/pull/441); PATH-miss/crash half not filed, tracked here only |
+| 26 | Caller must wrap the binary to fail closed: PATH-miss/crash yields empty stdout (read as allow); missing/malformed config yielded `ask` not `deny` | **resolved**: config-load half via `SHGUARD_STRICT_CONFIG=1` in `claude-code/settings.json`'s `env` block, making config-load failure `deny`, confirmed live 2026-09-05 on v0.6.4. PATH-miss/crash half via the caller-side wrapper upstream asked for, inline in `settings.json`: the PreToolUse `command` is `shguard || exit 2`, so a missing binary or a crash exits 2 (block) instead of yielding empty stdout | [shguard#440](https://github.com/tsukasaI/shguard/issues/440) closed via [shguard#441](https://github.com/tsukasaI/shguard/pull/441); PATH-miss/crash half not filed, closed in `settings.json` |
 
 ## Cutover caveat: `ask` is not a real control under `bypassPermissions`
 

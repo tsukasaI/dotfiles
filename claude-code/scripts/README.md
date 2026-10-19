@@ -58,7 +58,7 @@ bash claude-code/scripts/push-to-turso.sh
 
 1. ローカル DB の **WAL 整合スナップショット**を取得（`.backup`）。hook の追記とレースしない。
 2. Turso にスキーマを用意（`CREATE TABLE IF NOT EXISTS`、ローカルと同一カラム）。
-3. スナップショットの全行を `INSERT OR IGNORE` で送信。INSERT文は SQL の `quote()` 関数で
+3. スナップショットの全行を UPSERT（`INSERT ... ON CONFLICT DO UPDATE`）で送信。INSERT文は SQL の `quote()` 関数で
    自前生成するため、複数行・制御文字を含む transcript 本文も libSQL 互換で安全に送れる
    （`turso db shell` は `.bail`/atomicなBEGIN-COMMIT/`unistr()` を扱えないため、これらに依存しない）。
 4. **削除ゲート**＝送信が成功（exit 0）**かつ**、スナップショットの `session_id` に限定した
@@ -73,10 +73,12 @@ bash claude-code/scripts/push-to-turso.sh
 
 ### 冪等性についての注意
 
-INSERT文を `quote()` で自前生成しているため `INSERT OR IGNORE` を安全に使える。
-`turso db shell` は各文を自動コミットする（`BEGIN/COMMIT` がアトミックにならない）が、
-`OR IGNORE` のおかげで**途中で失敗しても、原因を直して再実行すれば既存行はスキップされ残りだけ送られる**
-（再実行で冪等）。削除はスナップショット限定の件数照合ゲートを通過した場合のみ行う。
+`turso db shell` は各文を自動コミットする（`BEGIN/COMMIT` がアトミックにならない）。
+各 INSERT は、受け取った行が Turso 側の既存行と同じかより新しい場合にだけ更新する UPSERT である
+（`sessions` は `ended_at`、`transcript_raw` は `size_bytes` で比較、`session_days` は `message_count` の大きい方）。
+このため**途中で失敗しても、原因を直して再実行すれば同じ結果に収束する**（再実行で冪等）。
+再開したセッションの長い transcript は Turso 側の古いコピーを置き換え、古いローカル行が新しいリモート行を上書きすることはない。
+削除はスナップショット限定の件数照合ゲートを通過した場合のみ行う。
 
 ## Turso のデータにアクセスする（分析・閲覧）
 
