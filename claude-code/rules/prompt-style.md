@@ -2,8 +2,8 @@
 paths:
   - "**/CLAUDE.md"
   - "**/SKILL.md"
-  - "claude-code/rules/*.md"
-  - "claude-code/agents/*.md"
+  - "**/rules/*.md"
+  - "**/agents/*.md"
 ---
 
 # Prompt style
