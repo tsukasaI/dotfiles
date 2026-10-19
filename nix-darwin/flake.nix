@@ -228,6 +228,9 @@
       ];
 
       nix.settings.experimental-features = "nix-command flakes";
+      # Not darwin's default `false`: the Claude Code sandbox may reach the
+      # nix daemon socket, and an unsandboxed builder would be its way out.
+      nix.settings.sandbox = true;
       # Store hygiene (issue #12): without these the Nix store grows
       # unbounded — nothing here ever reclaims old generations/derivations.
       nix.optimise.automatic = true;

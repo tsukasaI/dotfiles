@@ -57,12 +57,13 @@
       "Bash(git show:*)",
       "Bash(git branch:*)",
       "Bash(git ls-files:*)",
+      "mcp__cc-memory__get_last_retro",
+      "mcp__cc-memory__list_facts",
+      "mcp__cc-memory__process_inbox",
+      "mcp__cc-memory__record_retro_run",
       "mcp__claude_ai_cc-memory__get_last_retro",
       "mcp__claude_ai_cc-memory__list_facts",
       "mcp__claude_ai_cc-memory__process_inbox",
-      "mcp__claude_ai_cc-memory__edit_fact",
-      "mcp__claude_ai_cc-memory__delete_fact",
-      "mcp__claude_ai_cc-memory__update_hot_facts",
       "mcp__claude_ai_cc-memory__record_retro_run",
       "mcp__claude_ai_staygreen__*"
     ],
@@ -222,12 +223,14 @@
       "strictAllowlist": true,
       "allowUnixSockets": [
         "~/.gnupg/S.gpg-agent",
-        "~/.gnupg/S.keyboxd"
+        "~/.gnupg/S.keyboxd",
+        "/nix/var/nix/daemon-socket/socket"
       ]
     },
     "filesystem": {
       "allowWrite": [
-        "~/.cache/claude-sandbox"
+        "~/.cache/claude-sandbox",
+        "~/.cache/nix"
       ],
       "denyWrite": [
         "~/dotfiles/lefthook.yaml",
@@ -324,8 +327,7 @@
     ],
     "soft_deny": [
       "$defaults",
-      "Deleting a GitHub repo (`gh repo delete`) [named+specifics — **must name:** the exact repo to delete] — destructive and outward-facing, confirm the exact target before executing",
-      "`gh pr merge`, including `--auto` [named+specifics — **must name:** merging that PR] — supersedes the default Merge Without Review rule's `--auto`-on-branch-protection exemption: even `gh pr merge --auto` on a branch-protected repo requires the user to explicitly instruct the merge, even once review is complete"
+      "Deleting a GitHub repo (`gh repo delete`) [named+specifics — **must name:** the exact repo to delete] — destructive and outward-facing, confirm the exact target before executing"
     ],
     "hard_deny": [
       "$defaults",

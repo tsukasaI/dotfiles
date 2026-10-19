@@ -18,7 +18,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 | Path | What it is |
 |---|---|
 | `nix-darwin/flake.nix` | Source of truth for packages, Homebrew, and macOS defaults. Single host config; `system.primaryUser` must equal `whoami`. |
-| `claude-code/` | The user's **global** Claude Code config. Symlinked by `setup.sh`: `CLAUDE.md`, `settings.json`, `rules/`, `skills/`, `agents/`, `themes/` into `~/.claude/`, and `shguard/config.toml` into `~/.config/shguard/` (the path shguard reads). Referenced from `settings.json` by absolute `$HOME/dotfiles/...` path instead: `hooks/`, `statusline.ts` (`~/.claude/hooks` is herdr's own directory), and `mod/` (the `dotfiles-mod` plugin, via `env.CLAUDE_CODE_PLUGIN_DIRS`; see `hooks/README.md`). |
+| `claude-code/` | The user's **global** Claude Code config. Symlinked by `setup.sh`: `CLAUDE.md`, `settings.json`, `rules/`, `skills/`, `agents/`, `themes/` into `~/.claude/`, and `shguard/config.toml` into `~/.config/shguard/` (the path shguard reads). Referenced from `settings.json` by `$HOME/dotfiles/...` (`~/dotfiles/...` for `mod/`) path instead: `hooks/`, `statusline.ts` (`~/.claude/hooks` is herdr's own directory), and `mod/` (the `dotfiles-mod` plugin, via `env.CLAUDE_CODE_PLUGIN_DIRS`; see `hooks/README.md`). |
 | `.claude/` | Project-scoped Claude state for *this repo only* (plans, memory, local settings, skills, rules, worktrees). Not the same thing as `claude-code/`. |
 | `nvim/` | lazy.nvim: a plugin's keymaps live inside its own spec in `lua/plugins/`, not in `init.lua`. |
 | `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks (see Pitfalls). |
@@ -31,10 +31,16 @@ There is no staging or deploy step (hooks apply on the next tool call,
 
 - Apply system config: `sudo darwin-rebuild switch --flake ~/dotfiles/nix-darwin`
   (flake output resolved by hostname; macOS `defaults` changes need logout).
-- Verify a flake change without activating: `darwin-rebuild build --flake ~/dotfiles/nix-darwin`.
-  It needs the nix daemon socket, which the Bash sandbox blocks, and
-  `sandbox.allowUnsandboxedCommands` is `false`, so Claude can't run it or
-  `nix build`: ask the user to run them with `!`.
+- Verify a flake change without activating:
+  `darwin-rebuild build --flake ~/dotfiles/nix-darwin#Ino-macbook-air`.
+  Claude can run it (and `nix build`) in the Bash sandbox: `settings.json`
+  allows the nix daemon socket and `~/.cache/nix`. Name the host explicitly,
+  because the sandbox sees the LocalHostName `MacBook-Air` and hostname
+  resolution fails. That access relies on `nix.settings.sandbox = true` in
+  `flake.nix`: never set it to `false` or `relaxed`, because an unsandboxed
+  builder (or `__noChroot`) is a way out of the Bash sandbox. Accepted
+  residual risk: fixed-output derivations still get network access, a
+  channel around the sandbox proxy allowlist.
 - Update flake inputs: `nix flake update` (in `nix-darwin/`), then
   `darwin-rebuild switch` to activate.
 - Test a hook change with a synthetic payload:
