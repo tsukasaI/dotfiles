@@ -595,18 +595,10 @@ required_tokens = ["restore"]
 
 [[deny]]
 id = "dotfiles-git-rm"
-reason = "git rm removes tracked files"
+reason = "git rm -f/--force removes tracked files even when they have uncommitted changes"
 command = "git"
 required_tokens = ["rm"]
-
-# Built-in git-branch-force-delete only covers -D; this adds the safe-looking
-# -d/--delete forms to match the old hook's full strictness.
-[[deny]]
-id = "dotfiles-git-branch-delete-safe"
-reason = "git branch -d/--delete deletes a branch"
-command = "git"
-required_tokens = ["branch"]
-required_flags = ["d|--delete"]
+required_flags = ["f|--force"]
 
 # Remote and config edits redirect where an unsandboxed push/fetch goes or
 # what it runs. Read forms (git remote -v/get-url, git config <key> reads of

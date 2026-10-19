@@ -173,9 +173,16 @@ case_ "rsync to remote host"             'rsync -a ./src/ user@host:/backup/'  d
 case_ "rsync bare relative path (no ./ prefix)" 'rsync -a src/ dst/'           deny "delta#23 rsync bare-relative-path over-block, friction not a security hole"
 case_ "cat secrets.yaml"                 'cat secrets.yaml'                    allow "delta#9 secret-reader extension-suffix, pre-existing hole not covered by normalized_basename"
 case_ "git tag --delete"                 'git tag --delete v1.0'               deny
-case_ "git branch --delete"              'git branch --delete feature-x'       deny
+case_ "git branch --delete"              'git branch --delete feature-x'       allow
 case_ "git tag -d"                       'git tag -d v1.0'                     deny
-case_ "git branch -d"                    'git branch -d feature-x'             deny
+case_ "git branch -d"                    'git branch -d feature-x'             allow
+case_ "git branch -D"                    'git branch -D feature-x'             deny
+case_ "git branch -d -f"                 'git branch -d -f feature-x'          deny
+case_ "git rm"                           'git rm foo'                          allow
+case_ "git rm --cached"                  'git rm --cached foo'                 allow
+case_ "git rm -f"                        'git rm -f foo'                       deny
+case_ "git rm --force"                   'git rm --force foo'                  deny
+case_ "git rm -rf"                       'git rm -rf dir'                      deny
 
 # ── pre-commit bypass (--no-verify / git commit -n) ──────────────────────────
 case_ "git commit --no-verify"           'git commit --no-verify -m "x"'       deny
