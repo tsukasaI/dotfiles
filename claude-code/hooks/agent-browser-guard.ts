@@ -27,6 +27,9 @@ const FORBIDDEN_KEYS = new Set([
 ]);
 const PATH_KEYS = new Set(["path", "output", "baseline"]);
 const URL_KEYS = new Set(["url", "url1", "url2"]);
+// namespace is in FORBIDDEN_KEYS and never reaches this check.
+const NAME_KEYS = new Set(["session"]);
+const SAFE_NAME = /^[\w-]+$/;
 // Not a closed key allowlist per tool: agent-browser is pre-1.0 and churns its
 // schema, so instead any unvetted key that looks like a filesystem or launch
 // control fails closed until it is reviewed and added to PATH_KEYS.
@@ -88,6 +91,11 @@ function checkUrl(key: string, value: unknown): string | null {
   return null;
 }
 
+function checkName(key: string, value: unknown): string | null {
+  if (typeof value !== "string" || !SAFE_NAME.test(value)) return `${PREFIX}${key} must match [A-Za-z0-9_-]+`;
+  return null;
+}
+
 function hasFileScheme(v: unknown, depth = 0): boolean {
   if (depth > 8) return true;
   if (typeof v === "string") return /^file:/i.test(v.trim());
@@ -113,6 +121,7 @@ export function decide(payload: unknown): string | null {
     let verdict: string | null = null;
     if (PATH_KEYS.has(key)) verdict = checkPath(key, value);
     else if (URL_KEYS.has(key)) verdict = checkUrl(key, value);
+    else if (NAME_KEYS.has(key)) verdict = checkName(key, value);
     else if (SUSPICIOUS_KEY.test(key)) verdict = `${PREFIX}argument "${key}" is not vetted`;
     else if (hasFileScheme(value)) verdict = `${PREFIX}${key} contains a file: URL`;
     if (verdict) return verdict;

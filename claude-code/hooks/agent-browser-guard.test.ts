@@ -33,6 +33,8 @@ describe("allows", () => {
   test("vitals localhost", () => expect(decide(call("vitals", { url: "http://localhost:3000" }))).toBeNull());
   test("scroll direction is not a directory key", () =>
     expect(decide(call("scroll", { direction: "down", amount: 300 }))).toBeNull());
+  test.each(["work", "my-session_2", "A1"])("session name %s", (session) =>
+    expect(decide(call("snapshot", { session }))).toBeNull());
   test("screenshot path under the allowed root", () => {
     if (!tmp) return;
     expect(decide(call("screenshot", { path: join(tmp, "x", "a.png") }))).toBeNull();
@@ -48,7 +50,10 @@ describe("denies", () => {
     "forbidden key %s",
     (key) => expect(decide(call("snapshot", { [key]: key === "extraArgs" ? [] : true }))).toContain("forbidden"),
   );
-  test("restore true", () => expect(decide(call("open", { restore: true }))).not.toBeNull());
+  test.each(["../x", "a/b", "/abs", "..", "a b", "a.b", "", "x\0", "a\\b"])("session %j", (session) =>
+    expect(decide(call("snapshot", { session }))).toContain("session must match"));
+  test("non-string session", () => expect(decide(call("snapshot", { session: 5 }))).toContain("session must match"));
+  test("restore true",() => expect(decide(call("open", { restore: true }))).not.toBeNull());
   for (const key of ["outputDir", "userDataDir", "executablePath", "profile", "downloadDirectory", "certFile"]) {
     test(`unvetted filesystem-like key ${key}`, () =>
       expect(decide(call("open", { [key]: "/x" }))).toContain("not vetted"));
