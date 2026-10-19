@@ -48,6 +48,24 @@ export const REDACTIONS: Array<[RegExp, string]> = [
   [new RegExp(`${B}[rs]k_(?:live|test)_[A-Za-z0-9]{16,}`, "g"), "[REDACTED:stripe-key]"],
   [new RegExp(`${B}npm_[A-Za-z0-9]{36}\\b`, "g"), "[REDACTED:npm-token]"],
   [new RegExp(`${B}glpat-[A-Za-z0-9_-]{20,}`, "g"), "[REDACTED:gitlab-token]"],
+  [new RegExp(`${B}hf_[A-Za-z0-9]{30,}`, "g"), "[REDACTED:huggingface-token]"],
+  [new RegExp(`${B}GOCSPX-[A-Za-z0-9_-]{20,}`, "g"), "[REDACTED:google-oauth-secret]"],
+  [new RegExp(`${B}ya29\\.[A-Za-z0-9_-]{20,}`, "g"), "[REDACTED:google-access-token]"],
+  [new RegExp(`${B}dop_v1_[a-f0-9]{64}\\b`, "g"), "[REDACTED:digitalocean-token]"],
+  [new RegExp(`${B}SG\\.[A-Za-z0-9_-]{16,}\\.[A-Za-z0-9_-]{16,}`, "g"), "[REDACTED:sendgrid-key]"],
+  [
+    // Separate from the PEM rule above: the armor line ends "KEY BLOCK-----",
+    // which `PRIVATE KEY-----` cannot match. Same bounded span and per-string
+    // application as that rule.
+    /-----BEGIN PGP PRIVATE KEY BLOCK-----[\s\S]{0,16384}?-----END PGP PRIVATE KEY BLOCK-----/g,
+    "[REDACTED:pgp-private-key]",
+  ],
+  [
+    // Only the credential is masked; the header name stays so the transcript
+    // still shows that a Basic header was sent.
+    new RegExp(`${B}(Authorization:\\s*Basic\\s+)[A-Za-z0-9+/]{8,}={0,2}`, "gi"),
+    "$1[REDACTED:basic-auth]",
+  ],
   [
     // The secret key has no prefix of its own, so only the assignment form is
     // recognizable. Quote/backslash runs are allowed around the separator

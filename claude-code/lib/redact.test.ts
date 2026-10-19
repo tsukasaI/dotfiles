@@ -8,6 +8,8 @@ const a = (n: number) => "a".repeat(n);
 // not flag these fake credentials as literals.
 const BEGIN = (kind = "") => `-----BEGIN ${kind}${"PRIVATE"} KEY-----`;
 const END = (kind = "") => `-----END ${kind}${"PRIVATE"} KEY-----`;
+const PGP_BEGIN = `-----BEGIN PGP ${"PRIVATE"} KEY BLOCK-----`;
+const PGP_END = `-----END PGP ${"PRIVATE"} KEY BLOCK-----`;
 const SAMPLES: Record<string, { token: string; stays?: string }> = {
   "[REDACTED:private-key]": {
     token: `${BEGIN("RSA ")}\nMIIEpAIBAAKCAQEA\nabc\n${END("RSA ")}`,
@@ -23,6 +25,18 @@ const SAMPLES: Record<string, { token: string; stays?: string }> = {
   "[REDACTED:stripe-key]": { token: `sk_live_${a(20)}` },
   "[REDACTED:npm-token]": { token: `npm_${a(36)}` },
   "[REDACTED:gitlab-token]": { token: `glpat-${a(24)}` },
+  "[REDACTED:huggingface-token]": { token: `hf_${a(34)}` },
+  "[REDACTED:google-oauth-secret]": { token: `GOCSPX-${a(24)}` },
+  "[REDACTED:google-access-token]": { token: `ya29.${a(24)}` },
+  "[REDACTED:digitalocean-token]": { token: `dop_v1_${a(64)}` },
+  "[REDACTED:sendgrid-key]": { token: `SG.${a(22)}.${a(22)}` },
+  "[REDACTED:pgp-private-key]": {
+    token: `${PGP_BEGIN}\nlQOYBGabc\nxyz\n${PGP_END}`,
+  },
+  "[REDACTED:basic-auth]": {
+    token: `Authorization: Basic ${a(24)}`,
+    stays: "Authorization: Basic ",
+  },
   "[REDACTED:aws-secret-key]": {
     token: `aws_secret_access_key=${a(40)}`,
     stays: "aws_secret_access_key=",
@@ -43,6 +57,10 @@ function secretOf(label: string): string {
       return "hunter2";
     case "[REDACTED:private-key]":
       return "MIIEpAIBAAKCAQEA";
+    case "[REDACTED:pgp-private-key]":
+      return "lQOYBGabc";
+    case "[REDACTED:basic-auth]":
+      return a(24);
     default:
       return SAMPLES[label]!.token;
   }
@@ -163,8 +181,18 @@ describe("redactTranscript structure", () => {
     expect(out).not.toContain("[REDACTED:private-key]");
   });
 
+  test("a PGP block is not mistaken for a PEM key and spans real newlines", () => {
+    const out = redactTranscript(JSON.stringify({ c: `x\n${PGP_BEGIN}\nlQOYBGabc\n${PGP_END}\ny` }));
+    expect(JSON.parse(out).c).toBe("x\n[REDACTED:pgp-private-key]\ny");
+  });
+
+  test("Basic header is case-insensitive and keeps the header name", () => {
+    const out = redactTranscript(JSON.stringify({ c: `curl -H "authorization: basic ${a(24)}=="` }));
+    expect(JSON.parse(out).c).toBe('curl -H "authorization: basic [REDACTED:basic-auth]"');
+  });
+
   test("ordinary text is untouched", () => {
-    const s = JSON.stringify({ c: "see task-list and risk-averse, sk-short, ghp_short" });
+    const s = JSON.stringify({ c: "see task-list and risk-averse, sk-short, ghp_short, hf_short, SG.a.b, Authorization: Basic x" });
     expect(redactTranscript(s)).toBe(s);
   });
 
