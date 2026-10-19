@@ -243,6 +243,19 @@
         interval = { Weekday = 0; Hour = 3; Minute = 15; };
         options = "--delete-older-than 30d";
       };
+      # Start gpg-agent/keyboxd at login. When the first gpg call of a login
+      # comes from the Claude Code Bash sandbox, gpg cannot spawn them (the
+      # spawn dotlock lives in the write-denied ~/.gnupg), so signed commits
+      # fail until something outside the sandbox launches them.
+      launchd.user.agents.gnupg-daemons = {
+        # Not an `a && b` command string: nix-darwin prefixes it with `exec`,
+        # which would end the shell before the second launch.
+        command = "${pkgs.writeShellScript "gnupg-launch-daemons" ''
+          ${pkgs.gnupg}/bin/gpgconf --launch gpg-agent
+          ${pkgs.gnupg}/bin/gpgconf --launch keyboxd
+        ''}";
+        serviceConfig.RunAtLoad = true;
+      };
       system.primaryUser = primaryUser;
       system.stateVersion = 5;
       nixpkgs.hostPlatform = system;
