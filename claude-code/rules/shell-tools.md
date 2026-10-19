@@ -21,8 +21,11 @@ shguard can't introspect a bare inline script, and can't rule out an
 unresolved `$VAR` expanding to a dangerous value anywhere in argv; both
 block outright (`ask_outcome` floors every ask to deny). `$TMPDIR` and
 `$HOME` are the exception: the `dotfiles-mod` plugin rewrites them to
-literal paths before shguard sees the command (not inside single quotes, a
-heredoc, or `$(...)`). Prefer the form shguard can verify statically:
+literal paths before shguard sees the command (not inside single quotes;
+any heredoc/here-string, `$(...)`, backquote, or `HOME=`/`TMPDIR=`
+assignment anywhere in the command disables the rewrite for the whole
+command). Prefer the form shguard can
+verify statically:
 
 - `awk '{ ... }' file`: write the script to a file at a literal path (a
   relative `./script.awk` or an absolute path, not `-`/process

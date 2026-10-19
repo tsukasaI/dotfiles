@@ -3,6 +3,8 @@ import type { EngineInterface, On } from 'claude-code'
 // Values safe to splice into a command unquoted or inside double quotes.
 const SAFE_VALUE = /^[A-Za-z0-9/._-]+$/
 const VAR = /^\$(?:\{(TMPDIR|HOME)\}|(TMPDIR|HOME)(?![A-Za-z0-9_]))/
+// Also matches after export/declare/env, which end in whitespace before the name.
+const ASSIGNS_VAR = /(?:^|[\s;&|(])(?:TMPDIR|HOME)\+?=/
 
 export type CanonVars = { TMPDIR?: string; HOME?: string }
 
@@ -12,11 +14,13 @@ export type CanonVars = { TMPDIR?: string; HOME?: string }
  * the command unchanged whenever the rewrite might not be meaning-preserving:
  * a heredoc (its body's quoting rules differ), a command substitution or
  * backquote (quoting restarts inside it, which this linear scan doesn't
- * model), or an unsafe value. A variable inside single quotes or after a
- * backslash is left as written.
+ * model), an assignment to HOME or TMPDIR (a later `$HOME` no longer means
+ * the value resolved here), or an unsafe value. A variable inside single
+ * quotes or after a backslash is left as written.
  */
 export function canonicalize(command: string, vars: CanonVars): string {
   if (command.includes('<<') || command.includes('$(') || command.includes('`')) return command
+  if (ASSIGNS_VAR.test(command)) return command
   for (const value of Object.values(vars)) {
     if (value !== undefined && !SAFE_VALUE.test(value)) return command
   }

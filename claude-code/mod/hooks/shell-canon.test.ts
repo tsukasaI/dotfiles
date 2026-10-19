@@ -10,6 +10,7 @@ test('rewrites unquoted and double-quoted variables', async () => {
     ['cat "${TMPDIR}/a b"', 'cat "/private/tmp/claude-501/a b"'],
     ['cd $HOME && ls', 'cd /Users/me && ls'],
     ['gh pr create --body-file $TMPDIR/body.md', 'gh pr create --body-file /private/tmp/claude-501/body.md'],
+    ['MYHOME=1 ls $HOME', 'MYHOME=1 ls /Users/me'],
   ]
   for (const [input, want] of cases) expect(canonicalize(input, VARS)).toBe(want)
 })
@@ -24,6 +25,20 @@ test('leaves the command alone where the rewrite could change meaning', async ()
     "echo \"$(printf '%s' '$HOME')\"",
     'echo `echo $HOME`',
     'echo $USER',
+  ]
+  for (const input of unchanged) expect(canonicalize(input, VARS)).toBe(input)
+})
+
+test('leaves the command alone when it assigns HOME or TMPDIR', async () => {
+  const unchanged = [
+    'HOME=/x ls $HOME',
+    'TMPDIR=/x cat $TMPDIR/f',
+    'export HOME=/x; ls $HOME',
+    'export -n TMPDIR=/x && ls $TMPDIR',
+    'declare -x HOME=/x && ls $HOME',
+    'env HOME=/x cat $HOME/f',
+    'cd /tmp && HOME+=/x ls $HOME',
+    'true | TMPDIR=/x ls $TMPDIR',
   ]
   for (const input of unchanged) expect(canonicalize(input, VARS)).toBe(input)
 })
