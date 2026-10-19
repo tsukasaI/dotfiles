@@ -3,7 +3,9 @@
 # Prevents Claude from weakening tool configs instead of fixing code.
 # exit 0 -> allow, exit 2 -> block (stderr is fed back to the model as the reason)
 
-set -euo pipefail
+# -E: without it the ERR trap below does not fire inside functions, and a
+# crash in check_path would exit with a non-2 status (= allow).
+set -Eeuo pipefail
 
 deny() {
   printf '[BLOCKED: %s] %s\n' "$1" "$2" >&2
@@ -26,6 +28,7 @@ esac
 
 # Not normalized here: the suffix globs below would miss `hooks/./x`, `hooks//x`
 # or `mod/../mod/x`, and realpath fails on files that don't exist yet (Write).
+# Symlinks are resolved separately, below.
 case "$FILE_PATH" in
   /*) ;;
   *) deny "PATH_FORM" "file_path must be absolute — failing closed" ;;
@@ -34,40 +37,9 @@ case "$FILE_PATH/" in
   *//* | */./* | */../*) deny "PATH_FORM" "file_path must be normalized (no //, ./ or ../ segments) — failing closed" ;;
 esac
 
-BASENAME=$(basename "$FILE_PATH")
-
-# Guardrail self-protection (#34, #70): the files that define these guardrails
-# must not be editable by the agent they police — otherwise a single Edit
-# can disarm every rule. Matched on the full path (not basename) so
-# same-named files in other projects stay editable. Both path forms are
-# covered: the repo path (claude-code/hooks/) and the deployed symlink path
-# (.claude/hooks/). Changing these files is a manual, human action.
-# Not all of claude-code/mod/: the band/pane modules stay editable by the
-# user's choice (#70). They also register tool.call hooks, so this is an
-# accepted risk, not a safe split.
-# Exception to full-path matching: lefthook config in any project (every
-# name/extension lefthook reads, plus its .lefthook*/ dirs), because git push
-# runs its pre-push hooks outside the Bash sandbox. Case-insensitive because
-# APFS is.
+# Case-insensitive throughout because APFS is: `.ESLINTRC` is the same file as
+# `.eslintrc`.
 shopt -s nocasematch
-case "$FILE_PATH" in
-  */.claude/hooks/block-config-edit.sh | \
-  */claude-code/hooks/* | \
-  */claude-code/mod/hooks/rule-guards.ts | \
-  */claude-code/mod/hooks/shell-canon.ts | \
-  */claude-code/mod/hooks/register.tsx | \
-  */claude-code/mod/hooks/hooks.json | \
-  */claude-code/mod/.claude-plugin/* | \
-  */claude-code/lib/* | \
-  */claude-code/shguard/config.toml | \
-  */.claude/shguard/config.toml | \
-  */.config/shguard/config.toml | \
-  */lefthook.* | */lefthook-local.* | */.lefthook*)
-    printf '[BLOCKED: GUARDRAIL_PROTECTION] "%s" defines the PreToolUse guardrails and must not be edited by Claude.\nAsk the user to apply the change manually (for shguard config.toml and this hook, the hooks-guardrails skill has the procedure).\n' "$BASENAME" >&2
-    exit 2
-    ;;
-esac
-shopt -u nocasematch
 
 # Protected config file patterns
 PROTECTED=(
@@ -95,17 +67,9 @@ PROTECTED=(
   '.rustfmt.toml'
   'clippy.toml'
   '.clippy.toml'
+  '.gitleaks.toml'
+  '.gitleaksignore'
 )
-
-for pattern in "${PROTECTED[@]}"; do
-  # shellcheck disable=SC2254
-  case "$BASENAME" in
-    $pattern)
-      printf '[BLOCKED: CONFIG_PROTECTION] Editing linter/formatter config "%s" is not allowed.\nFix the code to satisfy the tool, not the other way around.\n' "$BASENAME" >&2
-      exit 2
-      ;;
-  esac
-done
 
 # Package-manager lockfiles: tool-generated, hand-edits drift from what the
 # tool would produce and get silently clobbered on the next install —
@@ -120,28 +84,100 @@ LOCKFILES=(
   'go.sum'
 )
 
-for pattern in "${LOCKFILES[@]}"; do
-  # shellcheck disable=SC2254
-  case "$BASENAME" in
-    $pattern)
-      printf '[BLOCKED: LOCKFILE_PROTECTION] "%s" is tool-generated; run the tool instead of editing it directly (e.g. npm install, cargo build, go mod tidy).\n' "$BASENAME" >&2
+check_path() {
+  local path=$1 basename pattern content
+  basename=$(basename "$path")
+
+  # Guardrail self-protection (#34, #70): the files that define these guardrails
+  # must not be editable by the agent they police — otherwise a single Edit
+  # can disarm every rule. Matched on the full path (not basename) so
+  # same-named files in other projects stay editable. Both path forms are
+  # covered: the repo path (claude-code/hooks/) and the deployed symlink path
+  # (.claude/hooks/). Changing these files is a manual, human action.
+  # Not all of claude-code/mod/: the band/pane modules stay editable by the
+  # user's choice (#70). They also register tool.call hooks, so this is an
+  # accepted risk, not a safe split.
+  # Exception to full-path matching: lefthook config in any project (every
+  # name/extension lefthook reads, plus its .lefthook*/ dirs), because git push
+  # runs its pre-push hooks outside the Bash sandbox.
+  case "$path" in
+    */.claude/hooks/block-config-edit.sh | \
+    */claude-code/hooks/* | \
+    */claude-code/mod/hooks/rule-guards.ts | \
+    */claude-code/mod/hooks/shell-canon.ts | \
+    */claude-code/mod/hooks/register.tsx | \
+    */claude-code/mod/hooks/hooks.json | \
+    */claude-code/mod/.claude-plugin/* | \
+    */claude-code/lib/* | \
+    */claude-code/settings.json | \
+    */.claude/settings.json | \
+    */claude-code/shguard/config.toml | \
+    */.claude/shguard/config.toml | \
+    */.config/shguard/config.toml | \
+    */lefthook.* | */lefthook-local.* | */.lefthook*)
+      printf '[BLOCKED: GUARDRAIL_PROTECTION] "%s" defines the PreToolUse guardrails and must not be edited by Claude.\nAsk the user to apply the change manually (for shguard config.toml and this hook, the hooks-guardrails skill has the procedure).\n' "$basename" >&2
       exit 2
       ;;
   esac
-done
 
-# pyproject.toml is ruff's most common config location, but it also holds
-# unrelated project metadata (deps, build system, etc.) that legitimately
-# needs editing (#20) — so only protect it when a [tool.ruff] section is
-# actually present, not unconditionally like the dedicated ruff.toml files
-# above. A pyproject.toml that doesn't exist yet (new file via Write) has no
-# ruff config to protect, so it's allowed.
-if [[ "$BASENAME" == "pyproject.toml" && -f "$FILE_PATH" ]]; then
-  CONTENT=$(cat "$FILE_PATH" 2>/dev/null) || CONTENT=""
-  if [[ "$CONTENT" =~ \[tool\.ruff(\.|\]) ]]; then
-    printf '[BLOCKED: CONFIG_PROTECTION] "%s" contains a [tool.ruff] section; editing linter/formatter config is not allowed.\nFix the code to satisfy the tool, not the other way around.\n' "$BASENAME" >&2
-    exit 2
+  for pattern in "${PROTECTED[@]}"; do
+    # shellcheck disable=SC2254
+    case "$basename" in
+      $pattern)
+        printf '[BLOCKED: CONFIG_PROTECTION] Editing linter/formatter config "%s" is not allowed.\nFix the code to satisfy the tool, not the other way around.\n' "$basename" >&2
+        exit 2
+        ;;
+    esac
+  done
+
+  for pattern in "${LOCKFILES[@]}"; do
+    # shellcheck disable=SC2254
+    case "$basename" in
+      $pattern)
+        printf '[BLOCKED: LOCKFILE_PROTECTION] "%s" is tool-generated; run the tool instead of editing it directly (e.g. npm install, cargo build, go mod tidy).\n' "$basename" >&2
+        exit 2
+        ;;
+    esac
+  done
+
+  # pyproject.toml is ruff's most common config location, but it also holds
+  # unrelated project metadata (deps, build system, etc.) that legitimately
+  # needs editing (#20) — so only protect it when a [tool.ruff] section is
+  # actually present, not unconditionally like the dedicated ruff.toml files
+  # above. A pyproject.toml that doesn't exist yet (new file via Write) has no
+  # ruff config to protect, so it's allowed.
+  if [[ "$basename" == "pyproject.toml" && -f "$path" ]]; then
+    content=$(cat "$path" 2>/dev/null) || content=""
+    if [[ "$content" =~ \[tool\.ruff(\.|\]) ]]; then
+      printf '[BLOCKED: CONFIG_PROTECTION] "%s" contains a [tool.ruff] section; editing linter/formatter config is not allowed.\nFix the code to satisfy the tool, not the other way around.\n' "$basename" >&2
+      exit 2
+    fi
   fi
+}
+
+# Resolve symlinks in the nearest existing ancestor and re-append the not-yet-
+# existing tail, so a Write through a symlinked dir or file is judged by where
+# it lands. Not `realpath` on the whole path: it fails for files Write is about
+# to create. A dangling symlink is denied rather than resolved, since writing
+# through it creates its target.
+resolve_path() {
+  local probe=$1 tail="" real
+  while [[ ! -e "$probe" ]]; do
+    [[ -L "$probe" ]] && deny "SYMLINK" "\"$probe\" is a dangling symlink — failing closed"
+    tail="/${probe##*/}$tail"
+    probe=${probe%/*}
+    [[ -z "$probe" ]] && probe=/
+  done
+  command -v realpath >/dev/null 2>&1 || deny "INTERNAL_ERROR" "realpath not found — failing closed"
+  real=$(realpath "$probe") || deny "INTERNAL_ERROR" "realpath failed — failing closed"
+  [[ "$real" == / ]] && real=""
+  printf '%s%s\n' "$real" "$tail"
+}
+
+check_path "$FILE_PATH"
+RESOLVED=$(resolve_path "$FILE_PATH") || exit 2
+if [[ "$RESOLVED" != "$FILE_PATH" ]]; then
+  check_path "$RESOLVED"
 fi
 
 exit 0
