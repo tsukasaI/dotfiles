@@ -109,8 +109,10 @@ case_ "curl -K config-file url injection" 'curl -K /tmp/x.cfg http://localhost:3
 
 # ── gh api DELETE (#2) ───────────────────────────────────────────────────────
 case_ "gh api -X DELETE"                 'gh api -X DELETE repos/x/y'          deny
-case_ "gh api -XDELETE glued"            'gh api -XDELETE repos/x/y'           allow "delta#8 gh api chained-value, not expressible in current rule schema"
-case_ "gh api --method=delete"           'gh api --method=delete repos/x/y'    allow "delta#8 gh api chained-value, not expressible in current rule schema"
+case_ "gh api -XDELETE glued"            'gh api -XDELETE repos/x/y'           deny
+case_ "gh api --method=delete"           'gh api --method=delete repos/x/y'    deny
+case_ "gh api --method=DELETE"           'gh api repos/x/y --method=DELETE'    deny
+case_ "gh api -XPOST glued"              'gh api -XPOST repos/x/y/issues'      allow
 case_ "gh api quoted DELETE"             "gh api -X 'DELETE' repos/x/y"        deny
 case_ "gh api read"                      'gh api repos/x/y/pulls'              allow
 case_ "gh api POST (prompt gate)"        'gh api -X POST repos/x/y/issues -f title=t' allow
@@ -234,7 +236,8 @@ case_ "keychain find-generic-password"   'security find-generic-password -s othe
 case_ "keychain claude-factory item"     'security delete-generic-password -s claude-factory' deny
 case_ "keychain find-internet-password"  'security find-internet-password -s github.com -w' deny
 case_ "keychain dump-keychain -d"        'security dump-keychain -d'           deny "prints every item's secret"
-case_ "security list-keychains"          'security list-keychains'             allow
+case_ "security list-keychains"          'security list-keychains'             deny "blanket security rule"
+case_ "security export"                  'security export -k x.keychain'       deny
 case_ "bare pi"                          'pi --version'                        allow "no key in env without the wrapper"
 case_ "pi-factory in commit message"     'git commit -m "fix pi-factory claude-factory"' allow
 case_ "gh redirect into lefthook.yaml"   'gh api x > lefthook.yaml'            deny "redirects on excluded commands run unsandboxed"
@@ -293,6 +296,30 @@ case_ "python3 script"                   'python3 script.py'                   a
 case_ "tcsh script"                      'tcsh x.sh'                           deny
 case_ "diskutil eraseDisk"               'diskutil eraseDisk APFS x disk9'     deny
 case_ "diskutil list"                    'diskutil list'                       allow
+case_ "diskutil info device"             'diskutil info /dev/disk0'            allow
+case_ "diskutil unmount"                 'diskutil unmount disk2'              deny
+case_ "diskutil apfs deleteVolume"       'diskutil apfs deleteVolume disk3s1'  deny
+case_ "git remote add"                   'git remote add x https://example.com/r.git' deny
+case_ "git remote set-url"               'git remote set-url origin git@example.com:r.git' deny
+case_ "git remote rename"                'git remote rename origin o'          deny
+case_ "git remote -v"                    'git remote -v'                       allow
+case_ "git config core.hooksPath"        'git config core.hooksPath /tmp/h'    deny
+case_ "git config core.sshCommand"       'git config --add core.sshCommand x'  deny
+case_ "git config remote url"            'git config remote.origin.url x'      deny
+case_ "git config insteadOf"             'git config url.x.insteadOf y'        deny
+case_ "git config credential"            'git config credential.helper x'      deny
+case_ "git config includeIf"             'git config includeIf.gitdir:/x.path y' deny
+case_ "git config --global"              'git config --global user.name x'     deny
+case_ "git config -e"                    'git config -e'                       deny
+case_ "git config read email"            'git config user.email'               allow
+case_ "git config --get email"           'git config --get user.email'         allow
+case_ "gh ssh-key add"                   'gh ssh-key add k.pub'                deny
+case_ "gh gpg-key add"                   'gh gpg-key add k.asc'                deny
+case_ "gh repo archive"                  'gh repo archive a/b'                 deny
+case_ "gh repo rename"                   'gh repo rename x'                    deny
+case_ "gh release delete"                'gh release delete v1'                deny
+case_ "cat abs ssh key, case-folded"     'cat /USERS/inouetsukasa/.SSH/id_rsa' deny
+case_ "head tilde npmrc, case-folded"    'head ~/.NPMRC'                       deny
 case_ "kubectl get secret"               'kubectl get secret foo -o yaml'      deny
 case_ "kubectl get pods"                 'kubectl get pods'                    allow
 case_ "docker image push"                'docker image push x'                 deny

@@ -146,6 +146,19 @@ reason = "diskutil eraseVolume destroys all data on a volume"
 command = "diskutil"
 required_tokens = ["eraseVolume"]
 
+# The three erase rules above are now subsumed by this one; kept for their ids.
+# except_targets must cover every positional (a rule is excepted only when all
+# targets match), so the device-name forms are listed alongside list/info and
+# any other verb in the argv still denies.
+[[deny]]
+id = "dotfiles-disk-diskutil-mutating"
+reason = "diskutil verbs other than list/info repartition, unmount, erase or otherwise modify disks"
+command = "diskutil"
+except_targets = [
+  { exact = "list" }, { exact = "info" },
+  { prefix = "/dev/" }, { prefix = "disk" }, { exact = "/" }, { prefix = "/Volumes/" },
+]
+
 # =====================================================================
 # Network
 # =====================================================================
@@ -595,6 +608,49 @@ command = "git"
 required_tokens = ["branch"]
 required_flags = ["d|--delete"]
 
+# Remote and config edits redirect where an unsandboxed push/fetch goes or
+# what it runs. Read forms (git remote -v/get-url, git config <key> reads of
+# other keys) stay allowed. Key matching is case-sensitive (`prefix` has no
+# case_insensitive option, and git keys are case-insensitive), so only the
+# two common spellings of the hook/command keys are listed.
+[[deny]]
+id = "dotfiles-git-remote-add"
+reason = "git remote add registers a new push/fetch destination"
+command = "git"
+required_tokens = ["remote", "add"]
+
+[[deny]]
+id = "dotfiles-git-remote-set-url"
+reason = "git remote set-url repoints a remote at another destination"
+command = "git"
+required_tokens = ["remote", "set-url"]
+
+[[deny]]
+id = "dotfiles-git-remote-rename"
+reason = "git remote rename changes the remote that push/fetch rules and hooks name"
+command = "git"
+required_tokens = ["remote", "rename"]
+
+[[deny]]
+id = "dotfiles-git-config-dangerous-keys"
+reason = "git config of core.hooksPath/sshCommand/fsmonitor or remote.*/url.*/credential.*/include.* makes git run a chosen command or redirects its network target"
+command = "git"
+required_tokens = ["config"]
+targets = [
+  { prefix = "core.hooksPath" }, { prefix = "core.hookspath" },
+  { prefix = "core.sshCommand" }, { prefix = "core.sshcommand" },
+  { prefix = "core.fsmonitor" },
+  { prefix = "remote." }, { prefix = "url." }, { prefix = "credential." },
+  { prefix = "include." }, { prefix = "includeIf." }, { prefix = "includeif." },
+]
+
+[[deny]]
+id = "dotfiles-git-config-scope-edit"
+reason = "git config --global/--system/-e/--edit changes configuration shared beyond this repository"
+command = "git"
+required_tokens = ["config"]
+required_flags = ["--global|--system|e|--edit"]
+
 # =====================================================================
 # GitHub CLI destructive operations
 # =====================================================================
@@ -612,16 +668,46 @@ command = "gh"
 required_tokens = ["repo", "delete"]
 
 [[deny]]
+id = "dotfiles-github-repo-archive"
+reason = "gh repo archive makes a remote repository read-only"
+command = "gh"
+required_tokens = ["repo", "archive"]
+
+[[deny]]
+id = "dotfiles-github-repo-rename"
+reason = "gh repo rename breaks every clone URL and link to the repository"
+command = "gh"
+required_tokens = ["repo", "rename"]
+
+[[deny]]
 id = "dotfiles-github-release-create"
 reason = "gh release create publishes an outward-facing release (tag/notifications persist even if deleted)"
 command = "gh"
 required_tokens = ["release", "create"]
 
+[[deny]]
+id = "dotfiles-github-release-delete"
+reason = "gh release delete removes a published release"
+command = "gh"
+required_tokens = ["release", "delete"]
+
+[[deny]]
+id = "dotfiles-github-ssh-key-add"
+reason = "gh ssh-key add grants a key access to the GitHub account"
+command = "gh"
+required_tokens = ["ssh-key", "add"]
+
+[[deny]]
+id = "dotfiles-github-gpg-key-add"
+reason = "gh gpg-key add registers a signing key on the GitHub account"
+command = "gh"
+required_tokens = ["gpg-key", "add"]
+
 # Best-effort: catches DELETE/delete as a standalone token anywhere in argv
 # (position-independent via `targets`, so `-X DELETE`, `--method DELETE`, and
 # path-first orderings like `gh api repos/x/y -X DELETE` all match).
-# Does NOT catch --method=DELETE or -XDELETE (chained value) — see
-# docs/shguard-migration-deltas.md.
+# The attached forms (-XDELETE, --method=DELETE) are one flag token, so they
+# are matched by dotfiles-github-api-delete-attached below instead.
 [[deny]]
 id = "dotfiles-github-api-delete-upper"
 reason = "gh api -X DELETE / --method DELETE issues a destructive HTTP DELETE request"
@@ -644,6 +730,13 @@ reason = "gh api -X Delete / --method Delete issues a destructive HTTP DELETE re
 command = "gh"
 required_tokens = ["api"]
 targets = [{ exact = "Delete" }]
+
+[[deny]]
+id = "dotfiles-github-api-delete-attached"
+reason = "gh api -XDELETE / --method=DELETE issues a destructive HTTP DELETE request"
+command = "gh"
+required_tokens = ["api"]
+required_flags = ["-XDELETE|-Xdelete|-XDelete|--method=DELETE|--method=delete|--method=Delete"]
 
 # =====================================================================
 # History manipulation
@@ -747,6 +840,10 @@ command = "find"
 # extension-suffix patterns (*.pem, *.key, *.p12) aren't expressible here —
 # only common bare filenames/prefixes are covered. See
 # docs/shguard-migration-deltas.md.
+#
+# The trailing normalized_prefix entries fold case (APFS is case-insensitive)
+# and expand `~`, so they also match the absolute /Users/<me>/ spelling.
+# normalized_basename takes no case_insensitive option, so `.ENV` stays a gap.
 # =====================================================================
 
 [[deny]]
@@ -766,6 +863,14 @@ targets = [
     { prefix = ".aws/" }, { prefix = "~/.aws/" },
     { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
     { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
+    { normalized_prefix = "~/.ssh/", case_insensitive = true },
+    { normalized_prefix = "~/.aws/", case_insensitive = true },
+    { normalized_prefix = "~/.kube/config", case_insensitive = true },
+    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
+    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
+    { normalized_prefix = "~/.npmrc", case_insensitive = true },
+    { normalized_prefix = "~/.netrc", case_insensitive = true },
+    { normalized_prefix = "~/.pgpass", case_insensitive = true },
 ]
 
 [[deny]]
@@ -785,6 +890,14 @@ targets = [
     { prefix = ".aws/" }, { prefix = "~/.aws/" },
     { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
     { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
+    { normalized_prefix = "~/.ssh/", case_insensitive = true },
+    { normalized_prefix = "~/.aws/", case_insensitive = true },
+    { normalized_prefix = "~/.kube/config", case_insensitive = true },
+    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
+    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
+    { normalized_prefix = "~/.npmrc", case_insensitive = true },
+    { normalized_prefix = "~/.netrc", case_insensitive = true },
+    { normalized_prefix = "~/.pgpass", case_insensitive = true },
 ]
 
 [[deny]]
@@ -804,6 +917,14 @@ targets = [
     { prefix = ".aws/" }, { prefix = "~/.aws/" },
     { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
     { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
+    { normalized_prefix = "~/.ssh/", case_insensitive = true },
+    { normalized_prefix = "~/.aws/", case_insensitive = true },
+    { normalized_prefix = "~/.kube/config", case_insensitive = true },
+    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
+    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
+    { normalized_prefix = "~/.npmrc", case_insensitive = true },
+    { normalized_prefix = "~/.netrc", case_insensitive = true },
+    { normalized_prefix = "~/.pgpass", case_insensitive = true },
 ]
 
 [[deny]]
@@ -823,6 +944,14 @@ targets = [
     { prefix = ".aws/" }, { prefix = "~/.aws/" },
     { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
     { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
+    { normalized_prefix = "~/.ssh/", case_insensitive = true },
+    { normalized_prefix = "~/.aws/", case_insensitive = true },
+    { normalized_prefix = "~/.kube/config", case_insensitive = true },
+    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
+    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
+    { normalized_prefix = "~/.npmrc", case_insensitive = true },
+    { normalized_prefix = "~/.netrc", case_insensitive = true },
+    { normalized_prefix = "~/.pgpass", case_insensitive = true },
 ]
 
 [[deny]]
@@ -842,6 +971,14 @@ targets = [
     { prefix = ".aws/" }, { prefix = "~/.aws/" },
     { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
     { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
+    { normalized_prefix = "~/.ssh/", case_insensitive = true },
+    { normalized_prefix = "~/.aws/", case_insensitive = true },
+    { normalized_prefix = "~/.kube/config", case_insensitive = true },
+    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
+    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
+    { normalized_prefix = "~/.npmrc", case_insensitive = true },
+    { normalized_prefix = "~/.netrc", case_insensitive = true },
+    { normalized_prefix = "~/.pgpass", case_insensitive = true },
 ]
 
 [[deny]]
@@ -861,6 +998,14 @@ targets = [
     { prefix = ".aws/" }, { prefix = "~/.aws/" },
     { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
     { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
+    { normalized_prefix = "~/.ssh/", case_insensitive = true },
+    { normalized_prefix = "~/.aws/", case_insensitive = true },
+    { normalized_prefix = "~/.kube/config", case_insensitive = true },
+    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
+    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
+    { normalized_prefix = "~/.npmrc", case_insensitive = true },
+    { normalized_prefix = "~/.netrc", case_insensitive = true },
+    { normalized_prefix = "~/.pgpass", case_insensitive = true },
 ]
 
 [[deny]]
@@ -880,6 +1025,14 @@ targets = [
     { prefix = ".aws/" }, { prefix = "~/.aws/" },
     { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
     { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
+    { normalized_prefix = "~/.ssh/", case_insensitive = true },
+    { normalized_prefix = "~/.aws/", case_insensitive = true },
+    { normalized_prefix = "~/.kube/config", case_insensitive = true },
+    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
+    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
+    { normalized_prefix = "~/.npmrc", case_insensitive = true },
+    { normalized_prefix = "~/.netrc", case_insensitive = true },
+    { normalized_prefix = "~/.pgpass", case_insensitive = true },
 ]
 
 [[deny]]
@@ -899,6 +1052,14 @@ targets = [
     { prefix = ".aws/" }, { prefix = "~/.aws/" },
     { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
     { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
+    { normalized_prefix = "~/.ssh/", case_insensitive = true },
+    { normalized_prefix = "~/.aws/", case_insensitive = true },
+    { normalized_prefix = "~/.kube/config", case_insensitive = true },
+    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
+    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
+    { normalized_prefix = "~/.npmrc", case_insensitive = true },
+    { normalized_prefix = "~/.netrc", case_insensitive = true },
+    { normalized_prefix = "~/.pgpass", case_insensitive = true },
 ]
 
 [[deny]]
@@ -918,6 +1079,14 @@ targets = [
     { prefix = ".aws/" }, { prefix = "~/.aws/" },
     { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
     { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
+    { normalized_prefix = "~/.ssh/", case_insensitive = true },
+    { normalized_prefix = "~/.aws/", case_insensitive = true },
+    { normalized_prefix = "~/.kube/config", case_insensitive = true },
+    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
+    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
+    { normalized_prefix = "~/.npmrc", case_insensitive = true },
+    { normalized_prefix = "~/.netrc", case_insensitive = true },
+    { normalized_prefix = "~/.pgpass", case_insensitive = true },
 ]
 
 # =====================================================================
@@ -1383,26 +1552,9 @@ id = "dotfiles-pi-factory"
 reason = "pi-factory spends the factory API key; the user runs it (! pi-factory ...)"
 command = "pi-factory"
 
+# Blanket on purpose: the narrower find-generic-password/find-internet-password/
+# dump-keychain rules left export, add-*, delete-* and any future verb open.
 [[deny]]
-id = "dotfiles-keychain-find-generic-password"
-reason = "security find-generic-password can print Keychain secrets (e.g. the claude-factory API key)"
+id = "dotfiles-keychain-security"
+reason = "the security CLI reads and modifies Keychain items (e.g. the claude-factory API key); the sandbox lets it through without a prompt"
 command = "security"
-required_tokens = ["find-generic-password"]
-
-[[deny]]
-id = "dotfiles-keychain-claude-factory"
-reason = "the claude-factory Keychain item holds the factory API key and is user-only"
-command = "security"
-targets = [{ exact = "claude-factory" }]
-
-[[deny]]
-id = "dotfiles-keychain-find-internet-password"
-reason = "security find-internet-password can print Keychain secrets"
-command = "security"
-required_tokens = ["find-internet-password"]
-
-[[deny]]
-id = "dotfiles-keychain-dump-keychain"
-reason = "security dump-keychain lists every item and, with -d, prints their secrets"
-command = "security"
-required_tokens = ["dump-keychain"]
