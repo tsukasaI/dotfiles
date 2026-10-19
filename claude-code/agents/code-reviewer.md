@@ -19,5 +19,6 @@ Report every issue you find, including ones you are uncertain about or consider 
 
 Output format:
 - One entry per finding: file path and line number, severity (critical/high/medium/low), confidence (high/medium/low), and a specific fix — not just a description
+- For each medium/low finding, also a tier: `auto-fix` or `needs-decision`, by the criteria in the Review gate of the global CLAUDE.md; for `needs-decision`, name the criterion it failed
 - Order by severity
 - If no issues found, say so briefly

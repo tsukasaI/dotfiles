@@ -2,7 +2,7 @@
 name: mkgoal
 description: Builds a high-quality, verifiable /goal statement through a short slot-filling dialogue. Use when the user wants to start a Claude Code goal loop and needs the completion condition, verification command, constraints, and turn cap defined before running /goal. Also accepts one or more #<issue> references (typically handed off from /triage) to draft a single combined /goal statement covering all of them, reading each issue's Triage comment for its decided design, completion condition, and verification command. Claude may invoke it after /triage has finished, when the user asks to turn a triage group into a goal (e.g. "G1をgoalにして"), passing that group's issues as `#<N> ...` arguments. Not for running /goal itself, and never invoked from inside /triage or a subagent.
 argument-hint: [達成したいこと | #issue番号 ...]
-allowed-tools: Read, Grep, AskUserQuestion, Bash
+allowed-tools: Read, Grep, Glob, AskUserQuestion, Bash
 ---
 
 # /mkgoal — draft a verifiable /goal statement
@@ -73,13 +73,21 @@ of the statement as "(decided: <decision>)", so the implementer follows the
 call made in `/triage` instead of re-deciding it.
 
 Slot 3 (constraints) and slot 4 (turn cap) apply once, across the whole
-batch: ask a single turn cap covering all issues together (propose `5 ×
-number of issues` as the default), and ask once whether any constraint should
-hold across all of them (e.g. "no issue's change touches another issue's
-files"). When Triage comments carry `Scope`, offer "changes stay within
-<union of scopes>, shown via `git diff --stat` each turn" as one option;
-it is a candidate, never adopted without the user's answer. "None" is still
-a valid, explicit answer.
+batch: ask a single turn cap covering all issues together (propose `15 ×
+number of issues` as the default, with `30 × number of issues` as the other
+option), and ask once whether any constraint should hold across all of them
+(e.g. "no issue's change touches another issue's files"). Offer these
+candidates, none adopted without the user's answer:
+
+- When Triage comments carry `Scope`: "changes stay within <union of
+  scopes>, shown via `git diff --stat` each turn".
+- "no deleted lines under <test glob>, shown via `git diff --numstat --
+  <test glob>` each turn", which blocks weakening tests to pass. Infer
+  `<test glob>` with Glob from the repo's own test-file convention (e.g.
+  `**/*_test.go`, `tests/`); the option's description names the glob so
+  the user can confirm or correct it.
+
+"None" is still a valid, explicit answer.
 
 When not in issue mode, ignore this section entirely and follow Slots below
 exactly as written.
@@ -99,8 +107,10 @@ or not yet checkable.
    a valid answer, but it must be explicit — ask, never assume. Prefer
    constraints whose violation would be visible in the transcript (e.g. tie
    them to `git diff --stat` output shown each turn).
-4. **Turn cap** — a positive integer. If the user gave none, propose `5` and
-   get confirmation.
+4. **Turn cap** — a positive integer. If the user gave none, propose `15` and
+   get confirmation. One task takes about that many turns once implement,
+   PR, review, auto-fix, and re-review each use a turn and a retry or two
+   happens.
 
 *Done:* all 4 slots filled; slots 1–3 checkable or constraints explicitly "none".
 
@@ -127,7 +137,7 @@ incomplete — ask how it will be measured.
 - Ask about ALL missing or below-bar slots in ONE AskUserQuestion call — one
   question per slot, up to 4. Put concrete candidates in the options: an
   objective proxy for a subjective condition, "None" for constraints, and
-  5 (default) / 10 / 20 for the turn cap. Free-form answers arrive through the
+  15 (default) / 30 for the turn cap. Free-form answers arrive through the
   built-in "Other" option.
 - An unanswered or unrelated reply is not consent to a proposed default — ask
   again and wait for an explicit answer before assembling.
@@ -160,6 +170,24 @@ included:
   `gh pr merge --squash --delete-branch` without asking again. This is the
   standing exception to the usual "merge only when I say so" rule, scoped
   strictly to goals launched through this skill.
+- Settle medium/low findings by the tiers in the global CLAUDE.md Review
+  gate (`auto-fix` in the same PR, listed under `## Auto-fixed`;
+  `needs-decision` as an issue with a decision note); the criteria live
+  there only. Creating those issues and the `needs-decision` label is
+  pre-authorized like the merge, capped at 3 × the number of issues in the
+  goal (3 outside issue mode); past the cap, the rest go as a checklist
+  into one parent `needs-decision` issue. The cap stops a runaway loop from
+  flooding the tracker.
+- Stuck rule: when the same verification command fails the same way 3
+  turns in a row, file that issue's remaining work as a `needs-decision`
+  issue (reason: stuck, with the failing output) and move on to the next
+  issue. A raised turn cap is safe only because this stops a loop that has
+  stopped converging.
+- The final turn shows a `## Follow-ups` block: `Auto-fixed:` one line per
+  finding (`file:line`, numstat line, PR URL) and `Needs-decision:` one line
+  per issue (URL, reason). The evaluator reads the transcript, not the PR
+  body, so the block must repeat what the PR says. Open issues never block
+  completion; requiring zero would reward closing issues to hit it.
 
 ## Assemble
 
@@ -170,11 +198,21 @@ Build the statement on a single line from this template:
     code-reviewer subagent (model: opus, or model: fable if the change touches
     a security boundary or an architectural decision) review
     the change; send any review fixups to a model: sonnet subagent as well,
-    and never Edit/Write code in the main loop; run `<verification command>` and show its full output in the
-    conversation each turn; the goal is met when that output confirms
-    <objective condition>, while <constraints> holds; once the reviewer
-    approves, squash-merge the PR via `gh pr merge --squash --delete-branch`
-    without asking again; or stop after <N> turns.
+    and never Edit/Write code in the main loop; settle medium/low findings
+    by the global CLAUDE.md Review gate tiers (auto-fix in the same PR,
+    listed under `## Auto-fixed` in the PR body; needs-decision as a
+    `needs-decision` issue with a decision note, created without asking, at
+    most 3 issues, the rest as a checklist in one parent issue); run
+    `<verification command>` and show its full output in the conversation
+    each turn; if it fails the same way 3 turns in a row, file the remaining
+    work as a `needs-decision` issue with that output; the goal is met when
+    that output confirms <objective condition> (or the work was filed as
+    stuck), while <constraints> holds, and the final turn shows a
+    `## Follow-ups` block listing each auto-fixed finding (`file:line`,
+    numstat line, PR URL) and each needs-decision issue (URL, reason); open
+    issues never block completion; once the reviewer approves, squash-merge
+    the PR via `gh pr merge --squash --delete-branch` without asking again;
+    or stop after <N> turns.
 
 In issue mode, list each issue as its own named clause instead of one task
 summary, and join the per-issue completion conditions with "and":
@@ -185,12 +223,23 @@ summary, and join the per-issue completion conditions with "and":
     then have a code-reviewer subagent (model: opus, or model: fable if the
     change touches a security boundary or an architectural decision) review
     each change; send any review fixups to a model: sonnet subagent as well,
-    and never Edit/Write code in the main loop; for #<N1>, run `<verification command 1>`;
-    for #<N2>, run `<verification command 2>` [...]; show full output each
-    turn. The goal is met when every issue's output confirms its own
-    condition, while <batch constraints> holds; once the reviewer approves a
-    PR, squash-merge it via `gh pr merge --squash --delete-branch` without
-    asking again; or stop after <N> turns.
+    and never Edit/Write code in the main loop; settle medium/low findings
+    by the global CLAUDE.md Review gate tiers (auto-fix in the same PR,
+    listed under `## Auto-fixed` in the PR body; needs-decision as a
+    `needs-decision` issue with a decision note, created without asking, at
+    most <3 × number of issues> issues, the rest as a checklist in one
+    parent issue); for #<N1>, run `<verification command 1>`; for #<N2>, run
+    `<verification command 2>` [...]; show full output each turn; if an
+    issue's command fails the same way 3 turns in a row, file its remaining
+    work as a `needs-decision` issue with that output and move on to the
+    next issue. The goal is met when every issue's output confirms its own
+    condition (or its work was filed as stuck), while <batch constraints>
+    holds, and the final turn shows a `## Follow-ups` block listing each
+    auto-fixed finding (`file:line`, numstat line, PR URL) and each
+    needs-decision issue (URL, reason); open issues never block completion;
+    once the reviewer approves a PR, squash-merge it via
+    `gh pr merge --squash --delete-branch` without asking again; or stop
+    after <N> turns.
 
 Rules:
 - Single line, no line breaks, at most 4,000 characters. If over, tighten
@@ -204,9 +253,9 @@ Rules:
   and instruct showing its output each turn too.
 - The task summary states what to achieve. The statement doubles as Claude's
   first-turn directive.
-- The sonnet/reviewer/squash-merge clauses from Standing implementation pattern
-  above are always included verbatim in intent, regardless of repo. Never
-  drop them for brevity.
+- The sonnet/reviewer/squash-merge, review-tier, stuck-rule, and Follow-ups
+  clauses from Standing implementation pattern above are always included
+  verbatim in intent, regardless of repo. Never drop them for brevity.
 
 *Done:* single-line checkable `/goal` statement drafted from template.
 
@@ -233,6 +282,7 @@ Rules:
 | "検証コマンドを実行して動作確認しておこう" | 実行しない。ドラフトするだけ。実行は /goal の仕事。 |
 | "4スロット全部聞くと煩わしいから推測で埋める" | 埋めない。欠けたスロットは必ず聞く。沈黙は同意ではない。 |
 | "制約はたぶん無いだろうから省略しよう" | 制約は公式推奨の第3要素。「なし」は明示回答としてのみ受け付ける。 |
+| "follow-up issue をゼロにする条件を足そう" | 足さない。ゼロ要求は issue を閉じて数字を合わせる動機になる。残件は `## Follow-ups` で見せる。 |
 | "文が長いと格好悪いから要素を削ろう" | 4,000字まで許容される。短さより要素の完全性。ただし改行は入れない。 |
 
 ## Hard limits

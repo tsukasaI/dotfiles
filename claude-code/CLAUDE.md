@@ -73,8 +73,19 @@
 - Review gate (branch+PR repos only; `dotfiles`/`ops` never get a `code-reviewer` pass):
   - When: non-trivial implementation (same bar as plan mode). Run `code-reviewer` once, automatically, right after `gh pr create`. Never for mechanical changes (config, dependency/SHA bumps, docs, formatting).
   - Model: `opus`; `fable` only for a security boundary or an architectural decision, since Fable's weekly quota is the scarce one.
-  - Approved = no critical/high finding: merge, and file a GitHub issue for remaining medium/low findings. A classifier refusal or pause, or a pass from a fallback model other than the one requested, is not an approval.
-- Re-review after critical/high fixups: resume the original reviewer via `SendMessage` (agent id from its first `Agent` call) and ask only about the incremental diff. Its "resolved" verdict is less independent than a first pass, so a fixup well outside the original findings may warrant a fresh `code-reviewer`. A reviewer run inside a Workflow has no agent id, so it always gets a fresh one.
+  - Approved = no critical/high finding. A classifier refusal or pause, or a pass from a fallback model other than the one requested, is not an approval.
+  - Before merging, settle every remaining medium/low finding by the tier the reviewer gave it. The implementer never assigns a tier: letting it judge its own work as minor is the reward-hacking opening.
+    - `auto-fix` when all hold: stays within the change's Scope (the issue's triage `Scope`, else the files the PR already touches); touches no public API/CLI flag, config schema, dependency, or security boundary; deletes no test lines; estimated fix ≤ 30 lines. Fix it in the same PR via a `model: sonnet` subagent, re-review (below), and list it under `## Auto-fixed` in the PR body, one line per finding (summary, `file:line`, its `git diff --numstat` line), so I can revert it after the fact.
+    - `needs-decision` otherwise, and for anything the implementer found on its own. File a GitHub issue labeled `needs-decision` (`gh label create needs-decision` if the label is missing) whose body starts with the decision note below, after checking `gh issue list --label needs-decision --search "<title>"` for a duplicate. Open issues never block the merge.
+  - Decision note (`/triage` parses this shape; keep the marker and field names verbatim):
+    ```
+    <!-- decision-note:v1 -->
+    - Decide: <the question, one line>
+    - Options: <A (Recommended): ...>; <B: ...>
+    - Not auto-fixed because: <the auto-fix criterion it failed, or "found by implementer">
+    - Source: <PR URL>, finding <n>
+    ```
+- Re-review after critical/high or `auto-fix` fixups (always, even when small): resume the original reviewer via `SendMessage` (agent id from its first `Agent` call) and ask only about the incremental diff. Its "resolved" verdict is less independent than a first pass, so a fixup well outside the original findings may warrant a fresh `code-reviewer`. A reviewer run inside a Workflow has no agent id, so it always gets a fresh one.
 - When you invoke the `code-review` skill on your own initiative (not me typing `/code-review <level>` myself) and I haven't named a level, default to `high`.
 
 # Advisor usage

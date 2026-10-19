@@ -27,6 +27,13 @@ and whenever the main-loop model changes tier.
   for a security-boundary or architectural change), and squash-merge via
   `gh pr merge --squash --delete-branch` once the reviewer approves. It is never
   asked about as a slot.
+- The assembled statement always contains the follow-up clauses: medium/low
+  findings settled by the CLAUDE.md Review gate tiers (`## Auto-fixed` in
+  the PR body; `needs-decision` issues with a decision note, created without
+  asking, capped at 3 × issues, overflow into one parent issue), the stuck
+  rule (same failure 3 turns in a row → file and move on), and a final-turn
+  `## Follow-ups` block. It never requires the follow-up issue count to be
+  zero.
 - The constraints clause appears unless the user explicitly answered "none".
 
 ## Tests
@@ -45,7 +52,7 @@ the constraints clause.
 
 Expected: ONE AskUserQuestion call asking (1) the exact test command,
 (2) constraints with a "None" option, (3) the turn cap with proposed
-default 5. The condition itself is accepted once tied to the command.
+default 15. The condition itself is accepted once tied to the command.
 
 ### 3. Subjective condition (Japanese)
 
@@ -60,7 +67,7 @@ AskUserQuestion call.
     /mkgoal Lighthouse performance ≥ 90, verified with npm run lighthouse
 
 Expected: slots 1 and 2 filled silently; ONE AskUserQuestion call asking
-(1) constraints with a "None" option, (2) turn cap with default 5, and
+(1) constraints with a "None" option, (2) turn cap with default 15, and
 waiting for explicit answers.
 
 ### 5. Genuinely ambiguous / subjective request
@@ -68,7 +75,7 @@ waiting for explicit answers.
     /mkgoal improve API performance
 
 Expected: one AskUserQuestion call asking (1) which metric and threshold,
-(2) which command measures it, (3) constraints, (4) turn cap with default 5.
+(2) which command measures it, (3) constraints, (4) turn cap with default 15.
 Does not assemble until all four meet the bar.
 
 ### 6. Bare invocation
@@ -83,7 +90,7 @@ Does not invent a goal.
 Run test 4 and answer "None" to the constraints question.
 
 Expected: the assembled statement omits the constraints clause entirely;
-all other clauses (full output each turn, "or stop after 5 turns") present.
+all other clauses (full output each turn, "or stop after 15 turns") present.
 
 ### 8. Subjective constraint
 
@@ -120,8 +127,9 @@ verification command, and that carry no Triage comment.)
 Expected: runs `gh issue view` exactly twice (once per issue, `--json
 title,body,url,comments`), no other Bash. Slots 1 and 2 fill per issue from the
 bodies; ONE AskUserQuestion call asks only (1) a single turn cap for the
-whole batch with proposed default 10 (5 × 2 issues), (2) one constraint
-across all issues with a "None" option. The statement names each issue as
+whole batch with proposed default 30 (15 × 2 issues) and 60 as the other
+option, (2) one constraint across all issues with a "None" option and the
+test-deletion candidate. The issue cap in the statement reads 6 (3 × 2). The statement names each issue as
 its own clause ("Resolve issue #12 (<title>) and issue #15 (<title>)"),
 gives each its own verification command, and joins the completion
 conditions with "and".
@@ -155,7 +163,7 @@ comment fills `Completion condition` and `Verification`, with `Decision`
 set to a chosen option, and whose body names a different or no command.)
 
 Expected: slots 1 and 2 fill silently from the Triage comment, not the
-body; the AskUserQuestion call asks only the batch turn cap (default 5)
+body; the AskUserQuestion call asks only the batch turn cap (default 15)
 and the batch constraint, with a "changes stay within <Scope>" option
 next to "None". The statement's issue clause contains
 "decided: <Decision>".
@@ -185,7 +193,19 @@ alone (or are asked about), exactly as in test 11/12.
 
 Expected: before any slot question, one AskUserQuestion offers "Split
 (Recommended)" and "Keep all 4 in one goal". On Split: the statement
-covers #a #b #c only, the turn cap default is 15, and `/mkgoal #<d>` is
+covers #a #b #c only, the turn cap default is 45, and `/mkgoal #<d>` is
 listed outside the final code block. On Keep all: one statement covers
-all four, turn cap default 20. With 3 or fewer issues, the question is
+all four, turn cap default 60. With 3 or fewer issues, the question is
 never asked.
+
+### 18. Issue mode, test-deletion constraint candidate
+
+    /mkgoal #<N>
+
+(Run in a repo with a clear test-file convention, e.g. Go `*_test.go`.)
+
+Expected: the batch constraint question offers "no deleted lines under
+<test glob>, shown via `git diff --numstat -- <test glob>` each turn",
+with the inferred glob (e.g. `**/*_test.go`) named in the option's
+description. Glob is the only tool used to infer it; the candidate is not
+adopted unless the user picks it.

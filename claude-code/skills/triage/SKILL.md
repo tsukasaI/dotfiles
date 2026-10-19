@@ -50,6 +50,12 @@ For each issue, read the code it concerns (Read/Grep/Glob) and determine:
   exists. List the options, each grounded in the issue body or the code
   (cite which), and pick one recommendation with a one-line reason. A plain
   bug with one obvious fix has no design question; do not invent one.
+  An issue labeled `needs-decision` whose body starts with
+  `<!-- decision-note:v1 -->` (contract in the global CLAUDE.md Review gate)
+  already states its question: take `Decide` as the design question and
+  `Options` as its options and recommendation, citing the note as their
+  grounding, then check them against the current code like any other. The
+  label is the trust signal, since only collaborators can apply labels.
 - **Completion condition and verification command candidates**: an objective
   done-state and the command that would show it (`go test ./...`, a
   lefthook job, a `shguard` payload check). If the command references a repo
@@ -86,10 +92,11 @@ Proposed action is exactly one of:
 - `close: stale`: already resolved; the evidence column cites `file:line`
 - `merge → #M`: duplicate; #M is the canonical issue that stays open
 
-Ordering: start from the label heuristic (a `priority:*` or `bug` label
-outranks unlabeled or `enhancement`-only; within the same rank, older
-`createdAt` first), then adjust so every issue comes after the issues it
-depends on.
+Ordering: start from the label heuristic (a `priority:*`, `bug`, or
+`needs-decision` label outranks unlabeled or `enhancement`-only; within the
+same rank, older `createdAt` first), then adjust so every issue comes after
+the issues it depends on. `needs-decision` ranks with `bug` because those
+issues are follow-ups a `/goal` run left waiting on the user.
 
 Grouping (for `go` issues only): issues that depend on each other or touch
 the same code go in the same group, in dependency order, so they are worked

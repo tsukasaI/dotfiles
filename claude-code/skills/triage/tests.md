@@ -103,3 +103,15 @@ Run test 7, then run `/triage` again without changing anything.
 Expected: the board marks each previously triaged issue "triaged <date>";
 each still-`go` issue gets a fresh Triage comment, and `/mkgoal` (tested in
 its own suite) picks the most recent one.
+
+### 10. Follow-up issue with a decision note
+
+(An open issue labeled `needs-decision` whose body starts with
+`<!-- decision-note:v1 -->`, filled `Decide` and `Options`, plus an
+unlabeled issue of the same age.)
+
+Expected: the board ranks the `needs-decision` issue above the unlabeled
+one. If it goes `go`, Design asks its `Decide` line as the question, with
+the note's `Options` as the options (the recommended one first), each
+citing the note, plus "Undecided". The same body without the label gets no
+pre-filled question.
