@@ -93,6 +93,85 @@ test('create → review → merge drives the band', async ($, on) => {
   expect(await band()).toBeUndefined()
 })
 
+const PR_A ='https://github.com/tsukasaI/app/pull/12'
+const PR_B = 'https://github.com/tsukasaI/app/pull/13'
+const PR_C = 'https://github.com/tsukasaI/lib/pull/4'
+
+// Tracks `urls` via gh pr create; `ghList` answers every `gh pr list` and `calls` records its repos.
+async function track(
+  $: Parameters<Parameters<typeof test>[1]>[0],
+  on: Parameters<Parameters<typeof test>[1]>[1],
+  urls: string[],
+  ghList: (repo: string) => { exitCode: number; stdout: string },
+  mergeIsError = false,
+) {
+  const calls: string[] = []
+  mock.env(on, { HOME: '/Users/me' })
+  on('session.cwd', () => ({ value: '/Users/me/src/app' }))
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine band</Text>
+  })
+  on('process.run', ($, e) => {
+    if (e.argv[0] === 'gh') calls.push(e.argv[e.argv.indexOf('-R') + 1])
+    const out = e.argv[0] === 'gh' ? ghList(e.argv[e.argv.indexOf('-R') + 1]) : { exitCode: 0, stdout: 'feat/x\n' }
+    return { value: { ...out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  let created = ''
+  on('tool.call', { tool: 'Bash' }, (_, e) =>
+    e.command.includes('merge')
+      ? { result: {}, text: '', isError: mergeIsError }
+      : { result: { stdout: created }, text: created },
+  )
+  for (const url of urls) {
+    created = url
+    await $.tool.call({ tool: 'Bash', command: 'gh pr create --title t' })
+  }
+  return calls
+}
+
+const open = (...urls: string[]) => ({ exitCode: 0, stdout: JSON.stringify(urls.map(url => ({ url }))) })
+
+// PR numbers the band still draws.
+async function listed($: Parameters<Parameters<typeof test>[1]>[0]) {
+  const ui = await $.ui.mount({ plugin: 'dotfiles-mod', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  const found: number[] = []
+  for (const n of [4, 12, 13]) if (await ui.find({ type: 'Text', text: new RegExp(`PR #${n}:`) })) found.push(n)
+  await ui.unmount()
+  return found
+}
+
+test('a numberless merge drops every listed PR that gh no longer reports open', async ($, on) => {
+  await track($, on, [PR_A, PR_B], () => open(PR_B))
+  await $.tool.call({ tool: 'Bash', command: 'gh pr merge --squash --delete-branch' })
+  expect(await listed($)).toEqual([13])
+})
+
+test('a merge that ended in error still reconciles against gh', async ($, on) => {
+  await track($, on, [PR_A, PR_B], () => open(PR_B), true)
+  await $.tool.call({ tool: 'Bash', command: 'gh pr merge 12 --squash --delete-branch' })
+  expect(await listed($)).toEqual([13])
+})
+
+test('a failed gh list keeps the entries', async ($, on) => {
+  await track($, on, [PR_A, PR_B], () => ({ exitCode: 1, stdout: '' }), true)
+  await $.tool.call({ tool: 'Bash', command: 'gh pr merge --squash' })
+  expect(await listed($)).toEqual([12, 13])
+})
+
+test('a failed gh list falls back to the merged number when the call succeeded', async ($, on) => {
+  await track($, on, [PR_A, PR_B], () => ({ exitCode: 1, stdout: '' }))
+  await $.tool.call({ tool: 'Bash', command: 'gh pr merge 12 --squash' })
+  expect(await listed($)).toEqual([13])
+})
+
+test('a merge asks gh once per repo', async ($, on) => {
+  const calls = await track($, on, [PR_A, PR_B, PR_C], r => (r === 'tsukasaI/app' ? open(PR_A, PR_B) : open()))
+  await $.tool.call({ tool: 'Bash', command: 'gh pr merge --squash' })
+  expect(calls.sort()).toEqual(['tsukasaI/app', 'tsukasaI/lib'])
+  expect(await listed($)).toEqual([12, 13])
+})
+
 test('a bare gh pr merge clears the only tracked PR', async ($, on) => {
   mock.env(on, { HOME: '/Users/me' })
   on('session.cwd', () => ({ value: '/Users/me/src/app' }))

@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { On } from 'claude-code'
+import type { EngineInterface, On } from 'claude-code'
 
 import type { PrReview } from '../types'
 
@@ -8,6 +8,7 @@ const prs = atom({ plugin: 'dotfiles-mod', key: 'prs' } as const, [])
 const PR_CREATE = /\bgh\s+pr\s+create\b/
 const PR_MERGE = /\bgh\s+pr\s+merge\b/
 const PR_URL = /https:\/\/github\.com\/[^\s/]+\/[^\s/]+\/pull\/(\d+)/
+const PR_REPO = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/pull\/\d+/
 const AGENT_ID = /agentId:\s*([A-Za-z0-9_-]+)/
 // A critical/high that names a finding's severity: at the start of a line
 // (after a list marker or heading), in brackets, bold or parens, after
@@ -48,10 +49,46 @@ export function mergedNumber(command: string): number | undefined {
   return n ? Number(n[1]) : undefined
 }
 
+const prRepo = (p: PrReview) => PR_REPO.exec(p.url)?.[1]
+
+// undefined on any failure: the caller keeps that repo's entries.
+async function openPrUrls($: EngineInterface, repo: string): Promise<Set<string> | undefined> {
+  try {
+    const listed = await $.process.run(
+      ['gh', 'pr', 'list', '-R', repo, '--state', 'open', '--json', 'url', '--limit', '200'],
+      { timeoutMs: 15000 },
+    )
+    if (listed.exitCode !== 0 || listed.isStdoutTruncated) return undefined
+    const rows: unknown = JSON.parse(listed.stdout)
+    if (!Array.isArray(rows)) return undefined
+    return new Set(rows.map((r: { url?: string }) => r.url))
+  } catch {
+    return undefined
+  }
+}
+
 export function registerReviewState(on: On): void {
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     const ran = await next(e)
-    if (ran.deny !== undefined || ran.isError === true) return ran
+    if (ran.deny !== undefined) return ran
+
+    if (PR_MERGE.test(e.command)) {
+      // Asked even when the call errored: `--delete-branch` cleanup can fail after the remote merge landed.
+      const repos = new Set((await read($, prs)).flatMap(p => prRepo(p) ?? []))
+      const open = new Map(await Promise.all([...repos].map(async r => [r, await openPrUrls($, r)] as const)))
+      const n = ran.isError === true ? undefined : mergedNumber(e.command)
+      await update($, prs, list =>
+        list.filter(p => {
+          const urls = open.get(prRepo(p) ?? '')
+          if (urls !== undefined) return urls.has(p.url)
+          if (ran.isError === true) return true
+          if (n !== undefined) return p.number !== n
+          return list.length !== 1
+        }),
+      )
+      return ran
+    }
+    if (ran.isError === true) return ran
 
     if (PR_CREATE.test(e.command)) {
       const url = PR_URL.exec(ran.text ?? '')
@@ -59,12 +96,6 @@ export function registerReviewState(on: On): void {
         const pr: PrReview = { url: url[0], number: Number(url[1]), review: 'none', reviewer: '' }
         await update($, prs, list => [...list.filter(p => p.url !== pr.url), pr])
       }
-    } else if (PR_MERGE.test(e.command)) {
-      const n = mergedNumber(e.command)
-      await update($, prs, list => {
-        if (n !== undefined) return list.filter(p => p.number !== n)
-        return list.length === 1 ? [] : list
-      })
     }
     return ran
   })
