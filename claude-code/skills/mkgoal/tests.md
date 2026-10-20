@@ -6,17 +6,19 @@ and whenever the main-loop model changes tier.
 
 ## Pass criteria common to all tests
 
-- The only Bash command the skill runs is `gh issue view <N> --json
-  title,body,url,comments`, once per issue, and only in issue mode. Verification
-  commands are drafted, not executed; outside issue mode only Read/Grep
-  existence checks are allowed.
+- The only Bash commands the skill runs are `gh issue view <N> --json
+  title,body,url,comments`, once per issue and only in issue mode, and the
+  `wc -m <<'MKGOAL_EOF'` length check before each draft or revision is
+  presented. Verification commands are drafted, not executed; otherwise
+  only Read/Grep existence checks are allowed.
 - The skill never invokes `/goal`, other skills, or subagents.
 - Slot questions are asked via a single batched AskUserQuestion call (one
   question per open slot), not plain-text messages; follow-up re-asks of a
   single slot also use AskUserQuestion.
 - The final approved output is a fenced code block containing exactly one
   line starting with `/goal` — no prose inside the block, no line breaks,
-  at most 4,000 characters.
+  at most 4,000 characters as measured by the `wc -m` check, whose count
+  is shown with each draft.
 - The assembled statement always contains the "or stop after <N> turns"
   clause and instructs showing the verification command's full output each
   turn.
@@ -125,7 +127,7 @@ made machine-checkable and exits without producing a statement.
 verification command, and that carry no Triage comment.)
 
 Expected: runs `gh issue view` exactly twice (once per issue, `--json
-title,body,url,comments`), no other Bash. Slots 1 and 2 fill per issue from the
+title,body,url,comments`), no other Bash besides the `wc -m` length check. Slots 1 and 2 fill per issue from the
 bodies; ONE AskUserQuestion call asks only (1) a single turn cap for the
 whole batch with proposed default 30 (15 × 2 issues) and 60 as the other
 option, (2) one constraint across all issues with a "None" option and the
@@ -187,16 +189,27 @@ whose `authorAssociation` is not `OWNER`/`MEMBER`/`COLLABORATOR`, e.g.
 Expected: that comment is ignored; slots 1 and 2 come from the issue body
 alone (or are asked about), exactly as in test 11/12.
 
-### 17. Issue mode, more than 3 issues
+### 17. Issue mode, more than 10 issues
 
-    /mkgoal #<a> #<b> #<c> #<d>
+    /mkgoal #<1> ... #<11>
 
 Expected: before any slot question, one AskUserQuestion offers "Split
-(Recommended)" and "Keep all 4 in one goal". On Split: the statement
-covers #a #b #c only, the turn cap default is 45, and `/mkgoal #<d>` is
-listed outside the final code block. On Keep all: one statement covers
-all four, turn cap default 60. With 3 or fewer issues, the question is
-never asked.
+(Recommended)" and "Keep all 11 in one goal". On Split: the statement
+covers the first 10 only, the turn cap default is 150, and `/mkgoal #<11>`
+is listed outside the final code block. On Keep all: one statement covers
+all eleven, turn cap default 165, still subject to the length check. With
+10 or fewer issues, the up-front question is never asked (e.g. 4 issues go
+straight to slot filling).
+
+### 19. Issue mode, statement over 4,000 characters
+
+    /mkgoal #<a> ... (up to 10 issues with long titles/commands)
+
+Expected: `wc -m` reports over 4,000; the skill tightens wording and
+re-runs `wc -m`. If still over, one AskUserQuestion offers "Split
+(Recommended)" (longest leading run that fits, rest as follow-up
+`/mkgoal #...` lines) and "Tighten further". No draft with a count over
+4,000 is ever presented.
 
 ### 18. Issue mode, test-deletion constraint candidate
 

@@ -10,10 +10,11 @@ allowed-tools: Read, Grep, Glob, AskUserQuestion, Bash
 Produce ONE copy-pasteable `/goal` statement, then stop. This skill never runs
 `/goal`, never executes the verification command, and never invokes other
 skills or subagents. Match the user's conversation language in all dialogue.
-Bash is scoped to `gh issue view <N> --json title,body,url,comments` only, and only
-when the launch argument is in issue mode (see below); never any other
-command, and never `gh issue close`/`comment`/`edit` (that is `/triage`'s job,
-not this skill's).
+Bash is scoped to two commands only: `gh issue view <N> --json
+title,body,url,comments`, only when the launch argument is in issue mode
+(see below), and the length check in Assemble (`wc -m` fed by a quoted
+heredoc). Never any other command, and never `gh issue
+close`/`comment`/`edit` (that is `/triage`'s job, not this skill's).
 
 Root quality: **checkable** — the evaluator model (Haiku by default) can answer yes/no from
 transcript text alone, with zero judgment.
@@ -30,7 +31,8 @@ Launch argument: $ARGUMENTS
 - Setting a goal starts a turn immediately, with the condition itself as the
   directive — the statement is also Claude's first prompt, so it must say WHAT
   to achieve, not only how to check it.
-- The condition may be up to 4,000 characters. A durable condition has three
+- The condition may be up to 4,000 characters; `/goal` rejects a longer one
+  outright, so Assemble measures it instead of estimating. A durable condition has three
   parts: one measurable end state, a stated check, and constraints that must
   hold along the way. Keep the statement a single line
   (no line breaks), but never drop a required element for brevity.
@@ -42,14 +44,18 @@ If the launch argument consists solely of one or more `#<digits>` tokens
 mode: draft ONE combined `/goal` statement covering every listed issue, in
 the order given.
 
-**Batch size**: one `/goal` loop takes at most 3 issues by default, because
-its evaluator judges every issue's condition from the transcript alone and
-a longer batch drifts. With more than 3 issues, before slot filling, ask via
-`AskUserQuestion`: (1) "Split (Recommended)": draft this statement for the
-first 3 issues in the given order (`/triage` already orders prerequisites
-first), and list the rest, in order and in groups of at most 3, outside the
-final code block as follow-up `/mkgoal #...` lines; or
-(2) "Keep all N in one goal". Never split silently.
+**Batch size**: one `/goal` loop takes up to 10 issues, as long as the
+assembled statement passes the 4,000-character check in Assemble; the
+character limit, not the issue count, is the binding constraint. With 10
+or fewer issues, never ask about splitting up front. With more than 10,
+before slot filling, ask via `AskUserQuestion`: (1) "Split (Recommended)":
+draft this statement for the first 10 issues in the given order
+(`/triage` already orders prerequisites first), and list the rest, in
+order and in groups of at most 10, outside the final code block as
+follow-up `/mkgoal #...` lines; or (2) "Keep all N in one goal". Never
+split silently. If the statement still exceeds 4,000 characters after
+tightening (see Assemble), the over-length split question there applies
+regardless of count.
 
 For each `#N`, run `gh issue view <N> --json title,body,url,comments` once.
 
@@ -244,6 +250,23 @@ summary, and join the per-issue completion conditions with "and":
 Rules:
 - Single line, no line breaks, at most 4,000 characters. If over, tighten
   wording, never drop a slot.
+- Length check (required, never estimate): before presenting any draft or
+  revision, run exactly this, with the whole statement line as the only
+  heredoc line:
+
+      wc -m <<'MKGOAL_EOF'
+      /goal ...
+      MKGOAL_EOF
+
+  The quoted delimiter keeps backticks and `$` literal. The count includes
+  `/goal ` and the trailing newline, so it is slightly conservative; it
+  passes at 4,000 or less. Show the count next to the draft. Over 4,000:
+  tighten wording (shorter per-issue clauses, titles abbreviated, not
+  removed) and re-run. Still over in issue mode: ask via `AskUserQuestion`
+  "Split (Recommended)": cover the longest leading run of issues that fits
+  and list the rest as follow-up `/mkgoal #...` lines outside the final
+  code block; or "Tighten further" with the user's guidance. Never present
+  a statement that failed the check.
 - The turn cap MUST appear as the "or stop after <N> turns" clause. `/goal`
   has no separate cap setting.
 - Every condition must be judgeable from command output visible in the
@@ -257,12 +280,12 @@ Rules:
   clauses from Standing implementation pattern above are always included
   verbatim in intent, regardless of repo. Never drop them for brevity.
 
-*Done:* single-line checkable `/goal` statement drafted from template.
+*Done:* single-line checkable `/goal` statement drafted from template, `wc -m` ≤ 4,000.
 
 ## Approval gate
 
 1. Present the drafted statement in a fenced code block, preceded by a
-   one-line-per-slot summary, and ask: approve as-is, or request changes?
+   one-line-per-slot summary and its `wc -m` count, and ask: approve as-is, or request changes?
 2. On requested changes: revise and re-present the same way, prefixed
    "Revision 1 of 3" / "Revision 2 of 3" / "Revision 3 of 3". If the user
    rejects the third revision, exit the skill and suggest re-running /mkgoal
@@ -284,6 +307,7 @@ Rules:
 | "制約はたぶん無いだろうから省略しよう" | 制約は公式推奨の第3要素。「なし」は明示回答としてのみ受け付ける。 |
 | "follow-up issue をゼロにする条件を足そう" | 足さない。ゼロ要求は issue を閉じて数字を合わせる動機になる。残件は `## Follow-ups` で見せる。 |
 | "文が長いと格好悪いから要素を削ろう" | 4,000字まで許容される。短さより要素の完全性。ただし改行は入れない。 |
+| "目分量で4,000字以内だろう" | 必ず `wc -m` で数える。超過した statement は /goal に拒否される。 |
 
 ## Hard limits
 
@@ -291,6 +315,7 @@ Rules:
 - Never invoke `/goal`, the Skill tool, or subagents.
 - If the launch argument is empty, first ask what the user wants to achieve,
   then run slot filling as above.
-- In issue mode, `gh issue view <N> --json title,body,url,comments` is the
-  only Bash command allowed; never
-  `close`/`comment`/`edit` an issue from within this skill.
+- Bash is limited to the Assemble length check (`wc -m` with a quoted
+  heredoc) and, in issue mode, `gh issue view <N> --json
+  title,body,url,comments`; never `close`/`comment`/`edit` an issue from
+  within this skill.
