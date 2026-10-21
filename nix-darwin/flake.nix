@@ -70,7 +70,22 @@
       environment.systemPackages = [
         ewc.packages.${system}.default
         fini.packages.${system}.default
-        herdr.packages.${system}.default
+        # Not extra-sandbox-paths for /bin/cp and /usr/bin/ranlib: that would
+        # open host binaries to every build. Drop once herdr's own
+        # nix/package.nix patches these vendored libghostty-vt build steps.
+        (herdr.packages.${system}.default.overrideAttrs (old: {
+          postPatch = (old.postPatch or "") + ''
+            pushd vendor/libghostty-vt
+            substituteInPlace src/build/LibtoolStep.zig \
+              --replace-fail /bin/cp ${pkgs.coreutils}/bin/cp \
+              --replace-fail /usr/bin/ranlib ${pkgs.cctools}/bin/ranlib
+            substituteInPlace src/build/GhosttyLibVt.zig \
+              --replace-fail /bin/ln ${pkgs.coreutils}/bin/ln
+            substituteInPlace pkg/apple-sdk/native_link.zig \
+              --replace-fail /usr/bin/xcrun ${pkgs.xcbuild}/bin/xcrun
+            popd
+          '';
+        }))
         shguard.packages.${system}.default
       ] ++ (with pkgs; [
         # Modern CLI replacements
