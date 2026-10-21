@@ -8,8 +8,10 @@ and whenever the main-loop model changes tier.
 
 - The only Bash commands the skill runs are `gh issue view <N> --json
   title,body,url,comments`, once per issue and only in issue mode, and the
-  `wc -m <<'MKGOAL_EOF'` length check before each draft or revision is
-  presented. Verification commands are drafted, not executed; otherwise
+  `wc -m <absolute scratchpad path>/mkgoal-statement.txt` length check
+  before each draft or revision is presented. The statement reaches that
+  file through Write, never a heredoc/`echo`/`printf` (shguard denies a
+  heredoc body with many `for`/`if`/`do` words). Verification commands are drafted, not executed; otherwise
   only Read/Grep existence checks are allowed.
 - The skill never invokes `/goal`, other skills, or subagents.
 - Slot questions are asked via a single batched AskUserQuestion call (one

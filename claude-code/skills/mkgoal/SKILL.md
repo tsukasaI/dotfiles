@@ -2,7 +2,7 @@
 name: mkgoal
 description: Builds a high-quality, verifiable /goal statement through a short slot-filling dialogue. Use when the user wants to start a Claude Code goal loop and needs the completion condition, verification command, constraints, and turn cap defined before running /goal. Also accepts one or more #<issue> references (typically handed off from /triage) to draft a single combined /goal statement covering all of them, reading each issue's Triage comment for its decided design, completion condition, and verification command. Claude may invoke it after /triage has finished, when the user asks to turn a triage group into a goal (e.g. "G1をgoalにして"), passing that group's issues as `#<N> ...` arguments. Not for running /goal itself, and never invoked from inside /triage or a subagent.
 argument-hint: [達成したいこと | #issue番号 ...]
-allowed-tools: Read, Grep, Glob, AskUserQuestion, Bash
+allowed-tools: Read, Grep, Glob, AskUserQuestion, Bash, Write
 ---
 
 # /mkgoal — draft a verifiable /goal statement
@@ -12,8 +12,9 @@ Produce ONE copy-pasteable `/goal` statement, then stop. This skill never runs
 skills or subagents. Match the user's conversation language in all dialogue.
 Bash is scoped to two commands only: `gh issue view <N> --json
 title,body,url,comments`, only when the launch argument is in issue mode
-(see below), and the length check in Assemble (`wc -m` fed by a quoted
-heredoc). Never any other command, and never `gh issue
+(see below), and the length check in Assemble (`wc -m` on a scratchpad
+file). Write is scoped to that one scratchpad file. Never any other
+command, and never `gh issue
 close`/`comment`/`edit` (that is `/triage`'s job, not this skill's).
 
 Root quality: **checkable** — the evaluator model (Haiku by default) can answer yes/no from
@@ -251,15 +252,13 @@ Rules:
 - Single line, no line breaks, at most 4,000 characters. If over, tighten
   wording, never drop a slot.
 - Length check (required, never estimate): before presenting any draft or
-  revision, run exactly this, with the whole statement line as the only
-  heredoc line:
-
-      wc -m <<'MKGOAL_EOF'
-      /goal ...
-      MKGOAL_EOF
-
-  The quoted delimiter keeps backticks and `$` literal. The count includes
-  `/goal ` and the trailing newline, so it is slightly conservative; it
+  revision, Write the whole statement line to `mkgoal-statement.txt` in
+  the session's scratchpad directory (overwriting it each time), then run
+  `wc -m <absolute path to that file>`, with the path written literally.
+  Never pass the statement through a heredoc, `echo`, or `printf`: shguard
+  counts `for`/`if`/`do`/`then`/`done` in a heredoc body as shell keywords
+  and denies the command once a multi-issue statement passes its cap.
+  The count includes `/goal ` and the trailing newline, so it is slightly conservative; it
   passes at 4,000 or less. Show the count next to the draft. Over 4,000:
   tighten wording (shorter per-issue clauses, titles abbreviated, not
   removed) and re-run. Still over in issue mode: ask via `AskUserQuestion`
@@ -315,7 +314,7 @@ Rules:
 - Never invoke `/goal`, the Skill tool, or subagents.
 - If the launch argument is empty, first ask what the user wants to achieve,
   then run slot filling as above.
-- Bash is limited to the Assemble length check (`wc -m` with a quoted
-  heredoc) and, in issue mode, `gh issue view <N> --json
+- Bash is limited to the Assemble length check (`wc -m` on the scratchpad
+  file, never a heredoc) and, in issue mode, `gh issue view <N> --json
   title,body,url,comments`; never `close`/`comment`/`edit` an issue from
   within this skill.
