@@ -1,8 +1,8 @@
 ---
 name: maintain-sweep
-description: Runs the maintenance investigation agents (crash-fuzzer, dup-unifier, dead-code-removal, etc.) against the current repository in parallel — read-only, opus — has a single fable agent triage their findings, then files the surviving ones as GitHub issues. Use when the user wants to run a maintenance sweep, "メンテナンスルーチンを回して", or asks to run several/all of the maintenance agents at once. Not for running one investigation agent by name — invoke that agent directly instead. Never edits code or opens PRs; fixes go through /triage → /mkgoal.
+description: Runs the maintenance investigation agents (sweep-structure, sweep-logic, sweep-dead, sweep-tests, crash-fuzzer) against the current repository in parallel (read-only, opus), has a single fable agent triage their findings, then files the surviving ones as GitHub issues. Use when the user wants to run a maintenance sweep, "メンテナンスルーチンを回して", or asks to run several/all of the maintenance agents at once. Not for running one investigation agent by name; invoke that agent directly instead. Never edits code or opens PRs; fixes go through /triage → /mkgoal.
 disable-model-invocation: true
-argument-hint: [routine ...] (optional — omit to run all 10 investigation agents)
+argument-hint: [agent ...] (optional; omit to run all 5 investigation agents)
 allowed-tools: Bash, Write, Workflow
 ---
 
@@ -30,25 +30,27 @@ Launch argument: $ARGUMENTS
 
 ## Investigation agents
 
-| Name | What it investigates |
+Split by context, not by problem type: each agent reads one slice of the
+code once and applies several related lenses to it, instead of ten agents
+each re-reading the same code for one lens. On the fini 10/12 snapshot the
+5-agent split re-found as many known-good issues (5/10) as the former
+10-agent split, with about 21% fewer output tokens; each run caught issues
+the other missed, so a single sweep is a sample, not a full audit.
+
+| Name | Lenses (the `routine` tag on each finding) |
 |---|---|
-| crash-fuzzer | Real app crashes and their root cause |
-| internal-flag-auditor | Forgotten internal-only/beta features and stable 100%-rollout flags — ship (inline) or delete |
-| logic-simplifier | Nested business logic that can simplify without behavior change |
-| logic-bugfixer | Real bugs found by modeling logic and state transitions |
-| dup-unifier | Near-duplicate implementations worth unifying |
-| dead-code-removal | Provably unreachable code |
-| useless-test-pruner | Tests that can never fail |
-| flaky-test-fixer | Root cause of CI tests that pass/fail inconsistently |
-| abstraction-improver | Overengineered abstractions with few real implementations |
-| abstraction-police | Violations of the project's own documented layering rules |
+| sweep-structure | dup-unifier, abstraction-improver, abstraction-police |
+| sweep-logic | logic-bugfixer, logic-simplifier |
+| sweep-dead | dead-code-removal, internal-flag-auditor |
+| sweep-tests | useless-test-pruner, flaky-test-fixer |
+| crash-fuzzer | Real app crashes and their root cause (runs the target, so it stays separate) |
 
 ## Preflight
 
 1. Confirm the current directory is a git repository
    (`git rev-parse --is-inside-work-tree`). If not, tell the user and stop.
 2. Parse `$ARGUMENTS` into a routine list:
-   - Empty → all 10 routines above.
+   - Empty → all 5 agents above.
    - Space-separated names → validate each against the table above; if any
      name doesn't match, list the valid names and stop without running
      anything.
@@ -80,6 +82,7 @@ const FINDING_SCHEMA = {
       items: {
         type: 'object',
         properties: {
+          routine: { type: 'string' },
           title: { type: 'string' },
           file: { type: 'string' },
           line: { type: 'number' },
@@ -138,7 +141,10 @@ const reports = await parallel(args.routines.map(routine => () =>
 ))
 
 const allFindings = reports.flatMap(r =>
-  (r.findings || []).map(f => ({ ...f, routine: r.routine }))
+  (r.findings || []).map(f => ({
+    ...f,
+    routine: f.routine && f.routine !== r.routine ? `${r.routine}/${f.routine}` : r.routine,
+  }))
 )
 log(`${allFindings.length} findings across ${args.routines.length} routines`)
 
@@ -191,6 +197,6 @@ Present:
 
 | Rationalization | Reality |
 |---|---|
-| "調査エージェントにもEditを持たせれば早い" | 調査担当10体はread-onlyだから並列実行が安全になっている。sweepはコードを一切書き換えない。修正は/triage → /mkgoalの流れで行う。 |
+| "調査エージェントにもEditを持たせれば早い" | 調査担当5体はread-onlyだから並列実行が安全になっている。sweepはコードを一切書き換えない。修正は/triage → /mkgoalの流れで行う。 |
 | "findingをそのままissueにすればtriageは要らない" | 調査担当ごとに重複や誤検知が混ざる。全findingを一度に見て統合・除外するのがtriageの役目で、Fableを使うのもこの1回だけ。 |
 | "issueを8件以上まとめて作ろう" | 1回8件まで。超えた分はdroppedに理由付きで残り、次回のsweepで再検出される。backlogを一度に膨らませると/triageで比較しきれない。 |

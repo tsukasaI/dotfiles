@@ -65,7 +65,7 @@
   | Role | Model | Set in |
   |---|---|---|
   | Subagents (Explore, web-researcher, Agent/Workflow `agent()`) | Cheapest model that can do the subtask; default `sonnet` | `model:` argument at call time |
-  | Maintenance investigation agents (`/maintain-sweep`) | `opus` | `agents/*.md` frontmatter (deliberate exception to the 2-of-4 rule below); no `effort:` on purpose, so they inherit the session's effort |
+  | Maintenance investigation agents (`/maintain-sweep`: `sweep-*`, `crash-fuzzer`) | `opus` | `agents/*.md` frontmatter (deliberate exception to the 2-of-4 rule below); no `effort:` on purpose, so they inherit the session's effort |
 
 - When delegating to Agent or Workflow `agent()`, pass `model:` explicitly (default `sonnet`) — don't rely on inheritance from the main loop. Escalate above the default only when the subtask meets ≥2 of: (a) no existing pattern in this codebase to imitate, (b) a security/auth/crypto boundary, (c) multiple valid approaches with a real trade-off, (d) it already failed once at the default tier.
   - Example (escalate): "design a cache-invalidation strategy for this service" — no precedent, real trade-offs.
