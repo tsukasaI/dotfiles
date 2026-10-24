@@ -11,7 +11,7 @@
 - Commit after each completed subtask; never start the next subtask while pre-commit fails — fix the check first. Bypass flags (`--no-verify`, `git push --force`) are hook-blocked; use `--force-with-lease` when force is genuinely needed.
 - Git workflow by repo:
   - `dotfiles` and `ops` → commit directly to main and push once a subtask is complete, no explicit "commit" instruction needed.
-  - Every other repo → NEVER commit to main: create a branch (`<type>/<short-slug>`), open a PR. Merge via `gh pr merge --squash --delete-branch` once the `code-reviewer` review approves (see Review gate); if no review ran, or it did not approve, stop and wait for me to say so.
+  - Every other repo → NEVER commit to main: create a branch (`<type>/<short-slug>`), open a PR. Merge via `gh pr merge --squash --delete-branch` once the `code-reviewer` review approves (see the `review-gate` skill); if no review ran, or it did not approve, stop and wait for me to say so.
 - Commit message format (Contextual Commits = Conventional Commits + structured body):
   ```
   <type>(<scope>): <description>
@@ -44,8 +44,9 @@
 - Read scope literally: if a request says "this file", keep the change to that file; if it says "all", apply it everywhere. When the scope is unclear, ask rather than generalize.
 
 # Context & Session Management
-- Use subagents to keep the main context window clean. Test: "Do I need the tool output again, or just the conclusion?" If just the conclusion → subagent. Good for: verifying results against a spec, exploring other codebases, writing docs from a git diff.
-- Delegation triggers: exploration likely to exceed ~10 tool calls, or 3+ independent subtasks (e.g. multiple unrelated issues) → fan out to subagents instead of serial main-loop work. Once delegated, do NOT duplicate the same reads in the main loop — wait, then verify the conclusions.
+- Delegate to a subagent when the work needs little from this conversation and returns a compact result. Test: "Do I need the tool output again, or just the conclusion?" If just the conclusion → subagent. Good for: independent research paths, exploring other codebases, black-box verification against a spec, writing docs from a git diff.
+- Split by context, not by kind of work. When the next decision depends on intermediate details (debugging, a design that changes as you read), keep it in the main loop: a subagent's summary drops exactly those details. Tool-call count alone is not a reason to delegate.
+- Fan out in parallel only for independent paths that each pass the test above (e.g. several unrelated issues). Once delegated, do NOT duplicate the same reads in the main loop — wait, then verify the conclusions.
 - Verify one load-bearing claim from every subagent report before acting on it — this habit has caught real false positives; keep it.
 - cc-memory holds memory about me only: facts, my own learnings, projects I'm working on, and discussion outcomes. Claude Code's own learnings (gotchas, tool quirks) never go there. Decision record: `ops/memory/cc-memory-curation-decisions.md`.
   - Autonomous runs (`/goal`, `/loop`, subagents, Workflow `agent()`) never write to cc-memory. The one exception is `/dream` (in the `ops` repo) posting capped candidates to inbox, which `/retro` approves or discards.
@@ -69,24 +70,10 @@
 - When delegating to Agent or Workflow `agent()`, pass `model:` explicitly (default `sonnet`) — don't rely on inheritance from the main loop. Escalate above the default only when the subtask meets ≥2 of: (a) no existing pattern in this codebase to imitate, (b) a security/auth/crypto boundary, (c) multiple valid approaches with a real trade-off, (d) it already failed once at the default tier.
   - Example (escalate): "design a cache-invalidation strategy for this service" — no precedent, real trade-offs.
   - NG (stay at default): "write a table-driven test for this function" — a pattern to imitate exists.
-- When the main loop runs on `opus`, delegate code edits (implementation and review fixups) to a `model: sonnet` subagent instead of running Edit/Write on code yourself. The main loop keeps planning, branch/commit/PR, running verification, and the merge decision. Config/doc edits in `dotfiles`/`ops` and one-line fixes stay in the main loop.
-- Review gate (branch+PR repos only; `dotfiles`/`ops` never get a `code-reviewer` pass):
-  - When: non-trivial implementation (same bar as plan mode). Run `code-reviewer` once, automatically, right after `gh pr create`. Never for mechanical changes (config, dependency/SHA bumps, docs, formatting).
-  - Model: `opus`; `fable` only for a security boundary or an architectural decision, since Fable's weekly quota is the scarce one.
-  - Approved = no critical/high finding. A classifier refusal or pause, or a pass from a fallback model other than the one requested, is not an approval.
-  - A critical/high finding: fix it in the same PR via a `model: sonnet` subagent and re-review (below); once the re-review reports no critical/high left, it counts as approved. If the fix fails or the re-review still flags critical/high, stop and wait for me.
-  - Before merging, settle every remaining medium/low finding by the tier the reviewer gave it. The implementer never assigns a tier: letting it judge its own work as minor is the reward-hacking opening.
-    - `auto-fix` when all hold: stays within the change's Scope (the issue's triage `Scope`, else the files the PR already touches); touches no public API/CLI flag, config schema, dependency, or security boundary; deletes no test lines; estimated fix ≤ 30 lines. Fix it in the same PR via a `model: sonnet` subagent, re-review (below), and list it under `## Auto-fixed` in the PR body, one line per finding (summary, `file:line`, its `git diff --numstat` line), so I can revert it after the fact.
-    - `needs-decision` otherwise, and for anything the implementer found on its own. File a GitHub issue labeled `needs-decision` (`gh label create needs-decision` if the label is missing) whose body starts with the decision note below, after checking `gh issue list --label needs-decision --search "<title>"` for a duplicate. Open issues never block the merge.
-  - Decision note (`/triage` parses this shape; keep the marker and field names verbatim):
-    ```
-    <!-- decision-note:v1 -->
-    - Decide: <the question, one line>
-    - Options: <A (Recommended): ...>; <B: ...>
-    - Not auto-fixed because: <the auto-fix criterion it failed, or "found by implementer">
-    - Source: <PR URL>, finding <n>
-    ```
-- Re-review after critical/high or `auto-fix` fixups (always, even when small): resume the original reviewer via `SendMessage` (agent id from its first `Agent` call) and ask only about the incremental diff. Its "resolved" verdict is less independent than a first pass, so a fixup well outside the original findings may warrant a fresh `code-reviewer`. A reviewer run inside a Workflow has no agent id, so it always gets a fresh one.
+- When the main loop runs on `opus`, delegate implementation to a `model: sonnet` subagent, so the agent that writes the code is not the one that judges it done and merges it. The main loop keeps planning, branch/commit/PR, running verification, and the merge decision. Config/doc edits in `dotfiles`/`ops` and one-line fixes stay in the main loop.
+  - A handoff loses whatever the prompt doesn't carry, so delegate only once the spec is self-contained: the files to touch, the decided design, and the check that proves it works. If you can't write that yet, keep investigating in the main loop rather than handing the gap to the subagent.
+  - Send fixups (review findings, failed verification) back to that same implementer via `SendMessage` (agent id from its first `Agent` call) so it keeps its context; start a fresh `model: sonnet` subagent only when it can't be resumed.
+- Review gate: in branch+PR repos (never `dotfiles`/`ops`), right after `gh pr create` for a non-trivial implementation (same bar as plan mode; never for config, dependency/SHA bumps, docs, formatting), invoke the `review-gate` skill and follow it through the merge. It holds the reviewer model, what counts as approval, the medium/low tiers, the decision-note format, and re-review.
 - When you invoke the `code-review` skill on your own initiative (not me typing `/code-review <level>` myself) and I haven't named a level, default to `high`.
 
 # Advisor usage

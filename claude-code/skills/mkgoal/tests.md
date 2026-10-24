@@ -25,14 +25,15 @@ and whenever the main-loop model changes tier.
   clause and instructs showing the verification command's full output each
   turn.
 - The assembled statement always contains the standing implementation
-  pattern: delegate the implementation and any review fixups to a
-  `model: sonnet` subagent with no code Edit/Write in the main loop,
+  pattern: delegate the implementation to a `model: sonnet` subagent and
+  send review fixups back to that implementer via SendMessage, with no code
+  Edit/Write in the main loop,
   review with a `code-reviewer` subagent (`model: opus`, or `model: fable`
   for a security-boundary or architectural change), and squash-merge via
   `gh pr merge --squash --delete-branch` once the reviewer approves. It is never
   asked about as a slot.
 - The assembled statement always contains the follow-up clauses: medium/low
-  findings settled by the CLAUDE.md Review gate tiers (`## Auto-fixed` in
+  findings settled by the `review-gate` skill tiers (`## Auto-fixed` in
   the PR body; `needs-decision` issues with a decision note, created without
   asking, capped at 3 × issues, overflow into one parent issue), the stuck
   rule (same failure 3 turns in a row → file and move on), and a final-turn

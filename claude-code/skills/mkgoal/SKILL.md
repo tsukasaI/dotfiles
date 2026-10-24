@@ -167,18 +167,20 @@ included:
 - Delegate the implementation to a subagent launched with `model: sonnet`.
   `/goal` never switches the model, so naming the model only in prose would
   bind nothing; the Agent tool's `model` argument does.
-- Fixups for the reviewer's findings go to a `model: sonnet` subagent too.
+- Fixups for the reviewer's findings go back to that same implementer via
+  `SendMessage`, so it keeps its context instead of a fresh subagent
+  re-deriving it from a summary (global CLAUDE.md, Model behavior).
   The main loop never runs Edit/Write on code itself; it keeps branch,
   commit, PR, verification runs, and the merge.
 - Review with a `code-reviewer` subagent before completion counts, launched
   with `model: opus`, or `model: fable` when the change touches a security
-  boundary or makes an architectural decision (global CLAUDE.md Review gate).
+  boundary or makes an architectural decision (`review-gate` skill).
 - On the reviewer's approval, the PR is pre-authorized to squash-merge via
   `gh pr merge --squash --delete-branch` without asking again. This is the
   standing exception to the usual "merge only when I say so" rule, scoped
   strictly to goals launched through this skill.
-- Settle medium/low findings by the tiers in the global CLAUDE.md Review
-  gate (`auto-fix` in the same PR, listed under `## Auto-fixed`;
+- Settle medium/low findings by the tiers in the `review-gate` skill
+  (`auto-fix` in the same PR, listed under `## Auto-fixed`;
   `needs-decision` as an issue with a decision note); the criteria live
   there only. Creating those issues and the `needs-decision` label is
   pre-authorized like the merge, capped at 3 × the number of issues in the
@@ -204,9 +206,9 @@ Build the statement on a single line from this template:
     implementation to a subagent launched with model: sonnet, then have a
     code-reviewer subagent (model: opus, or model: fable if the change touches
     a security boundary or an architectural decision) review
-    the change; send any review fixups to a model: sonnet subagent as well,
-    and never Edit/Write code in the main loop; settle medium/low findings
-    by the global CLAUDE.md Review gate tiers (auto-fix in the same PR,
+    the change; send any review fixups back to that implementer via
+    SendMessage, and never Edit/Write code in the main loop; settle
+    medium/low findings by the review-gate skill tiers (auto-fix in the same PR,
     listed under `## Auto-fixed` in the PR body; needs-decision as a
     `needs-decision` issue with a decision note, created without asking, at
     most 3 issues, the rest as a checklist in one parent issue); run
@@ -229,9 +231,9 @@ summary, and join the per-issue completion conditions with "and":
     Delegate each implementation to a subagent launched with model: sonnet,
     then have a code-reviewer subagent (model: opus, or model: fable if the
     change touches a security boundary or an architectural decision) review
-    each change; send any review fixups to a model: sonnet subagent as well,
-    and never Edit/Write code in the main loop; settle medium/low findings
-    by the global CLAUDE.md Review gate tiers (auto-fix in the same PR,
+    each change; send any review fixups back to that implementer via
+    SendMessage, and never Edit/Write code in the main loop; settle
+    medium/low findings by the review-gate skill tiers (auto-fix in the same PR,
     listed under `## Auto-fixed` in the PR body; needs-decision as a
     `needs-decision` issue with a decision note, created without asking, at
     most <3 × number of issues> issues, the rest as a checklist in one

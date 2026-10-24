@@ -51,7 +51,7 @@ For each issue, read the code it concerns (Read/Grep/Glob) and determine:
   (cite which), and pick one recommendation with a one-line reason. A plain
   bug with one obvious fix has no design question; do not invent one.
   An issue labeled `needs-decision` whose body starts with
-  `<!-- decision-note:v1 -->` (contract in the global CLAUDE.md Review gate)
+  `<!-- decision-note:v1 -->` (contract in the `review-gate` skill)
   already states its question: take `Decide` as the design question and
   `Options` as its options and recommendation, citing the note as their
   grounding, then check them against the current code like any other. The
