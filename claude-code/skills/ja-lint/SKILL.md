@@ -28,7 +28,7 @@ Stdin works when there is no file. Use `--json` if you need to post-process.
 Do not pass `--strict` or `--fail-on` (they only change the exit code).
 When the document type is unambiguous, add `--doc-type <type>` (`pr`,
 `article`, `incident`, `proposal`, `minutes`, `manual`, `slides`, `essay`,
-`formal`, `promo`, `mail`, `paper`; see `--help`). It drops rules that are
+`formal`, `promo`, `mail`, `paper`, `script`; see `--help`). It drops rules that are
 normal for that type, and reports how many hits it dropped.
 
 ## Report
@@ -43,12 +43,12 @@ the file, so an empty result means "no pattern hit", not "no AI slop".
 `scripts/yomiyasu_lint.py` and `scripts/markdown_visibility.py` (which the
 linter imports) are vendored unmodified from
 https://github.com/nanaism/yomiyasu (MIT, see `LICENSE`; Unicode-derived
-emoji data, see `UNICODE-LICENSE.txt`) at release `v2.0.1`, commit
-`1bc21f9c8e6a55fc4ccd5a2c7dfe78a7b0d814c5`. Standard library only, no
+emoji data, see `UNICODE-LICENSE.txt`) at release `v2.4.0`, commit
+`ae258d7a57b335673e30b88a018ae08d4f72c449`. Standard library only, no
 network or subprocess use. Blob pins (`git hash-object <file>`):
 
-- `scripts/yomiyasu_lint.py`: `1ed31d3b200423872c3c539d30f250e694b49bde`
-- `scripts/markdown_visibility.py`: `0e85b119b2a8231e23a0fa0c5e8a68a68b1fc40b`
+- `scripts/yomiyasu_lint.py`: `288b9526d2c176540fd45e1d419e4bb1eb23e107`
+- `scripts/markdown_visibility.py`: `446f5862342561dc45b443c75763b707697f9f31`
 
 `scripts/test_yomiyasu_lint.py` pins the fence/frontmatter behavior this
 skill relies on (`python3 -I` it). Renewal: when bumping, read the upstream
