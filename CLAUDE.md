@@ -86,7 +86,10 @@ There is no staging or deploy step (hooks apply on the next tool call,
   global `core.hooksPath` — it will silently break `lefthook install` in
   every other repo on this machine again.
 - **Trust files over docs.** When any doc — including this one — disagrees
-  with reality, reality wins; update the doc.
+  with reality, reality wins. Unlike the global report-only default
+  (*Clarify before acting* in the global CLAUDE.md), fix the doc in the
+  same commit: this repo commits straight to main and its docs are part of
+  the live config.
 - **Live config is write-protected from Bash.** `sandbox.filesystem.denyWrite`
   in `claude-code/settings.json` covers every path an unsandboxed process
   runs or evaluates (lefthook config, `setup.sh`, `tests/`, `git/`, `ssh/`,
