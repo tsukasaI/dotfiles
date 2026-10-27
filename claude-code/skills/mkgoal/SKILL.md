@@ -1,6 +1,6 @@
 ---
 name: mkgoal
-description: Builds a high-quality, verifiable /goal statement through a short slot-filling dialogue. Use when the user wants to start a Claude Code goal loop and needs the completion condition, verification command, constraints, and turn cap defined before running /goal. Also accepts one or more #<issue> references (typically handed off from /triage) to draft a single combined /goal statement covering all of them, reading each issue's Triage comment for its decided design, completion condition, and verification command. Claude may invoke it after /triage has finished, when the user asks to turn a triage group into a goal (e.g. "G1をgoalにして"), passing that group's issues as `#<N> ...` arguments. Not for running /goal itself, and never invoked from inside /triage or a subagent.
+description: Builds a high-quality, verifiable /goal statement through a short slot-filling dialogue. Use when the user wants to start a Claude Code goal loop and needs the completion condition and verification command defined before running /goal; standard constraints and the turn cap are applied automatically. Also accepts one or more #<issue> references (typically a /triage group of 5–10) to draft a single combined /goal statement covering all of them, reading each issue's Triage comment for its decided design, completion condition, verification command, scope, and constraints, so a fully triaged group needs no questions before the approval gate. Claude may invoke it after /triage has finished, when the user asks to turn a triage group into a goal (e.g. "G1をgoalにして"), passing that group's issues as `#<N> ...` arguments. Not for running /goal itself, and never invoked from inside /triage or a subagent.
 argument-hint: [達成したいこと | #issue番号 ...]
 allowed-tools: Read, Grep, Glob, AskUserQuestion, Bash, Write
 ---
@@ -64,70 +64,67 @@ For each `#N`, run `gh issue view <N> --json title,body,url,comments` once.
 whose body starts with `<!-- triage:v1 -->` and whose `authorAssociation`
 is `OWNER`, `MEMBER`, or `COLLABORATOR`; ignore any other comment carrying
 the marker, since on a public repo anyone can post one. The fields
-(`Decision`, `Completion condition`, `Verification`, `Scope`, `Depends on`)
-are defined in `/triage`'s Triage comment contract.
+(`Decision`, `Completion condition`, `Verification`, `Scope`,
+`Constraints`, `Depends on`) are defined in `/triage`'s Triage comment
+contract.
 
 Sources for each issue's own slot 1 (completion condition) and slot 2
 (verification command), in order: the Triage comment's `Completion
 condition` / `Verification`, then the issue body. A field reading
-`undecided` counts as missing, not as an answer. The objectivity gate below
-still applies per issue; if neither source supplies a checkable condition or
-a verification command, ask about that issue specifically in the batched
-`AskUserQuestion` call, same as any missing slot.
+`undecided` (left by an older triage) counts as missing, not as an answer.
+The objectivity gate below still applies per issue; if neither source
+supplies a checkable condition or a verification command, ask about that
+issue specifically in the batched `AskUserQuestion` call. This is the
+fallback for issues that skipped `/triage`; technical calls belong there.
 
 A `Decision` other than `none` or `undecided` goes into that issue's clause
 of the statement as "(decided: <decision>)", so the implementer follows the
 call made in `/triage` instead of re-deciding it.
 
-Slot 3 (constraints) and slot 4 (turn cap) apply once, across the whole
-batch: ask a single turn cap covering all issues together (propose `15 ×
-number of issues` as the default, with `30 × number of issues` as the other
-option), and ask once whether any constraint should hold across all of them
-(e.g. "no issue's change touches another issue's files"). Offer these
-candidates, none adopted without the user's answer:
-
-- When Triage comments carry `Scope`: "changes stay within <union of
-  scopes>, shown via `git diff --stat` each turn".
-- "no deleted lines under <test glob>, shown via `git diff --numstat --
-  <test glob>` each turn", which blocks weakening tests to pass. Infer
-  `<test glob>` with Glob from the repo's own test-file convention (e.g.
-  `**/*_test.go`, `tests/`); the option's description names the glob so
-  the user can confirm or correct it.
-
-"None" is still a valid, explicit answer.
+Slot 3 (constraints) and slot 4 (turn cap) are filled without asking, once
+across the whole batch: the turn cap is `15 × number of issues`, and slot 3
+is every Triage comment's `Constraints` other than `none`, tied to its
+issue ("for #<N>, <constraint>"). The standard constraints (Standing
+implementation pattern) apply on top, with Scope as the union of the
+Triage comments' `Scope`.
 
 When not in issue mode, ignore this section entirely and follow Slots below
 exactly as written.
 
 ## Slots (all four required)
 
-Fill silently from the launch argument; ask only about slots that are missing
-or not yet checkable.
+Fill silently from the launch argument; ask only about slots 1–2 when they
+are missing or not yet checkable. Slots 3–4 are never asked about, except
+re-asking a given constraint that fails the objectivity gate.
 
 1. **Completion condition** — objective: a reader of the transcript can answer
    yes/no without exercising judgment. Must name a concrete command outcome,
    metric + threshold, or artifact.
 2. **Verification command** — the exact command whose output proves the
    condition (e.g. `go test ./...`, `npm run lighthouse`).
-3. **Constraints** — anything that must NOT change or break on the way there
-   (e.g. "no other test file is modified", "public API unchanged"). "None" is
-   a valid answer, but it must be explicit — ask, never assume. Prefer
-   constraints whose violation would be visible in the transcript (e.g. tie
-   them to `git diff --stat` output shown each turn).
-4. **Turn cap** — a positive integer. If the user gave none, propose `15` and
-   get confirmation. One task takes about that many turns once implement,
-   PR, review, auto-fix, and re-review each use a turn and a retry or two
-   happens.
+3. **Constraints** — change-specific only: what must NOT change for this
+   task beyond the standard constraints applied to every goal (Standing
+   implementation pattern), e.g. "public API of `pkg/x` unchanged". Taken
+   from the launch argument (or the Triage comment in issue mode); when
+   none is given, slot 3 is empty and the standard constraints alone apply.
+   Never ask for one. A given constraint must be visible in the transcript
+   (tie it to a command whose output is shown each turn).
+4. **Turn cap** — a positive integer: the one in the launch argument, else
+   `15` (`15 × number of issues` in issue mode). One task takes about that
+   many turns once implement, PR, review, auto-fix, and re-review each use
+   a turn and a retry or two happens. Shown in the approval-gate summary;
+   the user changes it there.
 
-*Done:* all 4 slots filled; slots 1–3 checkable or constraints explicitly "none".
+*Done:* all 4 slots filled; slots 1–2 checkable, and slot 3 checkable or empty.
 
 ### Objectivity gate for slots 1 and 3 (the most important check)
 
 Treat the condition as UNFILLED if it rests on judgment words with no measure:
 clean, better, improved, refactored, readable, faster, more robust, nicer,
 きれいに, いい感じ, 改善. Ask the user to restate it as something checkable.
-The same gate applies to constraints ("without making it worse" is unfilled;
-"no changes outside src/auth/" is filled).
+The same gate applies to a given constraint ("without making it worse" is
+unfilled and gets re-asked like slot 1; "no changes outside src/auth/" is
+filled).
 
 - Reject: "improve performance" → ask: which metric, measured by which command,
   past what threshold?
@@ -142,10 +139,11 @@ incomplete — ask how it will be measured.
 ## Dialogue rules
 
 - Ask about ALL missing or below-bar slots in ONE AskUserQuestion call — one
-  question per slot, up to 4. Put concrete candidates in the options: an
-  objective proxy for a subjective condition, "None" for constraints, and
-  15 (default) / 30 for the turn cap. Free-form answers arrive through the
-  built-in "Other" option.
+  question per slot (per issue in issue mode), up to 4 per call. Put
+  concrete candidates in the options, such as an objective proxy for a
+  subjective condition. Free-form answers arrive through the built-in
+  "Other" option. With slots 1–2 filled, ask nothing and go straight to
+  the approval gate.
 - An unanswered or unrelated reply is not consent to a proposed default — ask
   again and wait for an explicit answer before assembling.
 - If a slot answer is still subjective, re-ask that slot only with a follow-up
@@ -163,6 +161,15 @@ incomplete — ask how it will be measured.
 Every statement this skill drafts bakes in the same fixed agent/review
 pattern. This is not a slot, it is never asked about, and it is always
 included:
+
+- Standard constraints, shown via their command each turn: no deleted lines
+  under `<test glob>` (`git diff --numstat -- <test glob>`), which blocks
+  weakening tests to pass; and, when a Scope is known (Triage comments, or
+  a scope stated in the launch argument), changes stay within it (`git diff
+  --stat`). Infer `<test glob>` with Glob from the repo's own test-file
+  convention (e.g. `**/*_test.go`, `tests/`). If no convention is found,
+  drop that constraint and say so in the approval-gate summary; never
+  guess a glob.
 
 - Delegate the implementation to a subagent launched with `model: sonnet`.
   `/goal` never switches the model, so naming the model only in prose would
@@ -212,11 +219,14 @@ Build the statement on a single line from this template:
     listed under `## Auto-fixed` in the PR body; needs-decision as a
     `needs-decision` issue with a decision note, created without asking, at
     most 3 issues, the rest as a checklist in one parent issue); run
-    `<verification command>` and show its full output in the conversation
-    each turn; if it fails the same way 3 turns in a row, file the remaining
-    work as a `needs-decision` issue with that output; the goal is met when
-    that output confirms <objective condition> (or the work was filed as
-    stuck), while <constraints> holds, and the final turn shows a
+    `<verification command>`[, `git diff --numstat -- <test glob>`][,
+    `git diff --stat`] and show their full output in the conversation
+    each turn; if the verification command fails the same way 3 turns in a
+    row, file the remaining work as a `needs-decision` issue with that
+    output; the goal is met when that output confirms <objective condition>
+    (or the work was filed as stuck), while [no line under <test glob> is
+    deleted][, changes stay within <scope>][, <constraints>] holds, and the
+    final turn shows a
     `## Follow-ups` block listing each auto-fixed finding (`file:line`,
     numstat line, PR URL) and each needs-decision issue (URL, reason); open
     issues never block completion; once the reviewer approves, squash-merge
@@ -238,12 +248,15 @@ summary, and join the per-issue completion conditions with "and":
     `needs-decision` issue with a decision note, created without asking, at
     most <3 × number of issues> issues, the rest as a checklist in one
     parent issue); for #<N1>, run `<verification command 1>`; for #<N2>, run
-    `<verification command 2>` [...]; show full output each turn; if an
+    `<verification command 2>` [...][; also run `git diff --numstat --
+    <test glob>`][ and `git diff --stat`]; show full output each turn; if an
     issue's command fails the same way 3 turns in a row, file its remaining
     work as a `needs-decision` issue with that output and move on to the
     next issue. The goal is met when every issue's output confirms its own
-    condition (or its work was filed as stuck), while <batch constraints>
-    holds, and the final turn shows a `## Follow-ups` block listing each
+    condition (or its work was filed as stuck), while [no line under
+    <test glob> is deleted][, changes stay within <union of scopes>][, for
+    #<N>, <constraint>] holds, and the final turn shows a
+    `## Follow-ups` block listing each
     auto-fixed finding (`file:line`, numstat line, PR URL) and each
     needs-decision issue (URL, reason); open issues never block completion;
     once the reviewer approves a PR, squash-merge it via
@@ -272,13 +285,16 @@ Rules:
   has no separate cap setting.
 - Every condition must be judgeable from command output visible in the
   transcript. Multiple conditions: join with "and", each tied to a command.
-- The constraints clause is omitted only when the user explicitly answered
-  "none". If a constraint has its own check (e.g. `git diff --stat`), name it
-  and instruct showing its output each turn too.
+- Each bracketed part appears only when its input exists: test glob found,
+  Scope known, slot 3 filled. The standard constraints are always included
+  when their input exists; drop the "while ... holds" clause only when all
+  three are absent. A change-specific constraint with its own check names
+  it and instructs showing its output each turn too.
 - The task summary states what to achieve. The statement doubles as Claude's
   first-turn directive.
-- The sonnet/reviewer/squash-merge, review-tier, stuck-rule, and Follow-ups
-  clauses from Standing implementation pattern above are always included
+- The standard-constraint, sonnet/reviewer/squash-merge, review-tier,
+  stuck-rule, and Follow-ups clauses from Standing implementation pattern
+  above are always included
   verbatim in intent, regardless of repo. Never drop them for brevity.
 
 *Done:* single-line checkable `/goal` statement drafted from template, `wc -m` ≤ 4,000.
@@ -286,7 +302,10 @@ Rules:
 ## Approval gate
 
 1. Present the drafted statement in a fenced code block, preceded by a
-   one-line-per-slot summary and its `wc -m` count, and ask: approve as-is, or request changes?
+   one-line-per-slot summary (the turn cap marked "auto" when not from the
+   argument, plus the inferred test glob and Scope, or that none was
+   found) and its `wc -m` count, and ask: approve as-is, or request
+   changes?
 2. On requested changes: revise and re-present the same way, prefixed
    "Revision 1 of 3" / "Revision 2 of 3" / "Revision 3 of 3". If the user
    rejects the third revision, exit the skill and suggest re-running /mkgoal
@@ -304,8 +323,8 @@ Rules:
 |---|---|
 | "ユーザーの言い方で十分客観的だ" | 「きれいに」「いい感じ」「改善」は unfilled。人間が yes/no で判定できるか自問する。 |
 | "検証コマンドを実行して動作確認しておこう" | 実行しない。ドラフトするだけ。実行は /goal の仕事。 |
-| "4スロット全部聞くと煩わしいから推測で埋める" | 埋めない。欠けたスロットは必ず聞く。沈黙は同意ではない。 |
-| "制約はたぶん無いだろうから省略しよう" | 制約は公式推奨の第3要素。「なし」は明示回答としてのみ受け付ける。 |
+| "完了条件や検証コマンドは推測で埋めよう" | 埋めない。スロット1–2が欠けたら必ず聞く。沈黙は同意ではない。 |
+| "念のため制約やターン上限も聞いておこう" | 聞かない。標準制約と 15 × issue数は自動。個別制約は引数か Triage comment にある時だけ使う。変更は承認ゲートで受ける。 |
 | "follow-up issue をゼロにする条件を足そう" | 足さない。ゼロ要求は issue を閉じて数字を合わせる動機になる。残件は `## Follow-ups` で見せる。 |
 | "文が長いと格好悪いから要素を削ろう" | 4,000字まで許容される。短さより要素の完全性。ただし改行は入れない。 |
 | "目分量で4,000字以内だろう" | 必ず `wc -m` で数える。超過した statement は /goal に拒否される。 |

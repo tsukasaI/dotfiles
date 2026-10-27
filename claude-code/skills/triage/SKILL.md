@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Organizes the open GitHub issues in the current repo and settles their direction. Reads the code each issue touches (fanning out to sonnet Explore agents when the backlog is large) and proposes one board covering stale issues, duplicates to merge, dependency groups, and work order. The user approves or revises the board in one step, then picks an option for every open design question. Records each "go" issue's decision, completion condition, verification command, and scope as a structured Triage comment on the issue. Use when reviewing the backlog or deciding what to build next. Ends with the go issues in work order, grouped by dependency.
+description: Organizes the open GitHub issues in the current repo and settles their direction. Reads the code each issue touches (fanning out to sonnet Explore agents when the backlog is large) and proposes one board covering stale issues, duplicates to merge, groups of 5–10 issues sized for one /goal loop each, and work order. The user approves or revises the board in one step, then settles every open technical call (design option, completion condition, verification command, change-specific constraint). Records each "go" issue's decision, completion condition, verification command, scope, and constraints as a structured Triage comment on the issue, so /mkgoal needs no further technical questions. Use when reviewing the backlog or deciding what to build next. Ends with the go issues in work order, one line per group.
 disable-model-invocation: true
 argument-hint: (none, scans the current repo)
 allowed-tools: Bash, Read, Grep, Glob, Write, AskUserQuestion, Agent
@@ -23,8 +23,9 @@ survive, stale issues get re-implemented, and design calls get made mid-task
 by whoever is implementing. This skill makes those calls once, with the code
 and the whole backlog in view, and leaves the answers on each issue in
 GitHub, where any later step (`/mkgoal`, or a human picking an issue by
-hand) can read them. Sizing work into `/goal` loops is not this skill's
-concern; `/mkgoal` owns that.
+hand) can read them. Every technical call is made here, so `/mkgoal` only
+assembles; and groups are sized for one long-running `/goal` loop each
+(5–10 issues), since a loop for a single issue is rarely worth starting.
 
 ## Scan
 
@@ -60,13 +61,19 @@ For each issue, read the code it concerns (Read/Grep/Glob) and determine:
   done-state and the command that would show it (`go test ./...`, a
   lefthook job, a `shguard` payload check). If the command references a repo
   script, target, or path, confirm it exists with Grep/Glob. Never execute
-  it. If no checkable candidate exists, leave it "undecided"; `/mkgoal` will
-  ask.
+  it. If no checkable candidate exists, mark it missing; Design will ask.
+- **Constraint candidates**: something that must not change for this issue
+  specifically, with the command whose output would show a violation
+  (e.g. "exported signatures in `pkg/api` unchanged, shown via `git diff
+  -- pkg/api`"). Only what the issue body or code makes specific to this
+  change; never the standard constraints `/mkgoal` applies to every goal
+  (no deleted test lines, changes stay within Scope). Most issues have
+  none; do not invent one.
 
 **Fan-out**: with more than 5 open issues, split them across up to 3
 `Agent` calls (`subagent_type: Explore`, `model: sonnet`), launched in one
 message. Give each agent its issues' number, title, and body, and ask it to
-return exactly the five fields above per issue, with `file:line` evidence.
+return exactly the six fields above per issue, with `file:line` evidence.
 Before using any agent's report, verify one load-bearing claim from it
 yourself (e.g. re-read the `file:line` it cites for an "already resolved"
 verdict).
@@ -75,7 +82,7 @@ Duplicate and overlap detection runs in the main loop over all results
 together: two issues are duplicates when they ask for the same change to the
 same code, not merely when they share a file.
 
-*Done:* every open issue has all five fields, and every agent report had one
+*Done:* every open issue has all six fields, and every agent report had one
 claim verified.
 
 ## Board
@@ -98,14 +105,22 @@ same rank, older `createdAt` first), then adjust so every issue comes after
 the issues it depends on. `needs-decision` ranks with `bug` because those
 issues are follow-ups a `/goal` run left waiting on the user.
 
-Grouping (for `go` issues only): issues that depend on each other or touch
-the same code go in the same group, in dependency order, so they are worked
-on together. Independent issues each get their own group. Groups have no
-size cap here; how many issues one `/goal` loop takes is `/mkgoal`'s call.
+Grouping (for `go` issues only), one group per `/goal` loop:
+
+1. Units: issues that depend on each other or touch the same code form one
+   unit, in dependency order. A unit is never split across groups.
+2. Packing: with T `go` issues, make ceil(T / 10) groups of near-equal
+   size (13 → 7 + 6, 21 → 7 + 7 + 7), filling them with whole units in
+   work order, so every group holds 5–10 issues. When whole units make an
+   exact split impossible, stay as close to equal as they allow.
+3. With T < 5, all `go` issues form G1. A unit larger than 10 forms its own
+   group; `/mkgoal` asks about splitting it.
+
 Name groups `G1`, `G2`, ... in work order.
 
-Below the table, list each `go` issue's design questions (if any) in one
-line each, so the user sees what Design will ask.
+Below the table, list each `go` issue's open questions for Design (design
+question, missing completion condition or verification, constraint
+candidate) in one line each, so the user sees what Design will ask.
 
 Ask for approval with a single `AskUserQuestion` question: approve this
 board as-is, or revise it (revisions come through the built-in "Other"
@@ -118,17 +133,34 @@ re-running `/triage`.
 
 ## Design
 
-For every `go` issue with a design question, ask the user to pick an option
-via `AskUserQuestion` (up to 4 questions per call; run it back to back until
-every question has an answer). Use the options from Analyze, mark the
-recommended one "(Recommended)" and put it first, and state each option's
-grounding (issue body or `file:line`) in its description. Always include
-an "Undecided, leave it to /mkgoal or implementation time" option.
+Every technical call is settled here; `/mkgoal` asks none in the normal
+path. For each `go` issue, ask via `AskUserQuestion` (up to 4 questions per
+call; run it back to back until every question has an answer):
+
+- **Design question**: the options from Analyze, the recommended one first
+  and marked "(Recommended)", each option's grounding (issue body or
+  `file:line`) in its description.
+- **Completion condition / verification command**, when Analyze found no
+  checkable candidate: offer the closest objective candidates (grounded the
+  same way); a free-form answer comes through "Other". The answer must pass
+  `/mkgoal`'s objectivity gate (a yes/no from command output, no judgment
+  words); re-ask once with a concrete candidate if it does not.
+- **Constraint**, only when Analyze found a candidate: the candidate
+  (Recommended) and "None".
+
+The design and completion/verification questions also offer "Move to
+schedule": a `go` issue must leave Design fully decided, so an issue the
+user cannot decide yet becomes `schedule`. Picking it is the user's
+authorization to apply `schedule` to that issue instead of `go`; re-pack
+the remaining `go` issues by the Grouping rules and show the new group
+lines before Apply.
 
 This step runs only for `go` issues; never for `schedule`, `close`, or
 `merge` ones.
 
-*Done:* every design question has an answer, "Undecided" included.
+*Done:* every question has an answer, and every remaining `go` issue has a
+decided Decision, completion condition, verification command, and
+constraints.
 
 ## Apply
 
@@ -161,14 +193,16 @@ verbatim:
     <!-- triage:v1 -->
     ## Triage YYYY-MM-DD
     - Group: G<n> (order <k>)
-    - Decision: <chosen option, one line | undecided | none>
-    - Completion condition: <objective done-state | undecided>
-    - Verification: `<command>` | undecided
+    - Decision: <chosen option, one line | none>
+    - Completion condition: <objective done-state>
+    - Verification: `<command>`
     - Scope: <files or directories the fix touches>
+    - Constraints: <change-specific constraint, with the command that shows it | none>
     - Depends on: #<N>, ... | none
 
-"none" under Decision means the issue posed no design question;
-"undecided" means it did and the user deferred it.
+"none" under Decision means the issue posed no design question. A `go`
+issue never carries `undecided`; comments from before this rule may, and
+`/mkgoal` treats such a field as missing.
 
 ## Hand off
 
@@ -176,14 +210,12 @@ If no issue ended up `go`, say so and stop.
 
 Otherwise list the `go` issues in work order, one line per group:
 
-    G1: #<N1> → #<N2>  (<one-line reason they belong together>)
-    G2: #<N3>
+    G1: #<N1> → #<N2> → ... (<n> issues; dependency units in brackets, e.g. [#<N1> → #<N2>])
+    G2: #<N3> → ...
 
-Mark any issue whose Triage comment carries an `undecided` field, so the
-user knows what is still open. Then add one closing line naming the usual
-next step (e.g. "`/mkgoal #<N1> #<N2>` turns G1 into a /goal statement");
-it is a pointer, not the skill's output. Do not draft a goal statement or
-decide how many issues one `/goal` takes; that is `/mkgoal`'s job.
+Then add one closing line naming the usual next step (e.g. "`/mkgoal #<N1>
+#<N2> ...` turns G1 into a /goal statement"); it is a pointer, not the
+skill's output. Do not draft a goal statement.
 
 ## Red flags
 
@@ -191,7 +223,9 @@ decide how many issues one `/goal` takes; that is `/mkgoal`'s job.
 |---|---|
 | "古そうだから stale で閉じよう" | stale にするのはコードに解決済みの根拠 (`file:line`) がある時だけ。古さは根拠にならない。 |
 | "同じファイルを触るから重複だ" | 重複は同じコードへの同じ変更を求めている時だけ。ファイルが重なるだけなら同じグループにまとめる。 |
-| "/goal に収まるようにグループを分割しておこう" | goal の大きさは /mkgoal が決める。triage は依存とコードの重なりだけでグループを作る。 |
+| "独立した issue は1件ずつ別グループにしよう" | 1 issue の /goal はほぼ使わない。独立していても作業順に詰めて 5〜10 件のグループにする。依存単位だけは割らない。 |
+| "決めきれないから undecided で go にしておこう" | go は全部決まった状態で出す。決められないなら「Move to schedule」。/mkgoal に技術判断を残さない。 |
+| "制約を書いておいた方が安全だ" | テスト削除禁止と Scope 外禁止は /mkgoal が毎回自動で入れる。Constraints にはその変更だけに効くものを、本文かコードに根拠がある時だけ書く。 |
 | "選択肢を増やした方が親切だ" | 選択肢はすべて本文かコードに根拠を持つこと。根拠のない選択肢は作らない。 |
 | "盤面が承認されたから設計判断も推奨で埋めておこう" | 盤面の承認はアクションへの許可だけ。設計判断は Design で個別に聞き、答えを待つ。 |
 
@@ -208,7 +242,9 @@ decide how many issues one `/goal` takes; that is `/mkgoal`'s job.
   command.
 - Never close or comment on an issue unless the approved board lists that
   action for that issue.
-- Never record a Decision the user did not pick in Design; "Undecided" is
-  a valid answer and is recorded as `undecided`.
+- Never record a Decision, completion condition, verification command, or
+  constraint the user did not pick or accept in Design (a candidate
+  Analyze found unambiguously in the issue body or code is recorded without
+  asking only for completion condition and verification).
 - Never execute a verification command; only confirm the script or path
   it names exists.

@@ -16,11 +16,12 @@ on a scratch repo, not on a backlog you care about.
 - Multi-line comment bodies go through `--body-file` with a file under the
   scratchpad, never a multi-line `--body`.
 - Every `go` issue ends with exactly one comment starting with
-  `<!-- triage:v1 -->`, carrying all six contract fields, with the date
-  taken from `date +%F`.
+  `<!-- triage:v1 -->`, carrying all seven contract fields with no field
+  reading `undecided`, and the date taken from `date +%F`.
 - The final output lists the `go` issues in work order, one line per
   group, followed by at most one pointer line to `/mkgoal`; the skill
-  never runs `/mkgoal` or `/goal` and never caps group size.
+  never runs `/mkgoal` or `/goal`. Every group holds 5–10 issues, except
+  when fewer than 5 issues are `go` or a dependency unit alone exceeds 10.
 
 ## Tests
 
@@ -56,9 +57,10 @@ where the code admits two reasonable fixes.)
 
 Expected: Design asks via AskUserQuestion with options that each cite the
 body or a `file:line`, the recommended one first and marked
-"(Recommended)", plus an "Undecided" option. The chosen option lands in
-the Triage comment's `Decision`; picking "Undecided" records
-`Decision: undecided`.
+"(Recommended)", plus "Move to schedule" and no "Undecided" option. The
+chosen option lands in the Triage comment's `Decision`. Picking "Move to
+schedule" posts the `Scheduled` comment instead of a Triage comment, and
+the remaining `go` issues are re-packed and shown before Apply.
 
 ### 5. Plain bug, no design question
 
@@ -79,13 +81,17 @@ anywhere in the transcript.
 
 ### 7. Grouping
 
-(Five `go`-worthy issues: a chain of four where each depends on the
-previous one, and one independent issue.)
+Run three backlogs of `go`-worthy issues:
 
-Expected: the chain of four shares one group in dependency order, not
-split at 3; the independent issue gets its own group. Hand off lists
-`G1: #a → #b → #c → #d` and `G2: #e`, matching each Triage comment's
-`Group: G<n> (order <k>)`.
+- (a) Seven independent issues.
+- (b) Thirteen issues: a chain of four where each depends on the previous
+  one, plus nine independent issues.
+- (c) Twelve issues forming one dependency chain.
+
+Expected: (a) one group of 7, not seven groups of 1. (b) two groups of
+near-equal size (7 + 6 or 6 + 7), the chain of four kept whole inside one
+group in dependency order. (c) one group of 12, not split. Hand off lines
+match each Triage comment's `Group: G<n> (order <k>)`.
 
 ### 8. Fan-out above 5 issues
 
@@ -98,7 +104,7 @@ shown. With 5 or fewer issues, no Agent call is made.
 
 ### 9. Re-triage
 
-Run test 7, then run `/triage` again without changing anything.
+Run test 7 (a), then run `/triage` again without changing anything.
 
 Expected: the board marks each previously triaged issue "triaged <date>";
 each still-`go` issue gets a fresh Triage comment, and `/mkgoal` (tested in
@@ -113,5 +119,25 @@ unlabeled issue of the same age.)
 Expected: the board ranks the `needs-decision` issue above the unlabeled
 one. If it goes `go`, Design asks its `Decide` line as the question, with
 the note's `Options` as the options (the recommended one first), each
-citing the note, plus "Undecided". The same body without the label gets no
-pre-filled question.
+citing the note, plus "Move to schedule". The same body without the label
+gets no pre-filled question.
+
+### 11. Completion condition not derivable
+
+(A `go`-worthy issue whose body and code suggest no checkable done-state or
+command.)
+
+Expected: Design asks for its completion condition and verification
+command, with grounded candidates and "Move to schedule". A judgment-word
+answer (e.g.「いい感じに動く」) is re-asked once with a concrete candidate.
+The Triage comment never reads `undecided`.
+
+### 12. Change-specific constraint
+
+(Two `go`-worthy issues: one whose body says an exported API must stay
+unchanged, one plain bug.)
+
+Expected: Design asks a constraint question only for the first, offering
+the candidate tied to a command (Recommended) and "None". The plain bug
+gets no constraint question and `Constraints: none`. No Triage comment
+records "no deleted tests" or "stay within Scope" as a constraint.
