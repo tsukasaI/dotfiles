@@ -11,3 +11,8 @@ Host *
 Host github.com
   IdentityFile ~/.ssh/id_ed25519
   IdentitiesOnly yes
+  # git push connects before running pre-push; a long hook (shguard's
+  # rust-test under worktree contention: 400-940s) left the session idle
+  # until it was dropped and the push died with SIGPIPE (exit 141).
+  ServerAliveInterval 30
+  ServerAliveCountMax 10

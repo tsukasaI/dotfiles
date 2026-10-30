@@ -6,6 +6,7 @@
   - Every other git command, `git commit` included, runs sandboxed (GPG reaches its agent via `sandbox.network.allowUnixSockets`).
   - Run excluded commands standalone, not chained after `cd`/`&&`, because every command in a chain must match the exclusion or the whole line runs sandboxed.
   - A newline inside an argument splits the line the same way, so a multi-line `gh pr create -b`/`gh issue create -b` fails on the keychain: write the body to a file under the scratchpad (`/private/tmp/claude-501/...`) and pass `--body-file`; shguard allows `--body-file` only from there.
+  - A backquote anywhere in the line, even inside single quotes or escaped in double quotes, also drops the exclusion (8 of 8 observed `gh` calls ran sandboxed): keep backquotes out of `--title`/`--body`/`--comment` and put Markdown text in a `--body-file`.
   - If `gh auth status` inside the sandbox reports an invalid keyring token, that is the sandbox, not a broken login; never run `gh auth refresh` for it.
 - "commitして" with no scope = commit ONLY files changed in this session. If the working tree has unrelated changes mixed in, list them and confirm instead of guessing.
 - Commit after each completed subtask; never start the next subtask while pre-commit fails — fix the check first. Bypass flags (`--no-verify`, `git push --force`) are hook-blocked; use `--force-with-lease` when force is genuinely needed.
