@@ -67,6 +67,9 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   and write to a one-line summary (`+N -M` / line count) and shows the
   built-in diff or content on `Ctrl+O`; the built-in edit renderer still
   runs while collapsed because it holds the diff preview in renderer state.
+  `copy-code.ts` adds `/copy-code [n]`: walks the branch back to the newest
+  assistant reply with a fenced block (CommonMark fences, so a ```` block
+  quoting ``` stays whole) and `pbcopy`s block n, else the longest.
   `format.ts` runs `fini` after write/edit (as Claude Code's PostToolUse)
   and tells the model when the file changed. `style-guards.ts` runs
   `claude-code/hooks/slop-guard.ts` on prose writes and imports
