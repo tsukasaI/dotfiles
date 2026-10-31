@@ -24,6 +24,8 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   `refs/pi-checkpoints/<session>/<n>` once per prompt before the first
   edit/write/bash; `usage-log.ts` appends per-turn tokens/cost to
   `~/.pi/agent/usage/YYYY-MM.jsonl` (`PI_USAGE_LOG_DIR` overrides).
+  `statusline.ts` replaces the TUI footer (theme colors; today's cost is
+  read from usage-log's JSONL, so it imports `./usage-log.ts`).
 - Load check without model calls: send `{"type":"get_commands"}` to
   `pi --mode rpc --no-session`.
 - The `--container` mode uses its own `pi-agent-home` volume, so none of

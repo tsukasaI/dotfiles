@@ -119,6 +119,16 @@ export function readMonth(d: Date): UsageRecord[] {
 	return out;
 }
 
+/** Total cost logged today (local date), main calls plus nested tool usage. */
+export function todayCost(now = new Date()): number {
+	const today = localDate(now);
+	let cost = 0;
+	for (const r of readMonth(now)) {
+		if (localDate(new Date(r.ts)) === today) cost += r.cost.total + r.toolCost;
+	}
+	return cost;
+}
+
 function sum(recs: UsageRecord[]): Tokens & { turns: number } {
 	const t = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0, cost: 0, turns: 0 };
 	for (const r of recs) {
