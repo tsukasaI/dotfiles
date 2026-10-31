@@ -16,6 +16,7 @@ Personal dotfiles for macOS (Apple Silicon) managed with nix-darwin.
 ├── mise/          # Near-empty on purpose; toolchains come from Nix
 ├── git/           # Git configuration
 ├── claude-code/   # Global Claude Code config (settings, hooks, skills, agents, rules)
+├── pi/            # Pi coding agent (API-key billing): settings, extensions, prompts
 ├── docs/          # Investigation memos for this repo
 └── tests/         # shellcheck / shguard parity / rules sync checks (CI + lefthook)
 ```
@@ -38,7 +39,7 @@ Personal dotfiles for macOS (Apple Silicon) managed with nix-darwin.
 git clone https://github.com/tsukasaI/dotfiles.git ~/dotfiles
 
 # Symlink configs
-sh setup.sh
+bash setup.sh
 
 # Apply nix-darwin configuration
 # First run (darwin-rebuild not on PATH yet):
@@ -89,8 +90,14 @@ Configuration lives in `claude-code/`.
 
 ```
 claude-code/
+├── CLAUDE.md            # Global instructions (→ ~/.claude/CLAUDE.md)
 ├── settings.json        # Permissions, hooks, model, status line
 ├── statusline.ts        # Powerline status line (Bun/TypeScript)
+├── hooks/               # PreToolUse/PostToolUse/SessionEnd hooks (see hooks/README.md)
+├── lib/                 # Shared code for the hooks (transcript parsing, redaction)
+├── mod/                 # dotfiles-mod plugin (rule guards, $HOME rewrite, panes)
+├── rules/ skills/ agents/ themes/   # → ~/.claude/
+├── scripts/             # Manual-only tools (push-to-turso.sh)
 └── shguard/
     └── config.toml       # Rules for the shguard binary (PreToolUse Bash guardrail)
 ```
@@ -136,10 +143,18 @@ see the `Read(...)` entries there (secrets, credentials, `.env*`, private keys, 
 - `/clear` > `/compact` when you know what matters. Writing the brief yourself ("refactoring X, constraint is Y, relevant files are A/B, ruled out Z") produces cleaner context than trusting the model to summarize.
 - Compact proactively, not reactively. Run `/compact` early with a directive (e.g. `/compact focus on the auth refactor, drop the test debugging`) — auto-compact fires when context rot has already degraded the model.
 
+## Pi
+
+`pi/` configures the pi coding agent (`pi-coding-agent` from nixpkgs), run through `pi-factory` so it bills an API key instead of the Claude Code
+subscription. Its extensions reuse the Claude Code guardrails rather than
+copying them: shguard gates bash, `file-guard` applies the `Read(...)` deny
+rules and `block-config-edit.sh` to file tools, and `style-guards` runs
+`slop-guard.ts` and the mod plugin's commit checks. Details:
+`.claude/rules/pi.md`. Tests: `bun test pi/tests`.
+
 ## Troubleshooting
 
 - `darwin-rebuild switch` fails with a user mismatch: ensure `system.primaryUser` in `nix-darwin/flake.nix` matches `whoami`.
-- `setup.sh` fails on symlink conflicts: remove the existing target (e.g. `rm ~/.zshrc`) and re-run.
 - Claude Code hooks do nothing: confirm `~/.claude/settings.json` resolves on this host and `$HOME/dotfiles/...` paths exist.
 - Homebrew cask conflict after `cleanup = "zap"`: run `brew uninstall --cask <name>` manually, then rebuild.
 - `SessionStart` hook errors or is missing: on a fresh machine, `~/.claude/hooks/herdr-agent-state.sh` doesn't exist until `herdr` has run its own install step (it is not cloned or symlinked by this repo). Run the `herdr` integration setup for Claude Code, or remove the `SessionStart` entry in `claude-code/settings.json` if you don't use `herdr`.

@@ -49,6 +49,11 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   by `claude-code/hooks/block-config-edit.sh`, and also protects pi's own
   guards (`file-guard.ts`, `shguard.ts`, `settings.json`, `.pi` extension
   dirs), so changing those is a manual edit, as on the Claude Code side.
+  `format.ts` runs `fini` after write/edit (as Claude Code's PostToolUse)
+  and tells the model when the file changed. `style-guards.ts` runs
+  `claude-code/hooks/slop-guard.ts` on prose writes and imports
+  `claude-code/mod/hooks/rule-guards.ts`' commit-message and main-branch
+  checks; both fail open, like their Claude Code originals.
   `subagent.ts` runs scout (Haiku) / research / worker (Sonnet) / reviewer
   (Opus; prompt = body of `claude-code/agents/code-reviewer.md`) as child
   `pi --mode json -p` processes with `PI_SUBAGENT=1`, which stops the
