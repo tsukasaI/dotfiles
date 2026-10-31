@@ -1,6 +1,9 @@
 {
   "defaultProvider": "anthropic",
-  "defaultModel": "claude-sonnet-5-5",
+  "defaultModel": "claude-opus-5-5",
   "enableInstallTelemetry": false,
-  "lastChangelogVersion": "1.1.0"
+  "lastChangelogVersion": "1.3.0",
+  "extensions": ["~/dotfiles/pi/extensions"],
+  "skills": ["~/.claude/skills/ja-lint", "~/.claude/skills/handover"],
+  "prompts": ["~/dotfiles/pi/prompts"]
 }

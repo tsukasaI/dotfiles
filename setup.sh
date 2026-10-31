@@ -69,6 +69,9 @@ chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
 mkdir -p ~/.local/bin ~/.pi/agent
 link_with_backup "$DOTFILES/pi/pi-factory" ~/.local/bin/pi-factory
 link_with_backup "$DOTFILES/pi/settings.json" ~/.pi/agent/settings.json
+# Context files have no settings.json path option, so AGENTS.md needs a link;
+# extensions/prompts/skills are referenced from settings.json instead.
+link_with_backup "$DOTFILES/pi/AGENTS.md" ~/.pi/agent/AGENTS.md
 
 # Per-repo git hooks (lefthook): this repo's own pre-commit gitleaks check.
 # On a fresh machine setup.sh runs before darwin-rebuild switch, so lefthook
