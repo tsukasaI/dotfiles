@@ -36,7 +36,11 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   `shguard.ts` runs each model-issued bash command through
   `shguard check --json` (same `~/.config/shguard/config.toml` as Claude
   Code) and blocks anything but `Allow`, fail-closed; `!` commands are not
-  gated.
+  gated. `model-router.ts` registers `router/auto` (the default model): Haiku
+  rates each user turn and routes it to Haiku/Sonnet/Opus; manual override
+  is picking a physical model (`enabledModels` limits Ctrl+P to these four).
+  The rating call's cost goes to usage-log's JSONL only (routers cannot add
+  to the session total).
 - Load check without model calls: send `{"type":"get_commands"}` to
   `pi --mode rpc --no-session`.
 - The `--container` mode uses its own `pi-agent-home` volume, so none of

@@ -190,6 +190,21 @@ export function renderLines(d: StatusData, theme: SegmentTheme, width: number): 
 }
 
 /** Tokens and cost over every entry in the session file, abandoned branches included: they were paid for too. */
+/**
+ * Model label. A virtual model (model-router's router/auto) names only the
+ * selection, so the physical model of the latest response on this branch is
+ * appended: "auto \u2192 claude-sonnet-5-5".
+ */
+export function modelLabel(model: { provider: string; id: string } | undefined, branch: readonly any[]): string | undefined {
+	if (!model) return undefined;
+	if (model.provider !== "router") return model.id;
+	for (let i = branch.length - 1; i >= 0; i--) {
+		const m = branch[i]?.type === "message" ? branch[i].message : undefined;
+		if (m?.role === "assistant" && m.model && m.provider !== "router") return `${model.id} \u2192 ${m.model}`;
+	}
+	return model.id;
+}
+
 export function sessionTotals(entries: readonly any[]): { input: number; output: number; cost: number } {
 	const t = { input: 0, output: 0, cost: 0 };
 	for (const e of entries) {
@@ -267,7 +282,7 @@ export default function statusline(pi: ExtensionAPI) {
 						{
 							cwd: ctx.cwd,
 							branch: footerData.getGitBranch(),
-							model: ctx.model?.id,
+							model: modelLabel(ctx.model, ctx.sessionManager.getBranch()),
 							thinking: pi.getThinkingLevel(),
 							contextPercent: usage?.percent ?? null,
 							contextWindow: usage?.contextWindow ?? ctx.model?.contextWindow ?? 0,
