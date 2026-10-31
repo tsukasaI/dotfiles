@@ -1,9 +1,12 @@
 /**
- * statusline: replaces pi's footer with a two-row status line in the active
- * theme's colors (pi-side counterpart of claude-code/statusline.ts).
+ * statusline: replaces pi's footer with powerline-style segments (pi-side
+ * counterpart of claude-code/statusline.ts). Only the cwd stands out; the
+ * other segments alternate two quiet grays so boundaries stay visible, and a
+ * context or rate-limit segment turns warning/error colored at 70%/90%.
  *
- *   row 1: » dir │ ⎇ branch │ ◇ model │ ↯ thinking │ ⚙ running tool(s)
- *   row 2: context bar % / window │ ≡ in↓ out↑ │ $session · today · month │ rate limit │ extension statuses
+ *   row 1: » dir  ⎇ branch  ◇ model  ↯ thinking  ⚙ running tool(s)
+ *   row 2: context bar % / window  ≡ in↓ out↑  $session · today · month
+ *   row 3: rate limit  extension statuses (omitted when both are empty)
  *
  * Today's and this month's cost come from usage-log's JSONL, re-read at session
  * start, turn start, and when the run settles, so they lag by at most the
@@ -14,12 +17,73 @@
 
 import { homedir } from "node:os";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import { colorToRgb, mixColors, truncateToWidth } from "@earendil-works/pi-tui";
 import { costTotals } from "./usage-log.ts";
 
-/** The subset of pi's Theme this file uses; keeps renderLines testable. */
-export interface FgTheme {
-	fg(color: string, text: string): string;
+export type Role = "cwd" | "quiet" | "quiet2" | "warn" | "crit";
+
+/** Maps segment roles to colors; keeps renderLines testable without pi's Theme. */
+export interface SegmentTheme {
+	paint(role: Role, text: string): string;
+	/** ARROW in `from`'s background over `to`'s background (the terminal's when undefined). */
+	arrow(from: Role, to: Role | undefined): string;
+}
+
+/** Powerline separator (Nerd Font U+E0B0); the terminal font must be a Nerd Font. */
+const ARROW = "\ue0b0";
+
+interface Segment {
+	role: Role;
+	text: string;
+}
+
+function powerline(segments: Segment[], theme: SegmentTheme): string {
+	return segments
+		.map((s, i) => {
+			// An extension status may end in a full reset, which would also clear the segment background.
+			const text = s.text.replaceAll("\x1b[0m", "\x1b[39m");
+			return theme.paint(s.role, ` ${text} `) + theme.arrow(s.role, segments[i + 1]?.role);
+		})
+		.join("");
+}
+
+type Rgb = { r: number; g: number; b: number };
+const luminance = ({ r, g, b }: Rgb) => {
+	const c = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+	return 0.2126 * c(r) + 0.7152 * c(g) + 0.0722 * c(b);
+};
+const contrast = (a: Rgb, b: Rgb) => (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
+const NEAR_BLACK = { kind: "rgb", r: 16, g: 18, b: 22 } as const;
+const WHITE = { kind: "rgb", r: 255, g: 255, b: 255 } as const;
+
+/**
+ * Adapts pi's Theme. Every color is derived from theme tokens, so segments
+ * follow dark/light switches. The theme's own background tokens all share one
+ * lightness, which blurs segment boundaries, hence the vivid foreground tokens
+ * as backgrounds for cwd/alerts and a lighter mix of toolPendingBg as the
+ * second quiet shade.
+ */
+export function segmentTheme(theme: any): SegmentTheme {
+	const c = theme.colors;
+	const readableOn = (bg: any) => (contrast(colorToRgb(bg), NEAR_BLACK) >= contrast(colorToRgb(bg), WHITE) ? NEAR_BLACK : WHITE);
+	const bgOf: Record<Role, any> = {
+		cwd: c.mdLink,
+		quiet: c.toolPendingBg,
+		quiet2: mixColors(c.toolPendingBg, c.text, 0.18),
+		warn: c.warning,
+		crit: c.error,
+	};
+	const fgOf: Record<Role, any> = {
+		cwd: readableOn(bgOf.cwd),
+		quiet: c.text,
+		quiet2: c.text,
+		warn: readableOn(bgOf.warn),
+		crit: readableOn(bgOf.crit),
+	};
+	return {
+		paint: (role, text) => theme.style(text, { fg: fgOf[role], bg: bgOf[role] }),
+		arrow: (from, to) => theme.style(ARROW, { fg: bgOf[from], bg: to ? bgOf[to] : undefined }),
+	};
 }
 
 export interface StatusData {
@@ -77,54 +141,52 @@ export function abbreviateHome(path: string, home = homedir()): string {
 	return path === home || path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
 }
 
-const THINKING_COLOR: Record<string, string> = {
-	off: "thinkingOff",
-	minimal: "thinkingMinimal",
-	low: "thinkingLow",
-	medium: "thinkingMedium",
-	high: "thinkingHigh",
-	xhigh: "thinkingXhigh",
-	max: "thinkingMax",
-};
-
-function contextColor(pct: number): string {
-	return pct >= 90 ? "error" : pct >= 70 ? "warning" : pct >= 50 ? "accent" : "success";
+function levelRole(pct: number): Role | undefined {
+	return pct >= 90 ? "crit" : pct >= 70 ? "warn" : undefined;
 }
 
-export function renderLines(d: StatusData, theme: FgTheme, width: number): string[] {
-	const sep = theme.fg("borderMuted", " │ ");
+/** Fills unset roles with the quiet shade that differs from the previous segment, so neighbors never merge. */
+function alternate(segments: { role?: Role; text: string }[]): Segment[] {
+	const out: Segment[] = [];
+	for (const s of segments) {
+		const prev = out[out.length - 1]?.role;
+		out.push({ role: s.role ?? (prev === "quiet" ? "quiet2" : "quiet"), text: s.text });
+	}
+	return out;
+}
 
-	const row1 = [theme.fg("accent", `» ${abbreviateHome(d.cwd)}`)];
-	if (d.branch) row1.push(theme.fg("text", `⎇ ${d.branch}`));
-	if (d.model) row1.push(theme.fg("mdHeading", `◇ ${d.model}`));
-	row1.push(theme.fg(THINKING_COLOR[d.thinking] ?? "muted", `↯ ${d.thinking}`));
+export function renderLines(d: StatusData, theme: SegmentTheme, width: number): string[] {
+	const row1: { role?: Role; text: string }[] = [{ role: "cwd", text: `» ${abbreviateHome(d.cwd)}` }];
+	if (d.branch) row1.push({ text: `⎇ ${d.branch}` });
+	if (d.model) row1.push({ text: `◇ ${d.model}` });
+	row1.push({ text: `↯ ${d.thinking}` });
 	if (d.runningTools.length > 0) {
 		const more = d.runningTools.length > 1 ? ` +${d.runningTools.length - 1}` : "";
-		row1.push(theme.fg("toolTitle", `⚙ ${d.runningTools[0]}${more}`));
+		row1.push({ text: `⚙ ${d.runningTools[0]}${more}` });
 	}
 
-	const row2: string[] = [];
+	const row2: { role?: Role; text: string }[] = [];
 	if (d.contextPercent !== null) {
 		const pct = Math.max(0, Math.min(100, d.contextPercent));
 		const filled = Math.round(pct / 10);
 		const bar = "▰".repeat(filled) + "▱".repeat(10 - filled);
-		row2.push(theme.fg(contextColor(pct), `${bar} ${pct.toFixed(1)}%`) + theme.fg("dim", ` / ${k(d.contextWindow)}`));
+		row2.push({ role: levelRole(pct), text: `${bar} ${pct.toFixed(1)}% / ${k(d.contextWindow)}` });
 	} else {
-		row2.push(theme.fg("dim", `▱▱▱▱▱▱▱▱▱▱ ?% / ${k(d.contextWindow)}`));
+		row2.push({ text: `▱▱▱▱▱▱▱▱▱▱ ?% / ${k(d.contextWindow)}` });
 	}
-	row2.push(theme.fg("muted", `≡ ${k(d.input)}↓ ${k(d.output)}↑`));
-	row2.push(
-		theme.fg("warning", `$${d.sessionCost.toFixed(2)}`) +
-			theme.fg("dim", ` · today $${d.todayCost.toFixed(2)} · month $${d.monthCost.toFixed(2)}`),
-	);
+	row2.push({ text: `≡ ${k(d.input)}↓ ${k(d.output)}↑` });
+	row2.push({ text: `$${d.sessionCost.toFixed(2)} · today $${d.todayCost.toFixed(2)} · month $${d.monthCost.toFixed(2)}` });
+
+	const row3: { role?: Role; text: string }[] = [];
 	if (d.rateLimit) {
 		const pct = d.rateLimit.usedPercent;
-		const color = pct >= 90 ? "error" : pct >= 70 ? "warning" : "muted";
-		row2.push(theme.fg(color, `RL ${d.rateLimit.bucket} ${pct.toFixed(0)}%`));
+		row3.push({ role: levelRole(pct), text: `RL ${d.rateLimit.bucket} ${pct.toFixed(0)}%` });
 	}
-	row2.push(...d.statuses);
+	for (const s of d.statuses) row3.push({ text: s });
 
-	return [truncateToWidth(row1.join(sep), width), truncateToWidth(row2.join(sep), width)];
+	const rows = [row1, row2];
+	if (row3.length > 0) rows.push(row3);
+	return rows.map((r) => truncateToWidth(powerline(alternate(r), theme), width));
 }
 
 /** Tokens and cost over every entry in the session file, abandoned branches included: they were paid for too. */
@@ -218,7 +280,7 @@ export default function statusline(pi: ExtensionAPI) {
 							rateLimit,
 							statuses: [...footerData.getExtensionStatuses().values()],
 						},
-						theme,
+						segmentTheme(theme),
 						width,
 					);
 				},
