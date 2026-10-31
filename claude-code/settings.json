@@ -178,6 +178,7 @@
     "enabled": true,
     "allowUnsandboxedCommands": false,
     "network": {
+      "allowLocalBinding": true,
       "allowedDomains": [
         "github.com",
         "api.github.com",
@@ -224,7 +225,11 @@
       "allowUnixSockets": [
         "~/.gnupg/S.gpg-agent",
         "~/.gnupg/S.keyboxd",
-        "/nix/var/nix/daemon-socket/socket"
+        "/nix/var/nix/daemon-socket/socket",
+         "/private/tmp/claude-501/why3server*",
+         "/tmp/claude-501/why3server*",
+         "/tmp/claude-501",
+         "/private/tmp/claude-501"
       ]
     },
     "filesystem": {
