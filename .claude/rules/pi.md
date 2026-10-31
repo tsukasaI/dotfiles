@@ -36,7 +36,11 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   `shguard.ts` runs each model-issued bash command through
   `shguard check --json` (same `~/.config/shguard/config.toml` as Claude
   Code) and blocks anything but `Allow`, fail-closed; `!` commands are not
-  gated.
+  gated. `subagent.ts` runs scout (Haiku) / research / worker (Sonnet) as
+  child `pi --mode json -p` processes with `PI_SUBAGENT=1`, which stops the
+  child from registering these tools and from logging usage (the parent
+  counts it as `toolCost`). `advisor.ts` sends a structured brief, no
+  history, to Fable after a TUI confirmation.
 - Load check without model calls: send `{"type":"get_commands"}` to
   `pi --mode rpc --no-session`.
 - The `--container` mode uses its own `pi-agent-home` volume, so none of

@@ -163,10 +163,16 @@ export function summarize(recs: UsageRecord[], sessionId: string, now = new Date
 	].join("\n");
 }
 
+/** Set by subagent.ts for its child pi processes. */
+export const SUBAGENT_ENV = "PI_SUBAGENT";
+
 export default function usageLog(pi: ExtensionAPI) {
 	let warned = false;
 
 	pi.on("turn_end", async (event, ctx) => {
+		// A subagent's usage reaches the parent as its tool result's usage, which
+		// the parent's record counts as toolCost; logging it here too would double it.
+		if (process.env[SUBAGENT_ENV] === "1") return;
 		try {
 			const rec = toRecord(event, ctx.sessionManager.getSessionId(), ctx.cwd);
 			if (rec) appendRecord(rec);
