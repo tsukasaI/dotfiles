@@ -5,10 +5,12 @@ Distilled from the Claude Code config (`~/dotfiles/claude-code/CLAUDE.md` and
 `rules/`), keeping only the parts that do not depend on Claude Code tools.
 A repo's own `AGENTS.md` / `CLAUDE.md` outranks this file for that repo.
 
-## Safety (pi has no permission gate or sandbox)
+## Safety (pi has no sandbox; only bash is gated, by shguard)
 
 - Every tool call runs with my user's permissions and nothing asks for
-  approval. Act as if each command is final.
+  approval. The shguard extension blocks the bash commands its config
+  denies (force push, deletions, `rm`, Keychain reads, ...); read, write,
+  and edit are not gated at all. Act as if each command is final.
 - Never run destructive commands without my explicit go-ahead in this
   session: `rm -rf`, `git reset --hard`, `git clean`, `git push --force`,
   branch/tag deletion, dropping databases, overwriting files outside the

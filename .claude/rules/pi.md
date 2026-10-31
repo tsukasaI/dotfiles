@@ -33,6 +33,10 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   `claude-rules.ts` puts the project's `.claude/rules/` into the system
   prompt (bodies of rules without `paths:`, a read-on-demand list for the
   rest); `~/.claude/rules` is skipped because this `AGENTS.md` distills it.
+  `shguard.ts` runs each model-issued bash command through
+  `shguard check --json` (same `~/.config/shguard/config.toml` as Claude
+  Code) and blocks anything but `Allow`, fail-closed; `!` commands are not
+  gated.
 - Load check without model calls: send `{"type":"get_commands"}` to
   `pi --mode rpc --no-session`.
 - The `--container` mode uses its own `pi-agent-home` volume, so none of
