@@ -325,7 +325,11 @@ case_ "gh gpg-key add"                   'gh gpg-key add k.asc'                d
 case_ "gh repo archive"                  'gh repo archive a/b'                 deny
 case_ "gh repo rename"                   'gh repo rename x'                    deny
 case_ "gh release delete"                'gh release delete v1'                deny
-case_ "cat abs ssh key, case-folded"     'cat /USERS/inouetsukasa/.SSH/id_rsa' deny
+# Built from $HOME: the rule is a ~/.ssh/ prefix, so a hardcoded /Users/<me>
+# path is outside ~ on the CI runner (HOME=/home/runner) and allowed there.
+# tr, not ${HOME^^}: macOS /bin/bash 3.2 has no case conversion.
+UPPER_HOME=$(printf '%s' "$HOME" | tr '[:lower:]' '[:upper:]')
+case_ "cat abs ssh key, case-folded"     "cat $UPPER_HOME/.SSH/id_rsa"         deny
 case_ "head tilde npmrc, case-folded"    'head ~/.NPMRC'                       deny
 case_ "kubectl get secret"               'kubectl get secret foo -o yaml'      deny
 case_ "kubectl get pods"                 'kubectl get pods'                    allow

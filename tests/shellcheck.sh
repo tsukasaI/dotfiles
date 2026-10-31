@@ -6,5 +6,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Every tracked *.sh, so a new script can't be silently left out of the list.
-git ls-files -z '*.sh' | xargs -0 shellcheck -x --severity=warning
+# Every tracked *.sh, so a new script can't be silently left out of the list,
+# plus extensionless scripts, which the glob misses.
+{ git ls-files -z '*.sh'; printf '%s\0' pi/pi-factory; } | xargs -0 shellcheck -x --severity=warning
