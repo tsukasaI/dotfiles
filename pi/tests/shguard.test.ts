@@ -50,6 +50,17 @@ describe("extension", () => {
 		const res = await handlerWith(json({ decision: "Block", reason: "r" })).call({ toolName: "bash", input: { command: "git push -f" } });
 		expect(res).toEqual({ block: true, reason: "shguard: Block (r)" });
 	});
+	test("$HOME is checked and run as the literal path; a blocked command is left as written", async () => {
+		const home = process.env.HOME!;
+		const ok = handlerWith(json({ decision: "Allow" }));
+		const input = { command: 'ls "$HOME/x" ${HOME}/y' };
+		expect(await ok.call({ toolName: "bash", input })).toBeUndefined();
+		expect(ok.seen).toEqual([`ls "${home}/x" ${home}/y`]);
+		expect(input.command).toBe(`ls "${home}/x" ${home}/y`);
+		const blocked = { command: "cat $HOME/.netrc" };
+		await handlerWith(json({ decision: "Block" })).call({ toolName: "bash", input: blocked });
+		expect(blocked.command).toBe("cat $HOME/.netrc");
+	});
 	test("a bash call without a command string is blocked", async () => {
 		expect((await handlerWith(json({ decision: "Allow" })).call({ toolName: "bash", input: {} })).block).toBe(true);
 	});

@@ -8,12 +8,20 @@
  * makes a missing or malformed config deny instead of ask (as in
  * claude-code/settings.json). pi also blocks the tool when this handler throws.
  *
+ * `$HOME` / `${HOME}` are first replaced with the literal path via
+ * claude-code/mod's canonicalize (shared, so both harnesses rewrite alike):
+ * shguard denies an unresolved variable but can judge the real target. The
+ * rewritten command is also what runs, so the checked and executed commands
+ * stay identical. TMPDIR is left alone: Claude's rewrite targets its sandbox
+ * scratchpad, which pi does not use.
+ *
  * Only the bash tool is checked. Commands the user types with `!` are the
  * user's own and are not gated; read/write/edit are out of scope by choice.
  */
 
 import { execFile } from "node:child_process";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { canonicalize } from "../../claude-code/mod/hooks/shell-canon.ts";
 
 export type Verdict = { allow: true } | { allow: false; reason: string };
 
@@ -55,7 +63,11 @@ export default function shguard(pi: ExtensionAPI, run: Runner = runShguard) {
 		if (event.toolName !== "bash") return undefined;
 		const command = (event.input as { command?: unknown }).command;
 		if (typeof command !== "string") return { block: true, reason: "shguard: bash call without a command string" };
-		const verdict = await checkCommand(command, run);
-		return verdict.allow ? undefined : { block: true, reason: verdict.reason };
+		const home = process.env.HOME;
+		const canon = canonicalize(command, home ? { HOME: home } : {});
+		const verdict = await checkCommand(canon, run);
+		if (!verdict.allow) return { block: true, reason: verdict.reason };
+		(event.input as { command: string }).command = canon;
+		return undefined;
 	});
 }
