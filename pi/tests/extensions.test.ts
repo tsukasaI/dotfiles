@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import gitCheckpoint, { createCheckpoint } from "../extensions/git-checkpoint.ts";
-import usageLog, { readMonth, summarize, toRecord } from "../extensions/usage-log.ts";
+import usageLog, { costTotals, readMonth, summarize, toRecord } from "../extensions/usage-log.ts";
 
 const sh = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 
@@ -177,6 +177,9 @@ describe("usage-log", () => {
 		await commands.get("usage").handler("", ctx);
 		expect(notes.at(-1)).toContain("session   $0.0350  turns 2");
 		expect(summarize(recs, "other")).toContain("session   $0.0000  turns 0");
+		const totals = costTotals();
+		expect(totals.today).toBeCloseTo(0.035, 6);
+		expect(totals.month).toBeCloseTo(0.035, 6);
 	});
 
 	test("a torn line does not hide other records", () => {

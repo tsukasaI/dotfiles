@@ -5,7 +5,7 @@ import { describe, expect, mock, test } from "bun:test";
 mock.module("@earendil-works/pi-tui", () => ({
 	truncateToWidth: (s: string, w: number) => (s.length > w ? `${s.slice(0, w - 1)}…` : s),
 }));
-const { renderLines, sessionTotals, abbreviateHome } = await import("../extensions/statusline.ts");
+const { renderLines, sessionTotals, abbreviateHome, parseRateLimit } = await import("../extensions/statusline.ts");
 
 // Tag each colored span so tests can assert which theme color was used.
 const theme = { fg: (color: string, text: string) => `<${color}>${text}` };
@@ -20,6 +20,9 @@ const base = {
 	output: 678,
 	sessionCost: 0.1234,
 	todayCost: 1.5,
+	monthCost: 12.3,
+	runningTools: [] as string[],
+	rateLimit: undefined as any,
 	statuses: ["checkpoint #1 abcd1234"],
 };
 
@@ -35,7 +38,9 @@ describe("statusline", () => {
 		expect(r1).toBe("<accent>» ~/dotfiles<borderMuted> │ <text>⎇ main<borderMuted> │ <mdHeading>◇ claude-opus-5-5<borderMuted> │ <thinkingMedium>↯ medium");
 		expect(r2).toContain("<success>▰▰▱▱▱▱▱▱▱▱ 23.4%<dim> / 200.0k");
 		expect(r2).toContain("<muted>≡ 12.3k↓ 678↑");
-		expect(r2).toContain("<warning>$0.12<dim> · today $1.50");
+		expect(r2).toContain("<warning>$0.12<dim> · today $1.50 · month $12.30");
+		expect(r2).not.toContain("RL");
+		expect(r1).not.toContain("⚙");
 		expect(r2).toContain("checkpoint #1 abcd1234");
 	});
 
@@ -50,6 +55,32 @@ describe("statusline", () => {
 		expect(r1).not.toContain("⎇");
 		expect(r1).not.toContain("◇");
 		for (const line of renderLines(base, theme, 20)) expect(line.length).toBeLessThanOrEqual(20);
+	});
+
+	test("running tools: first name plus count", () => {
+		expect(renderLines({ ...base, runningTools: ["bash"] }, theme, 500)[0]).toContain("<toolTitle>⚙ bash");
+		expect(renderLines({ ...base, runningTools: ["bash", "read", "edit"] }, theme, 500)[0]).toContain("⚙ bash +2");
+	});
+
+	test("rate limit picks the most-used bucket and colors by threshold", () => {
+		// Shape captured from a real Anthropic response (values changed).
+		const h = {
+			"anthropic-ratelimit-requests-limit": "13000",
+			"anthropic-ratelimit-requests-remaining": "12999",
+			"anthropic-ratelimit-input-tokens-limit": "10000000",
+			"Anthropic-RateLimit-Input-Tokens-Remaining": "2000000",
+			"anthropic-ratelimit-input-tokens-reset": "2026-10-31T03:49:33Z",
+			"anthropic-ratelimit-output-tokens-limit": "2000000",
+			"anthropic-ratelimit-output-tokens-remaining": "garbage",
+		};
+		const rl = parseRateLimit(h)!;
+		expect(rl.bucket).toBe("in");
+		expect(rl.usedPercent).toBeCloseTo(80, 5);
+		expect(rl.reset).toBe("2026-10-31T03:49:33Z");
+		expect(renderLines({ ...base, rateLimit: rl }, theme, 500)[1]).toContain("<warning>RL in 80%");
+		expect(renderLines({ ...base, rateLimit: { bucket: "req", usedPercent: 3 } }, theme, 500)[1]).toContain("<muted>RL req 3%");
+		expect(parseRateLimit({})).toBeUndefined();
+		expect(parseRateLimit({ "anthropic-ratelimit-tokens-limit": "0", "anthropic-ratelimit-tokens-remaining": "0" })).toBeUndefined();
 	});
 
 	test("session totals include abandoned branches and nested tool usage", () => {
