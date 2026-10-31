@@ -63,6 +63,17 @@ describe("subagent", () => {
 		expect(sub.AGENTS.research.tools).not.toContain("edit");
 	});
 
+	test("reviewer: Opus, read-only, prompt is code-reviewer.md without frontmatter", () => {
+		const r = sub.AGENTS.reviewer;
+		expect(r.model).toBe("claude-opus-5-5");
+		expect(r.tools).not.toContain("edit");
+		expect(r.tools).not.toContain("write");
+		expect(r.prompt).toContain("You are read-only");
+		expect(r.prompt).toContain("senior security-focused code reviewer");
+		expect(r.prompt).not.toContain("model: opus");
+		expect(sub.agentBody("/nonexistent/agent.md")).toBeUndefined();
+	});
+
 	test("task validation", () => {
 		expect(sub.checkTasks([])).toContain("1-4");
 		expect(sub.checkTasks(Array(5).fill({ agent: "scout", task: "x" }))).toContain("1-4");

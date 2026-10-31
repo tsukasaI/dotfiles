@@ -6,6 +6,9 @@
  *   scout    Haiku   read-only recon: find files, read, summarize
  *   research Sonnet  read-only, deeper investigation
  *   worker   Sonnet  implements a well-specified change (can edit/write)
+ *   reviewer Opus    read-only code review; its prompt is the body of
+ *                    claude-code/agents/code-reviewer.md, so both harnesses
+ *                    review by the same instructions (review-gate skill)
  *
  * Each child runs `pi --mode json -p --no-session` with the user's extensions,
  * so shguard and .claude/rules apply there too. PI_SUBAGENT=1 keeps the child
@@ -15,6 +18,9 @@
  */
 
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Type } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { SUBAGENT_ENV } from "./usage-log.ts";
@@ -53,6 +59,28 @@ Investigate thoroughly (follow imports, read tests, check history when it matter
 Finish with: files changed (one line each on what and why), verification commands you ran with their result, and anything left undone or uncertain.`,
 	},
 };
+
+export const CODE_REVIEWER_MD = resolve(dirname(fileURLToPath(import.meta.url)), "../../claude-code/agents/code-reviewer.md");
+
+/** Body of a Claude Code agent file (frontmatter dropped); undefined if unreadable or empty. */
+export function agentBody(path: string): string | undefined {
+	try {
+		const body = readFileSync(path, "utf8").replace(/^---\n[\s\S]*?\n---\n/, "").trim();
+		return body || undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+// Omitted rather than run with a made-up prompt when the shared file is missing.
+const reviewerPrompt = agentBody(CODE_REVIEWER_MD);
+if (reviewerPrompt)
+	AGENTS.reviewer = {
+		model: "claude-opus-5-5",
+		thinking: "high",
+		tools: READ_ONLY,
+		prompt: `${READ_ONLY_RULE}\n\n${reviewerPrompt}`,
+	};
 
 export const MAX_TASKS = 4;
 const MAX_OUTPUT_CHARS = 30_000;
@@ -257,7 +285,7 @@ export default function subagent(pi: ExtensionAPI, spawner: Spawner = spawnPi) {
 	pi.registerTool({
 		name: "subagent",
 		label: "Subagent",
-		description: `Delegate work to a cheaper model running in its own context; only its final report comes back. Agents: scout (Haiku, read-only quick recon: locate files, read, summarize), research (Sonnet, read-only deeper investigation), worker (Sonnet, implements a well-specified change; can edit files). The agent has not seen this conversation: write a self-contained task with the goal, relevant paths, constraints, and the exact shape of report you need. Up to ${MAX_TASKS} tasks run in parallel; at most one worker per call.`,
+		description: `Delegate work to a model running in its own context; only its final report comes back. Agents: scout (Haiku, read-only quick recon: locate files, read, summarize), research (Sonnet, read-only deeper investigation), worker (Sonnet, implements a well-specified change; can edit files)${AGENTS.reviewer ? ", reviewer (Opus, read-only code review of a diff or PR with severities and review-gate tiers)" : ""}. The agent has not seen this conversation: write a self-contained task with the goal, relevant paths, constraints, and the exact shape of report you need. Up to ${MAX_TASKS} tasks run in parallel; at most one worker per call.`,
 		promptSnippet: "Delegate recon, research, or a well-specified implementation to Haiku/Sonnet subagents",
 		promptGuidelines: [
 			"Prefer subagent scout/research over reading many files yourself when you only need the findings, and run independent lookups as parallel tasks.",
@@ -266,7 +294,7 @@ export default function subagent(pi: ExtensionAPI, spawner: Spawner = spawnPi) {
 		parameters: Type.Object({
 			tasks: Type.Array(
 				Type.Object({
-					agent: Type.String({ description: "scout | research | worker" }),
+					agent: Type.String({ description: Object.keys(AGENTS).join(" | ") }),
 					task: Type.String({ description: "Self-contained task: goal, relevant paths, constraints, expected report shape" }),
 				}),
 				{ minItems: 1, maxItems: MAX_TASKS },

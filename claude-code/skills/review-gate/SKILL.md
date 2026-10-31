@@ -54,3 +54,19 @@ being reviewed. The global CLAUDE.md keeps only the trigger.
   one.
 - Merge via `gh pr merge --squash --delete-branch` once approved and every
   medium/low finding is settled.
+
+## In pi
+
+The gate is the same; only the mechanics differ.
+
+- Reviewer: `subagent` with agent `reviewer` (Opus, read-only; its prompt
+  is `~/.claude/agents/code-reviewer.md`). Put the PR URL or diff range, and
+  the issue's Scope if any, in the task. There is no Fable reviewer: for a
+  security boundary or an architectural decision, also send the diff to
+  `consult_advisor`.
+- Fixes go to a `subagent` worker, not the main loop.
+- Re-review: pi cannot resume a subagent, so every re-review is a fresh
+  `reviewer`. Give it the original findings and the incremental diff
+  (`git diff <reviewed-sha>..HEAD`) and ask only whether they are resolved.
+- pi's AGENTS.md has no merge exception: confirm with the user before
+  `gh pr merge` and before filing `needs-decision` issues.

@@ -1,7 +1,7 @@
 ---
 name: grill
 description: Interviews the user in small rounds (about 3 questions each) to deepen and stress-test their thinking on a decision, plan, or personal topic such as career, surfacing gaps and assumptions, then records the outcome in whatever document format the current repo already uses. User-invoked via /grill only.
-argument-hint: [深掘りしたいテーマ]
+argument-hint: "[深掘りしたいテーマ]"
 disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Bash, Agent, AskUserQuestion, Write, Edit
 ---
@@ -13,6 +13,11 @@ the result down in the form this repo already uses. Match the user's
 conversation language in all dialogue.
 
 Topic: $ARGUMENTS (if empty, ask for it in one line before anything else).
+
+<!-- pi does not substitute $ARGUMENTS; it appends the arguments after the
+skill body instead, so the literal fallback below keeps both harnesses working. -->
+If the line above shows a literal `$ARGUMENTS`, the topic is the text that
+follows this skill's instructions instead.
 
 Adapted from `grilling` in [mattpocock/skills](https://github.com/mattpocock/skills)
 (design tree, frontier, facts-are-mine/decisions-are-yours). Changed here:
@@ -37,15 +42,15 @@ and a written record.
 
 ## Step 1: Orient (before the first question)
 
-1. Read the repo's `CLAUDE.md` and any rules it imports or points to for the
+1. Read the repo's `CLAUDE.md` (or `AGENTS.md`) and any rules it imports or points to for the
    topic's domain (e.g. ops: `.claude/rules/career.md`). These rules govern
    what you may claim and where things are written; they override this skill.
 2. Note how the repo records decisions and investigations: `docs/`, ADR
    directories, `memory/`, issue templates, per-domain SSoT files. Don't
    decide the output location yet.
 3. Facts are your job, never the user's. Anything answerable from files,
-   git, or tools: look it up (dispatch an `Agent` with `model: sonnet` for
-   broader searches). Decisions and values are the user's.
+   git, or tools: look it up (for broader searches, dispatch an `Agent`
+   with `model: sonnet`, or in pi a `subagent` scout/research task). Decisions and values are the user's.
 4. Build the design tree: decisions, and which decisions hang off which.
 
 ## Step 2: Rounds
