@@ -16,6 +16,10 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
 - `settings.json` → `~/.pi/agent/settings.json`. It points pi at
   `extensions/` and `prompts/` here and at two skills read directly from
   `~/.claude/skills/` (`ja-lint`, `handover`; read-only reuse, no copies).
+  Pi ignores `allowed-tools`/`argument-hint` and does not substitute
+  `$ARGUMENTS` (it appends args after the body), so shared skills must work
+  under both. The unused built-in `mcp` and `llama.cpp` extensions are
+  disabled there (`-builtin:<name>`).
 - `AGENTS.md` → `~/.pi/agent/AGENTS.md` (symlink: context files have no
   settings path option). Pi does not read `~/.claude/CLAUDE.md`, so this is
   the pi-side distillation of it; keep the two in step by hand.

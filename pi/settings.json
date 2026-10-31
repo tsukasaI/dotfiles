@@ -3,7 +3,7 @@
   "defaultModel": "claude-opus-5-5",
   "enableInstallTelemetry": false,
   "lastChangelogVersion": "1.3.0",
-  "extensions": ["~/dotfiles/pi/extensions"],
+  "extensions": ["~/dotfiles/pi/extensions", "-builtin:mcp", "-builtin:llama.cpp"],
   "skills": ["~/.claude/skills/ja-lint", "~/.claude/skills/handover"],
   "prompts": ["~/dotfiles/pi/prompts"]
 }
