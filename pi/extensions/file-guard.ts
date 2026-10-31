@@ -1,25 +1,3 @@
-/**
- * file-guard: gates pi's file tools the way Claude Code's settings gate its
- * own, because shguard only sees bash and read/write/edit were ungated.
- *
- *   read, grep, find, ls  denied when the target, or any directory above it,
- *       matches a `Read(...)` rule in permissions.deny of
- *       claude-code/settings.json (one list for both harnesses), plus pi's
- *       own auth.json.
- *   write, edit  run through claude-code/hooks/block-config-edit.sh (linter
- *       configs, lockfiles, Claude's guard files, lefthook config), plus the
- *       files that define pi's own guards: this file, shguard.ts, pi's
- *       settings, and the global/project extension directories pi loads.
- *
- * Fail-closed: an unreadable deny list blocks every read-type call, and a
- * hook that crashes, times out, or exits other than 0 blocks the write.
- * Paths are judged both as given and with symlinks resolved, case-insensitively
- * (APFS). Residual gaps: grep/find/ls on a directory above a denied file
- * still reach it (only the named path is checked), bash goes through shguard
- * instead, and a new file in pi/extensions/ can register tools of its own
- * (as with the editable claude-code/mod band modules).
- */
-
 import { execFile } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
@@ -37,7 +15,7 @@ const WRITE_TOOLS = new Set(["write", "edit"]);
 const EXTRA_READ_DENY = ["~/.pi/agent/auth.json"];
 const UNICODE_SPACES = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g;
 
-/** Same normalization pi's file tools apply before touching the path. */
+// Not path.resolve alone: pi's file tools also expand ~ and strip a leading @ before touching the path.
 export function resolveToolPath(p: string, cwd: string, home = homedir()): string {
 	let s = p.replace(UNICODE_SPACES, " ");
 	if (s.startsWith("@")) s = s.slice(1);
@@ -47,11 +25,8 @@ export function resolveToolPath(p: string, cwd: string, home = homedir()): strin
 	return resolve(cwd, s);
 }
 
-/**
- * Resolves symlinks in the nearest existing ancestor and re-appends the rest,
- * so a path that does not exist yet (write) is judged by where it lands.
- * Undefined for a dangling symlink, which writing through would create.
- */
+// Not realpath on the whole path: it fails for a file write is about to create.
+/** Undefined for a dangling symlink, which writing through would create. */
 export function canonicalPath(abs: string): string | undefined {
 	let probe = abs;
 	let tail = "";
@@ -59,7 +34,7 @@ export function canonicalPath(abs: string): string | undefined {
 		try {
 			if (lstatSync(probe).isSymbolicLink()) return undefined;
 		} catch {
-			// does not exist at all
+			// Not rethrown: a path that does not exist at all is the normal case here.
 		}
 		const parent = dirname(probe);
 		if (parent === probe) break;
@@ -108,7 +83,6 @@ export function loadReadDeny(settingsPath = CLAUDE_SETTINGS, home = homedir()): 
 	return [...globs, ...EXTRA_READ_DENY].map((g) => globToRegex(g, home));
 }
 
-/** True when the path or any directory above it matches a rule. */
 export function matchesAny(path: string, rules: RegExp[]): boolean {
 	for (let p = path; ; p = dirname(p)) {
 		if (rules.some((r) => r.test(p))) return true;
@@ -116,12 +90,10 @@ export function matchesAny(path: string, rules: RegExp[]): boolean {
 	}
 }
 
-/** pi's own guard definitions; checked on the canonical path, case-insensitively. */
 export function isPiGuardFile(path: string, piDir = PI_DIR): boolean {
 	const lower = path.toLowerCase();
 	const own = ["extensions/file-guard.ts", "extensions/shguard.ts", "settings.json"].map((f) => join(piDir, f).toLowerCase());
 	if (own.includes(lower)) return true;
-	// Global and project-local pi config: settings and auto-loaded extensions.
 	return /\/\.pi\/(agent\/)?(settings\.json$|extensions(\/|$))/.test(lower);
 }
 
