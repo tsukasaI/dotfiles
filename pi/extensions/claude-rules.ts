@@ -1,34 +1,30 @@
 /**
- * claude-rules: loads the project's .claude/rules/ into pi the way Claude Code
- * does. Rules without `paths:` frontmatter are always on, so their bodies go
- * into the system prompt; path-scoped rules are listed with their globs and the
- * model reads one before touching matching files (pi has no per-file trigger).
- *
- * Only the project's rules: ~/.claude/rules is the global set that
- * pi/AGENTS.md already distills, and loading both would duplicate it.
- * Re-scanned before every prompt so edits apply without /reload.
+ * Puts Claude Code's rules into pi's system prompt: the global ~/.claude/rules
+ * and the project's nearest .claude/rules. Rules without `paths:` are inlined;
+ * path-scoped ones are listed for the model to read, since pi has no per-file
+ * trigger. Re-read before every prompt so edits apply without /reload.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export interface Rule {
-	/** Path relative to the project root, e.g. ".claude/rules/pi.md". */
+	/** How the model should refer to the file with the read tool. */
 	file: string;
 	paths: string[];
 	body: string;
 }
 
-// Always-on bodies past this many characters are listed instead, so one
-// oversized rule cannot crowd out the conversation.
+// Not a cap per rule: one oversized always-on rule is listed instead of inlined.
 const INLINE_BUDGET = 16_000;
+// Claude Code Bash-sandbox mechanics (.git/config write-protect, scratchpad paths); pi has no sandbox.
+const CLAUDE_ONLY = new Set(["git-sandbox.md"]);
 
-/**
- * Nearest .claude/rules from cwd upward, stopping at the repository root (.git)
- * or $HOME. $HOME/.claude/rules is the global set and is never returned.
- */
+export const GLOBAL_RULES = join(homedir(), ".claude", "rules");
+
+/** Nearest .claude/rules from cwd upward, within the repo; never $HOME's (that is the global set). */
 export function findRulesDir(cwd: string, home = homedir()): string | undefined {
 	let dir = cwd;
 	for (;;) {
@@ -41,7 +37,6 @@ export function findRulesDir(cwd: string, home = homedir()): string | undefined 
 	}
 }
 
-/** Splits YAML frontmatter and reads `paths:` (block list, inline list, or a single string). */
 export function parseRule(text: string): { paths: string[]; body: string } {
 	const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
 	if (!m) return { paths: [], body: text.trim() };
@@ -75,8 +70,10 @@ function markdownFiles(dir: string): string[] {
 	const out: string[] = [];
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		const full = join(dir, entry.name);
-		if (entry.isDirectory()) out.push(...markdownFiles(full));
-		else if (entry.isFile() && entry.name.endsWith(".md")) out.push(full);
+		// Not entry.isFile(): it is false for a symlinked rule file.
+		const isDir = entry.isDirectory() || (entry.isSymbolicLink() && statSync(full).isDirectory());
+		if (isDir) out.push(...markdownFiles(full));
+		else if (entry.name.endsWith(".md")) out.push(full);
 	}
 	return out.sort();
 }
@@ -84,6 +81,13 @@ function markdownFiles(dir: string): string[] {
 export function loadRules(rulesDir: string): Rule[] {
 	const root = dirname(dirname(rulesDir));
 	return markdownFiles(rulesDir).map((full) => ({ file: relative(root, full), ...parseRule(readFileSync(full, "utf8")) }));
+}
+
+export function loadGlobalRules(dir = GLOBAL_RULES): Rule[] {
+	if (!existsSync(dir)) return [];
+	return markdownFiles(dir)
+		.filter((full) => !CLAUDE_ONLY.has(basename(full)))
+		.map((full) => ({ file: `~/.claude/rules/${relative(dir, full)}`, ...parseRule(readFileSync(full, "utf8")) }));
 }
 
 export function buildSection(rules: Rule[]): string {
@@ -99,7 +103,7 @@ export function buildSection(rules: Rule[]): string {
 			listed.push(r);
 		}
 	}
-	let out = "\n\n# Project rules (.claude/rules)\n";
+	let out = "\n\n# Rules (~/.claude/rules, .claude/rules)\n";
 	for (const r of inline) out += `\n## ${r.file}\n\n${r.body}\n`;
 	if (listed.length > 0) {
 		out +=
@@ -110,18 +114,24 @@ export function buildSection(rules: Rule[]): string {
 	return out;
 }
 
-export default function claudeRules(pi: ExtensionAPI) {
+export default function claudeRules(pi: ExtensionAPI, globalDir = GLOBAL_RULES) {
 	pi.on("before_agent_start", async (event, ctx) => {
-		const dir = findRulesDir(ctx.cwd);
-		if (!dir) return;
-		let section: string;
-		try {
-			section = buildSection(loadRules(dir));
-		} catch (err) {
-			// An unreadable rule file should not block the prompt; say so instead of dropping rules silently.
-			if (ctx.hasUI) ctx.ui.notify(`claude-rules: could not read ${dir}: ${(err as Error).message}`, "warning");
-			return;
+		const rules: Rule[] = [];
+		for (const [label, load] of [
+			[globalDir, () => loadGlobalRules(globalDir)],
+			[ctx.cwd, () => {
+				const dir = findRulesDir(ctx.cwd);
+				return dir ? loadRules(dir) : [];
+			}],
+		] as const) {
+			try {
+				rules.push(...load());
+			} catch (err) {
+				// Not thrown: a broken rule file should not block the prompt, but dropping rules silently would hide it.
+				if (ctx.hasUI) ctx.ui.notify(`claude-rules: could not read rules for ${label}: ${(err as Error).message}`, "warning");
+			}
 		}
+		const section = buildSection(rules);
 		if (section) return { systemPrompt: event.systemPrompt + section };
 	});
 }

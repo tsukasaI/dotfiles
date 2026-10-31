@@ -1,9 +1,10 @@
 # Global instructions (pi)
 
 Source: `~/dotfiles/pi/AGENTS.md`, symlinked to `~/.pi/agent/AGENTS.md`.
-Distilled from the Claude Code config (`~/dotfiles/claude-code/CLAUDE.md` and
-`rules/`), keeping only the parts that do not depend on Claude Code tools.
-A repo's own `AGENTS.md` / `CLAUDE.md` outranks this file for that repo.
+Distilled from `~/dotfiles/claude-code/CLAUDE.md`, keeping only the parts
+that do not depend on Claude Code tools. The rules in `~/.claude/rules/`
+are not copied here: the claude-rules extension loads them into the system
+prompt directly, so don't repeat their content in this file. A repo's own `AGENTS.md` / `CLAUDE.md` outranks this file for that repo.
 
 ## Safety (pi has no sandbox; tools are gated only by extensions)
 
@@ -18,11 +19,6 @@ A repo's own `AGENTS.md` / `CLAUDE.md` outranks this file for that repo.
   command verbatim in a fenced block, or the intended edit as a diff, and
   stop. Exception: `dotfiles-tool-policy-*` rules (e.g. `find`) are tool
   preferences; retry at once with the named replacement (`fd`, `rg`).
-- shguard denies inline scripts (`bash -c`, `awk '...'`, `xargs`) and any
-  unresolved `$VAR` except `$HOME`; write a script file at a literal path,
-  or resolve the value to a literal first.
-- Once you ask me to run a command, it is mine: don't run it yourself, or
-  anything competing with it in that repo, until I report back.
 - Never run destructive commands without my explicit go-ahead in this
   session: `rm -rf`, `git reset --hard`, `git clean`, `git push --force`,
   branch/tag deletion, dropping databases, overwriting files outside the
@@ -47,14 +43,6 @@ A repo's own `AGENTS.md` / `CLAUDE.md` outranks this file for that repo.
 - For subjective goals (最適化, いい感じ, 楽に), ask for the acceptance
   criterion first.
 - Read scope literally. "this file" means this file only.
-
-## Surgical changes
-
-- Every changed line should trace directly to the request.
-- Unrelated dead code: mention it, don't delete it. Remove only the orphans
-  your own change created.
-- If your change makes a comment, doc statement, or duplicated value false,
-  updating it is in scope.
 
 ## Truthfulness
 
@@ -93,16 +81,9 @@ A repo's own `AGENTS.md` / `CLAUDE.md` outranks this file for that repo.
 
 ## Code
 
-- Comments carry *why* (constraints, rejected alternatives, non-obvious
-  reasons), not *how* the code works or the history of the change.
 - Before declaring a task complete, review your own diff: correctness, edge
   inputs (empty, missing, malformed, oversize, whitespace, multi-line),
   error handling, tests, naming, and that nothing unrelated changed.
-- Security controls default to fail-closed. Pin third-party actions and
-  images to content hashes.
-- A security control must hold on every output path (verbose, diff, error
-  messages). Telling an LLM to ignore instructions in input is not a
-  boundary; enforce it in code (caps, delimiters, truncation).
 - Prefer the project's existing patterns, test framework, and file layout
   over new ones.
 

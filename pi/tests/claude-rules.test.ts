@@ -1,9 +1,9 @@
 // Offline tests for pi/extensions/claude-rules.ts. Run: bun test pi/tests
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import claudeRules, { buildSection, findRulesDir, loadRules, parseRule } from "../extensions/claude-rules.ts";
+import claudeRules, { buildSection, findRulesDir, loadGlobalRules, loadRules, parseRule } from "../extensions/claude-rules.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -74,10 +74,38 @@ describe("buildSection", () => {
 	});
 });
 
+describe("global rules", () => {
+	test("labelled with ~ paths; Claude-sandbox-only rules and missing dirs skipped", () => {
+		const g = tree({ "security.md": "Fail closed.", "git-sandbox.md": "x", "lang/go.md": '---\npaths: ["**/*.go"]\n---\nGo' });
+		expect(loadGlobalRules(g).map((r) => r.file)).toEqual(["~/.claude/rules/lang/go.md", "~/.claude/rules/security.md"]);
+		expect(loadGlobalRules(join(g, "missing"))).toEqual([]);
+	});
+	test("symlinked rule files are loaded", () => {
+		const src = tree({ "real.md": "Linked rule." });
+		const g = tree({});
+		symlinkSync(join(src, "real.md"), join(g, "linked.md"));
+		expect(loadGlobalRules(g).map((r) => r.body)).toEqual(["Linked rule."]);
+	});
+	test("claude-code/rules parses, and comments.md is path-scoped", () => {
+		const rules = loadGlobalRules(join(import.meta.dir, "../../claude-code/rules"));
+		expect(rules.find((r) => r.file === "~/.claude/rules/comments.md")?.paths).toContain("**/*.ts");
+		expect(rules.some((r) => r.file.endsWith("git-sandbox.md"))).toBe(false);
+	});
+});
+
 describe("extension", () => {
+	test("global and project rules both reach the prompt, global first", async () => {
+		let handler: Function | undefined;
+		const g = tree({ "g.md": "Global rule." });
+		claudeRules({ on: (_ev: string, h: Function) => (handler = h) } as any, g);
+		const proj = tree({ ".git/HEAD": "", ".claude/rules/r.md": "Project rule." });
+		const res = await handler!({ systemPrompt: "BASE" }, { cwd: proj, hasUI: false });
+		expect(res.systemPrompt.indexOf("Global rule.")).toBeLessThan(res.systemPrompt.indexOf("Project rule."));
+	});
+
 	test("appends the section to the system prompt; leaves it alone without rules", async () => {
 		let handler: Function | undefined;
-		claudeRules({ on: (_ev: string, h: Function) => (handler = h) } as any);
+		claudeRules({ on: (_ev: string, h: Function) => (handler = h) } as any, "/nonexistent-global-rules");
 		const withRules = tree({ ".git/HEAD": "", ".claude/rules/r.md": "Rule." });
 		const res = await handler!({ systemPrompt: "BASE" }, { cwd: withRules, hasUI: false });
 		expect(res.systemPrompt).toStartWith("BASE");
