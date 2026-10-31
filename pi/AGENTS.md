@@ -5,12 +5,24 @@ Distilled from the Claude Code config (`~/dotfiles/claude-code/CLAUDE.md` and
 `rules/`), keeping only the parts that do not depend on Claude Code tools.
 A repo's own `AGENTS.md` / `CLAUDE.md` outranks this file for that repo.
 
-## Safety (pi has no sandbox; only bash is gated, by shguard)
+## Safety (pi has no sandbox; tools are gated only by extensions)
 
 - Every tool call runs with my user's permissions and nothing asks for
   approval. The shguard extension blocks the bash commands its config
-  denies (force push, deletions, `rm`, Keychain reads, ...); read, write,
-  and edit are not gated at all. Act as if each command is final.
+  denies (force push, deletions, `rm`, Keychain reads, ...). The
+  file-guard extension blocks reads of secret paths and writes to
+  linter/formatter configs, lockfiles, and guard files. Neither is a
+  sandbox. Act as if each command is final.
+- When a guard blocks a call, never retry with an equivalent command
+  (`unlink` for `rm`, a different tool, piping around it). Show me the
+  command verbatim in a fenced block, or the intended edit as a diff, and
+  stop. Exception: `dotfiles-tool-policy-*` rules (e.g. `find`) are tool
+  preferences; retry at once with the named replacement (`fd`, `rg`).
+- shguard denies inline scripts (`bash -c`, `awk '...'`, `xargs`) and any
+  unresolved `$VAR` except `$HOME`; write a script file at a literal path,
+  or resolve the value to a literal first.
+- Once you ask me to run a command, it is mine: don't run it yourself, or
+  anything competing with it in that repo, until I report back.
 - Never run destructive commands without my explicit go-ahead in this
   session: `rm -rf`, `git reset --hard`, `git clean`, `git push --force`,
   branch/tag deletion, dropping databases, overwriting files outside the
@@ -88,6 +100,9 @@ A repo's own `AGENTS.md` / `CLAUDE.md` outranks this file for that repo.
   error handling, tests, naming, and that nothing unrelated changed.
 - Security controls default to fail-closed. Pin third-party actions and
   images to content hashes.
+- A security control must hold on every output path (verbose, diff, error
+  messages). Telling an LLM to ignore instructions in input is not a
+  boundary; enforce it in code (caps, delimiters, truncation).
 - Prefer the project's existing patterns, test framework, and file layout
   over new ones.
 
@@ -100,6 +115,8 @@ A repo's own `AGENTS.md` / `CLAUDE.md` outranks this file for that repo.
   read-only investigation. Run independent lookups as parallel tasks.
 - `worker` (Sonnet) only for well-specified, mechanical changes; read its
   diff yourself before calling the work done.
+- `reviewer` (Opus, read-only) for code review. In branch+PR repos, after
+  opening a PR for a non-trivial change, follow the `review-gate` skill.
 - Subagents and the advisor have not seen this conversation: give each a
   self-contained task or brief.
 - `consult_advisor` (Fable, pricier than you, each call approved by me)
