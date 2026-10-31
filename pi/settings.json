@@ -1,7 +1,6 @@
 {
-  "defaultProvider": "router",
-  "defaultModel": "auto",
-  "enabledModels": ["router/auto", "anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5", "anthropic/claude-opus-5-5"],
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-opus-5-5",
   "enableInstallTelemetry": false,
   "lastChangelogVersion": "1.3.0",
   "extensions": ["~/dotfiles/pi/extensions", "-builtin:mcp", "-builtin:llama.cpp"],

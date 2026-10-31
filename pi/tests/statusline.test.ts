@@ -7,7 +7,7 @@ mock.module("@earendil-works/pi-tui", () => ({
 	colorToRgb: (c: any) => c,
 	mixColors: (a: any, b: any, t: number) => ({ kind: "rgb", r: a.r + (b.r - a.r) * t, g: a.g + (b.g - a.g) * t, b: a.b + (b.b - a.b) * t }),
 }));
-const { renderLines, sessionTotals, abbreviateHome, parseRateLimit, segmentTheme, modelLabel } = await import("../extensions/statusline.ts");
+const { renderLines, sessionTotals, abbreviateHome, parseRateLimit, segmentTheme } = await import("../extensions/statusline.ts");
 
 // Tag each span so tests can assert which role was used:
 // [role]text for a segment, >from/to for an arrow (to "-" = terminal background).
@@ -131,15 +131,6 @@ describe("statusline", () => {
 		expect(renderLines({ ...base, rateLimit: { bucket: "tok", usedPercent: 95 } }, theme, 500)[2]).toStartWith("[crit]");
 		expect(parseRateLimit({})).toBeUndefined();
 		expect(parseRateLimit({ "anthropic-ratelimit-tokens-limit": "0", "anthropic-ratelimit-tokens-remaining": "0" })).toBeUndefined();
-	});
-
-	test("model label appends the routed model for router/auto only", () => {
-		const msg = (provider: string, model: string) => ({ type: "message", message: { role: "assistant", provider, model } });
-		const branch = [msg("anthropic", "claude-haiku-5-5"), { type: "message", message: { role: "user" } }, msg("anthropic", "claude-sonnet-5-5")];
-		expect(modelLabel({ provider: "router", id: "auto" }, branch)).toBe("auto \u2192 claude-sonnet-5-5");
-		expect(modelLabel({ provider: "router", id: "auto" }, [])).toBe("auto");
-		expect(modelLabel({ provider: "anthropic", id: "claude-opus-5-5" }, branch)).toBe("claude-opus-5-5");
-		expect(modelLabel(undefined, branch)).toBeUndefined();
 	});
 
 	test("session totals include abandoned branches and nested tool usage", () => {
