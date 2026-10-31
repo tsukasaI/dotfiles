@@ -24,6 +24,15 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   The other skills depend on Claude Code tools (Workflow, MCP,
   AskUserQuestion, SendMessage) and are not wired in. The unused built-in `mcp` and `llama.cpp` extensions are
   disabled there (`-builtin:<name>`).
+- `themes/`: loaded through the `themes` setting. `flat-dark.json` is the
+  built-in `dark.json` with `userMessageBg` and `tool*Bg` set to `""`
+  (terminal default) and a pale blue `userMessageText` to mark user turns.
+  Any explicit cell background shows as an opaque band under Ghostty's
+  `background-opacity` even when it equals the window color, because
+  `background-opacity-cells` composites it over the already-translucent
+  window (ghostty discussion #8642), so don't reintroduce faint panel colors. Themes outside
+  `~/.pi/agent/themes/` are not hot-reloaded: run `/reload` after editing.
+  When pi updates, diff against the new built-in `dark.json` for added tokens.
 - `AGENTS.md` → `~/.pi/agent/AGENTS.md` (symlink: context files have no
   settings path option). Pi does not read `~/.claude/CLAUDE.md`, so this is
   the pi-side distillation of it; keep the two in step by hand. Rules are
@@ -54,6 +63,10 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   dirs), so changing those is a manual edit, as on the Claude Code side.
   Known gaps: grep/find/ls on a parent of a denied path still reach it,
   and a new file in `extensions/` can register its own tools.
+  `compact-diff.ts` (`registerToolRenderer`, display only) collapses edit
+  and write to a one-line summary (`+N -M` / line count) and shows the
+  built-in diff or content on `Ctrl+O`; the built-in edit renderer still
+  runs while collapsed because it holds the diff preview in renderer state.
   `format.ts` runs `fini` after write/edit (as Claude Code's PostToolUse)
   and tells the model when the file changed. `style-guards.ts` runs
   `claude-code/hooks/slop-guard.ts` on prose writes and imports

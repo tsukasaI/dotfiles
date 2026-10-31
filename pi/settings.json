@@ -10,5 +10,7 @@
     "~/.claude/skills/grill",
     "~/.claude/skills/review-gate"
   ],
-  "prompts": ["~/dotfiles/pi/prompts"]
+  "prompts": ["~/dotfiles/pi/prompts"],
+  "themes": ["~/dotfiles/pi/themes"],
+  "theme": "flat-dark"
 }

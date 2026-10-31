@@ -1,12 +1,9 @@
 // Offline tests for pi/extensions/statusline.ts. Run: bun test pi/tests
 import { describe, expect, mock, test } from "bun:test";
 
-// pi-tui is supplied by pi at runtime and is not installed in this repo.
-mock.module("@earendil-works/pi-tui", () => ({
-	truncateToWidth: (s: string, w: number) => (s.length > w ? `${s.slice(0, w - 1)}\x1b[0m…\x1b[0m` : s),
-	colorToRgb: (c: any) => c,
-	mixColors: (a: any, b: any, t: number) => ({ kind: "rgb", r: a.r + (b.r - a.r) * t, g: a.g + (b.g - a.g) * t, b: a.b + (b.b - a.b) * t }),
-}));
+import { piTuiFake } from "./pi-tui-fake.ts";
+
+mock.module("@earendil-works/pi-tui", () => piTuiFake);
 const { renderLines, sessionTotals, abbreviateHome, parseRateLimit, segmentTheme } = await import("../extensions/statusline.ts");
 
 // Tag each span so tests can assert which role was used:
