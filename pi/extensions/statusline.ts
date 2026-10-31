@@ -1,20 +1,3 @@
-/**
- * statusline: replaces pi's footer with powerline-style segments (pi-side
- * counterpart of claude-code/statusline.ts). Only the cwd stands out; the
- * other segments alternate two quiet grays so boundaries stay visible, and a
- * context or rate-limit segment turns warning/error colored at 70%/90%.
- *
- *   row 1: » dir  ⎇ branch  ◇ model  ↯ thinking  ⚙ running tool(s)
- *   row 2: context bar % / window  ≡ in↓ out↑  $session · today · month
- *   row 3: rate limit  extension statuses (omitted when both are empty)
- *
- * Today's and this month's cost come from usage-log's JSONL, re-read at session
- * start, turn start, and when the run settles, so they lag by at most the
- * in-flight turn. The rate limit is the most-used Anthropic bucket from the
- * last response's anthropic-ratelimit-* headers (limits are per model).
- * TUI mode only; other modes keep no footer.
- */
-
 import { homedir } from "node:os";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { colorToRgb, mixColors, truncateToWidth } from "@earendil-works/pi-tui";
@@ -23,7 +6,6 @@ import { costTotals } from "./usage-log.ts";
 
 export type Role = "cwd" | "quiet" | "quiet2" | "warn" | "crit";
 
-/** Maps segment roles to colors; keeps renderLines testable without pi's Theme. */
 export interface SegmentTheme {
 	paint(role: Role, text: string): string;
 	/** ARROW in `from`'s background over `to`'s background (the terminal's when undefined). */
@@ -57,13 +39,8 @@ const contrast = (a: Rgb, b: Rgb) => (Math.max(luminance(a), luminance(b)) + 0.0
 const NEAR_BLACK = { kind: "rgb", r: 16, g: 18, b: 22 } as const;
 const WHITE = { kind: "rgb", r: 255, g: 255, b: 255 } as const;
 
-/**
- * Adapts pi's Theme. Every color is derived from theme tokens, so segments
- * follow dark/light switches. The theme's own background tokens all share one
- * lightness, which blurs segment boundaries, hence the vivid foreground tokens
- * as backgrounds for cwd/alerts and a lighter mix of toolPendingBg as the
- * second quiet shade.
- */
+// Not the theme's background tokens: they share one lightness, so segment
+// boundaries blur. Vivid foreground tokens back cwd/alerts instead.
 export function segmentTheme(theme: any): SegmentTheme {
 	const c = theme.colors;
 	const readableOn = (bg: any) => (contrast(colorToRgb(bg), NEAR_BLACK) >= contrast(colorToRgb(bg), WHITE) ? NEAR_BLACK : WHITE);

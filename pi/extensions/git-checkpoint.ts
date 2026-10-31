@@ -1,20 +1,3 @@
-/**
- * git-checkpoint: snapshot the repo once per prompt, right before the first
- * mutating tool call (edit / write / bash / subagent), so a bad run can be undone.
- *
- * Snapshot = a commit object built from a throwaway index (GIT_INDEX_FILE),
- * stored at refs/pi-checkpoints/<session-id>/<NNNN>. Unlike `git stash create`
- * (examples/extensions/git-checkpoint.ts) it includes untracked files, and it
- * never touches the working tree, the real index, the stash list, or hooks.
- *
- * Skipped in subagent children (PI_SUBAGENT=1): they run under the parent's
- * prompt, whose checkpoint already covers them, and with --no-session each
- * child would otherwise add its own ref under a fresh session id.
- *
- * /checkpoints [list [all] | diff <n> | restore <n> | prune]
- *   restore only prints commands; it never rewrites files itself.
- */
-
 import { execFile } from "node:child_process";
 import { copyFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -22,7 +5,7 @@ import { isAbsolute, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { SUBAGENT_ENV } from "./usage-log.ts";
 
-// subagent: its children skip checkpoints, so the parent snapshots before any of them run.
+// Not only edit/write/bash: subagent children skip checkpoints, so the parent must snapshot first.
 const MUTATING_TOOLS = new Set(["edit", "write", "bash", "subagent"]);
 const REF_ROOT = "refs/pi-checkpoints";
 // Fixed identity: snapshots must not depend on user.name/email being set, and
@@ -71,7 +54,7 @@ export async function createCheckpoint(cwd: string, sessionId: string, label: st
 	const tmp = mkdtempSync(join(tmpdir(), "pi-checkpoint-"));
 	try {
 		const indexFile = join(tmp, "index");
-		// Seed from the real index so `add -A` can reuse its stat cache.
+		// Not an empty index: seeding from the real one lets `add -A` reuse its stat cache.
 		let realIndex = await gitOk(root, ["rev-parse", "--git-path", "index"]);
 		if (!isAbsolute(realIndex)) realIndex = join(root, realIndex);
 		if (existsSync(realIndex)) copyFileSync(realIndex, indexFile);

@@ -1,10 +1,3 @@
-/**
- * Puts Claude Code's rules into pi's system prompt: the global ~/.claude/rules
- * and the project's nearest .claude/rules. Rules without `paths:` are inlined;
- * path-scoped ones are listed for the model to read, since pi has no per-file
- * trigger. Re-read before every prompt so edits apply without /reload.
- */
-
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";

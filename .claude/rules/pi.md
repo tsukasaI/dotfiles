@@ -26,7 +26,9 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   disabled there (`-builtin:<name>`).
 - `AGENTS.md` → `~/.pi/agent/AGENTS.md` (symlink: context files have no
   settings path option). Pi does not read `~/.claude/CLAUDE.md`, so this is
-  the pi-side distillation of it; keep the two in step by hand.
+  the pi-side distillation of it; keep the two in step by hand. Rules are
+  not distilled: `claude-rules.ts` loads `~/.claude/rules` itself, so
+  AGENTS.md must not repeat their content.
 - `extensions/`: every `.ts` file here is loaded, so tests live in `tests/`
   (`bun test pi/tests`, offline). `git-checkpoint.ts` snapshots the repo to
   `refs/pi-checkpoints/<session>/<n>` once per prompt before the first
@@ -36,9 +38,10 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   `statusline.ts` replaces the TUI footer (theme colors; today's cost is
   read from usage-log's JSONL and the goal state from goal's entries, so it
   imports `./usage-log.ts` and `./goal.ts`).
-  `claude-rules.ts` puts the project's `.claude/rules/` into the system
-  prompt (bodies of rules without `paths:`, a read-on-demand list for the
-  rest); `~/.claude/rules` is skipped because this `AGENTS.md` distills it.
+  `claude-rules.ts` puts `~/.claude/rules/` and the project's
+  `.claude/rules/` into the system prompt (bodies of rules without
+  `paths:`, a read-on-demand list for the rest). `git-sandbox.md` is
+  skipped: it describes Claude Code's Bash sandbox, which pi lacks.
   `shguard.ts` runs each model-issued bash command through
   `shguard check --json` (same `~/.config/shguard/config.toml` as Claude
   Code) and blocks anything but `Allow`, fail-closed; `!` commands are not
@@ -49,6 +52,8 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   by `claude-code/hooks/block-config-edit.sh`, and also protects pi's own
   guards (`file-guard.ts`, `shguard.ts`, `settings.json`, `.pi` extension
   dirs), so changing those is a manual edit, as on the Claude Code side.
+  Known gaps: grep/find/ls on a parent of a denied path still reach it,
+  and a new file in `extensions/` can register its own tools.
   `format.ts` runs `fini` after write/edit (as Claude Code's PostToolUse)
   and tells the model when the file changed. `style-guards.ts` runs
   `claude-code/hooks/slop-guard.ts` on prose writes and imports
@@ -59,7 +64,13 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   `pi --mode json -p` processes with `PI_SUBAGENT=1`, which stops the
   child from registering these tools, logging usage (the parent counts it
   as `toolCost`), running goal, and taking checkpoints (the parent
-  checkpoints on the `subagent` call). Children time out after 30 min. `advisor.ts` sends a structured brief, no
+  checkpoints on the `subagent` call). Children time out after 30 min.
+  `session-log.ts` starts `lib/save-session.ts` (bun, detached) on
+  `session_shutdown`; it writes the redacted session to `pi_sessions` /
+  `pi_transcript_raw` / `pi_session_days` in Claude Code's
+  `~/.local/share/claude-logs/logs.db` (`PI_SESSION_LOG_DB` overrides).
+  `push-to-turso.sh` copies only its own three tables, so these rows stay
+  local and are never pruned. `advisor.ts` sends a structured brief, no
   history, to Fable after a TUI confirmation. `goal.ts` adds `/goal
   [--max N] <condition>` (Claude Code's /goal): at `agent_before_settle`
   Haiku judges the transcript and a miss appends the reason and continues;
@@ -70,7 +81,7 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   pi's boundary preview reports `canContinue: false` after an assistant
   reply; the appended custom message makes `continue: true` valid, so don't
   gate on it.
-- `bun test pi/tests` is not in CI; run it after changing `extensions/`.
+- `bun test pi/tests` runs on pre-push (lefthook), not in CI.
 - Load check without model calls: send `{"type":"get_commands"}` to
   `pi --mode rpc --no-session`.
 - The `--container` mode uses its own `pi-agent-home` volume, so none of

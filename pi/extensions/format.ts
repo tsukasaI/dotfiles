@@ -1,13 +1,3 @@
-/**
- * format: runs `fini` on every file pi's write/edit tools changed, the same
- * normalizer Claude Code's PostToolUse hook runs on Edit/Write.
- *
- * Unlike that hook, the model is told when fini rewrote the file (its next
- * edit would otherwise target stale text) and sees fini's findings
- * (secrets, TODO, debug code). Best-effort, not a guard: a missing binary,
- * timeout, or failure leaves the tool result unchanged apart from a note.
- */
-
 import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -32,13 +22,14 @@ const snapshot = (path: string): string | undefined => {
 	}
 };
 
-/** Formats the file and returns a note for the model, or undefined when there is nothing to say. */
+/** Undefined when fini changed nothing and reported nothing. */
 export async function formatFile(path: string, run: FiniRunner = runFini): Promise<string | undefined> {
 	const before = snapshot(path);
 	if (before === undefined) return undefined;
 	const { stdout, error } = await run(path);
 	if (error) return `[format] fini did not run on ${path}: ${error.message.split("\n")[0]}`;
 	const notes: string[] = [];
+	// Not silent like Claude Code's hook: after a rewrite the model's next edit would target stale text.
 	if (snapshot(path) !== before) notes.push(`[format] fini normalized ${path}; re-read it before the next edit.`);
 	const findings = stdout.trim();
 	if (/^Detected:/m.test(findings)) notes.push(`[format] fini findings:\n${findings.slice(0, MAX_NOTE_CHARS)}`);

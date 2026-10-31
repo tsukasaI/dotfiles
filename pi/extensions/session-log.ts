@@ -8,8 +8,7 @@ const SAVER = resolve(dirname(fileURLToPath(import.meta.url)), "../lib/save-sess
 
 export type Launcher = (args: string[]) => void;
 
-// Detached rather than awaited: quitting pi should not wait on a SQLite write
-// (Claude Code's SessionEnd hook is async for the same reason). Not node:sqlite
+// Not awaited: quitting pi should not wait on a SQLite write. Not node:sqlite
 // in-process: the saver shares bun:sqlite and claude-code/lib with save-transcript.ts.
 const launch: Launcher = (args) => {
 	const child = spawn("bun", ["--config=/dev/null", SAVER, ...args], { detached: true, stdio: "ignore" });

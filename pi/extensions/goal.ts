@@ -1,20 +1,3 @@
-/**
- * goal: `/goal <condition>` keeps the agent working until a small evaluator
- * model, reading only the transcript, says the condition is met. Pi's
- * counterpart to Claude Code's /goal, so mkgoal statements run unchanged.
- *
- * The condition is sent as the first prompt. At each agent_before_settle the
- * evaluator (Haiku, named as a physical model) answers met / not met; not met
- * appends the reason as a custom message and asks for one more run.
- * The loop ends when the evaluator says met, at the turn cap, on `/goal stop`,
- * when a run is aborted or fails, and when the evaluator call or its answer
- * fails (fail-closed: an unjudged turn never continues).
- *
- * State lives in "goal" custom entries, so it follows branches and resumes.
- * Evaluator cost goes to usage-log's JSONL as its own record, and into the
- * session total via the entry's evalUsage (statusline reads it).
- */
-
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { appendRecord, SUBAGENT_ENV, toRecord } from "./usage-log.ts";
 

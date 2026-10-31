@@ -1,12 +1,3 @@
-/**
- * usage-log: append one JSONL record per turn (= one model call) with token
- * usage and cost, and show totals with /usage.
- *
- * Log: $PI_USAGE_LOG_DIR or <agent-dir>/usage, one file per month
- * (YYYY-MM.jsonl, local time). Cost comes from pi's model catalog prices
- * (usage.cost), so models without catalog prices log 0.
- */
-
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -58,7 +49,7 @@ function monthFile(d: Date): string {
 
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
-/** Build a record from a turn_end payload. Returns undefined for non-assistant messages. */
+/** Undefined for non-assistant messages. */
 export function toRecord(
 	event: { turnIndex: number; message: any; toolResults?: any[] },
 	sessionId: string,

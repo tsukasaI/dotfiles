@@ -1,22 +1,3 @@
-/**
- * subagent: lets the main model (Opus) hand work to cheaper models in
- * separate pi processes, so their exploration never enters the main context
- * and the main model's prompt cache stays on one model.
- *
- *   scout    Haiku   read-only recon: find files, read, summarize
- *   research Sonnet  read-only, deeper investigation
- *   worker   Sonnet  implements a well-specified change (can edit/write)
- *   reviewer Opus    read-only code review; its prompt is the body of
- *                    claude-code/agents/code-reviewer.md, so both harnesses
- *                    review by the same instructions (review-gate skill)
- *
- * Each child runs `pi --mode json -p --no-session` with the user's extensions,
- * so shguard and .claude/rules apply there too. PI_SUBAGENT=1 keeps the child
- * from registering these tools again (no recursion), from logging its own
- * usage, and from taking git checkpoints (the parent's prompt already took
- * one); the child's usage comes back as this tool's result usage instead.
- */
-
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -62,7 +43,7 @@ Finish with: files changed (one line each on what and why), verification command
 
 export const CODE_REVIEWER_MD = resolve(dirname(fileURLToPath(import.meta.url)), "../../claude-code/agents/code-reviewer.md");
 
-/** Body of a Claude Code agent file (frontmatter dropped); undefined if unreadable or empty. */
+/** Undefined when the file is unreadable or has no body. */
 export function agentBody(path: string): string | undefined {
 	try {
 		const body = readFileSync(path, "utf8").replace(/^---\n[\s\S]*?\n---\n/, "").trim();
@@ -84,7 +65,6 @@ if (reviewerPrompt)
 
 export const MAX_TASKS = 4;
 const MAX_OUTPUT_CHARS = 30_000;
-// A hung child would otherwise block the tool until the user aborts.
 export const TASK_TIMEOUT_MS = 30 * 60_000;
 const KILL_GRACE_MS = 5_000;
 
@@ -126,7 +106,6 @@ export interface TaskResult {
 	turns: number;
 }
 
-/** Folds the child's JSON event lines into a result. Pure, so tests can feed recorded events. */
 export class EventCollector {
 	usage = emptyUsage();
 	turns = 0;
@@ -184,7 +163,7 @@ export type Spawner = (
 const spawnPi: Spawner = (args, { cwd, signal, onLine }) =>
 	new Promise((resolve) => {
 		const proc = spawn("pi", args, { cwd, env: { ...process.env, [SUBAGENT_ENV]: "1" }, stdio: ["ignore", "pipe", "pipe"] });
-		// Decode as a stream: concatenating raw chunks splits multibyte characters.
+		// Not `buf += chunk`: a raw chunk boundary can split a multibyte character.
 		proc.stdout.setEncoding("utf8");
 		proc.stderr.setEncoding("utf8");
 		let buf = "";
@@ -268,7 +247,7 @@ export function formatResults(results: TaskResult[]): string {
 		.join("\n\n");
 }
 
-/** Validation the schema cannot express; returns an error message or undefined. */
+/** Returns an error message, or undefined when the tasks are valid. */
 export function checkTasks(tasks: { agent: string; task: string }[]): string | undefined {
 	if (tasks.length === 0 || tasks.length > MAX_TASKS) return `give 1-${MAX_TASKS} tasks`;
 	const unknown = tasks.find((t) => !AGENTS[t.agent]);

@@ -1,13 +1,3 @@
-/**
- * advisor: `consult_advisor` asks Claude Fable for advice on a problem the
- * main model is stuck on. One request, no tools, and no conversation history:
- * the main model writes a structured brief, which keeps the call cheap
- * (Fable costs 2.5x Opus) and forces the problem to be stated clearly.
- *
- * Every call needs the user's confirmation in the TUI, showing the brief and
- * a cost estimate; without a UI the call is refused (fail-closed).
- */
-
 import { Type } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { SUBAGENT_ENV } from "./usage-log.ts";

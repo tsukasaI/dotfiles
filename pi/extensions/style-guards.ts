@@ -1,19 +1,3 @@
-/**
- * style-guards: the two Claude Code style checks pi was missing.
- *
- *   slop  write/edit of .md/.mdx/.txt runs claude-code/hooks/slop-guard.ts
- *         with a synthesized PreToolUse payload (pi's edits[] folded into one
- *         old/new pair), so the phrase list and em-dash rule stay in one place.
- *   commit  bash `git commit` gets claude-code/mod's checks: Conventional
- *         Commits subject, no Japanese, and no commit on main/master outside
- *         dotfiles/ops. The message parser is imported from the mod module.
- *
- * Both fail open, as they do in Claude Code: they enforce style, not safety.
- * A commit whose message can't be read statically (editor, `-F file`,
- * expanding `$`) is not checked here, whereas the mod hook denies it; that
- * flag is not exported and rule-guards.ts is a protected guard file.
- */
-
 import { execFile } from "node:child_process";
 import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,7 +7,7 @@ import { resolveToolPath } from "./file-guard.ts";
 
 const SLOP_GUARD = resolve(dirname(fileURLToPath(import.meta.url)), "../../claude-code/hooks/slop-guard.ts");
 const PROSE = new Set([".md", ".mdx", ".txt"]);
-// Repos where committing straight to main is the workflow (same as rule-guards.ts).
+// Not imported: rule-guards.ts does not export it, and it is a protected guard file.
 const DIRECT_TO_MAIN = /[:/]tsukasaI\/(dotfiles|ops)(\.git)?$/;
 
 type Block = { block: true; reason: string } | undefined;
@@ -37,7 +21,6 @@ const exec: Exec = (cmd, args, { cwd, input }) =>
 		child.stdin?.end(input ?? "");
 	});
 
-/** Claude Code Edit/Write payload for slop-guard; undefined when the call has nothing to check. */
 export function slopPayload(toolName: string, input: any, abs: string): object | undefined {
 	if (!PROSE.has(extname(abs).toLowerCase())) return undefined;
 	if (toolName === "write") {
@@ -60,13 +43,14 @@ export async function checkSlop(payload: object, run: Exec = exec): Promise<Bloc
 		const out = JSON.parse(stdout)?.hookSpecificOutput;
 		if (out?.permissionDecision === "deny") return { block: true, reason: `slop-guard: ${out.permissionDecisionReason}` };
 	} catch {
-		// no verdict printed = allow; any failure fails open
+		// Not fail-closed, matching slop-guard itself: it enforces style, not safety.
 	}
 	return undefined;
 }
 
 export async function checkCommit(command: string, cwd: string, run: Exec = exec): Promise<Block> {
 	const message = commitMessage(command);
+	// Not denied like the mod hook does: its "unreadable message" flag is not exported.
 	if (message === undefined) return undefined;
 	const bad = messageProblem(message);
 	if (bad) return { block: true, reason: `commit-guard: ${bad}.` };
@@ -91,7 +75,7 @@ export default function styleGuards(pi: ExtensionAPI, run: Exec = exec) {
 				return payload ? await checkSlop(payload, run) : undefined;
 			}
 		} catch {
-			// fail open: a style check must never block on its own crash
+			// Not rethrown: pi blocks the tool when a tool_call handler throws.
 		}
 		return undefined;
 	});
