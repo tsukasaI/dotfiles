@@ -25,6 +25,7 @@ export interface UsageRecord {
 	ts: string;
 	sessionId: string;
 	cwd: string;
+	/** -1 for a call outside the agent loop (goal.ts's evaluator). */
 	turnIndex: number;
 	provider: string;
 	model: string;

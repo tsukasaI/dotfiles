@@ -133,15 +133,17 @@ describe("statusline", () => {
 		expect(parseRateLimit({ "anthropic-ratelimit-tokens-limit": "0", "anthropic-ratelimit-tokens-remaining": "0" })).toBeUndefined();
 	});
 
-	test("session totals include abandoned branches and nested tool usage", () => {
+	test("session totals include abandoned branches, nested tool usage, and goal evaluations", () => {
 		const entries = [
 			{ type: "message", message: { role: "user" } },
 			{ type: "message", message: { role: "assistant", usage: { input: 10, output: 5, cost: { total: 0.01 } } } },
 			{ type: "message", message: { role: "toolResult", usage: { cost: { total: 0.002 } } } },
 			{ type: "compaction" },
+			{ type: "custom", customType: "goal", data: { condition: "c", evalUsage: { cost: { total: 0.004 } } } },
+			{ type: "custom", customType: "other", data: { evalUsage: { cost: { total: 9 } } } },
 			{ type: "message", message: { role: "assistant", usage: { input: 1, output: 1, cost: { total: 0.03 } } } },
 		];
 		const t = sessionTotals(entries);
-		expect(t).toEqual({ input: 11, output: 6, cost: expect.closeTo(0.042, 6) });
+		expect(t).toEqual({ input: 11, output: 6, cost: expect.closeTo(0.046, 6) });
 	});
 });

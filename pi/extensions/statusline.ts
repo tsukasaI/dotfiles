@@ -18,6 +18,7 @@
 import { homedir } from "node:os";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { colorToRgb, mixColors, truncateToWidth } from "@earendil-works/pi-tui";
+import { GOAL_ENTRY } from "./goal.ts";
 import { costTotals } from "./usage-log.ts";
 
 export type Role = "cwd" | "quiet" | "quiet2" | "warn" | "crit";
@@ -193,6 +194,11 @@ export function renderLines(d: StatusData, theme: SegmentTheme, width: number): 
 export function sessionTotals(entries: readonly any[]): { input: number; output: number; cost: number } {
 	const t = { input: 0, output: 0, cost: 0 };
 	for (const e of entries) {
+		// goal.ts's evaluator calls are not messages; each goal entry carries its own call's usage.
+		if (e?.type === "custom" && e.customType === GOAL_ENTRY && e.data?.evalUsage) {
+			t.cost += e.data.evalUsage.cost?.total ?? 0;
+			continue;
+		}
 		if (e?.type !== "message") continue;
 		const m = e.message;
 		if (m?.role === "assistant" && m.usage) {

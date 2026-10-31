@@ -40,7 +40,16 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   child `pi --mode json -p` processes with `PI_SUBAGENT=1`, which stops the
   child from registering these tools and from logging usage (the parent
   counts it as `toolCost`). `advisor.ts` sends a structured brief, no
-  history, to Fable after a TUI confirmation.
+  history, to Fable after a TUI confirmation. `goal.ts` adds `/goal
+  [--max N] <condition>` (Claude Code's /goal): at `agent_before_settle`
+  Haiku judges the transcript and a miss appends the reason and continues;
+  it stops on met, the cap (`--max`, else the statement's "stop after N
+  turns", else 20), `/goal stop`, an aborted run, or a failed evaluation
+  (fail-closed). State is in `goal` custom entries; evaluator cost goes to
+  usage-log as `turnIndex: -1` records and to the statusline session total.
+  pi's boundary preview reports `canContinue: false` after an assistant
+  reply; the appended custom message makes `continue: true` valid, so don't
+  gate on it.
 - Load check without model calls: send `{"type":"get_commands"}` to
   `pi --mode rpc --no-session`.
 - The `--container` mode uses its own `pi-agent-home` volume, so none of
