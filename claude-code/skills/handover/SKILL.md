@@ -1,6 +1,6 @@
 ---
 name: handover
-description: Produces a copy-pasteable handover document summarizing this session's goal, progress, decisions, and next step, so a fresh Claude Code session (no memory of this conversation) can resume without re-discovery. Output goes to chat only, as one fenced markdown block — never written to a file. User-invoked via /handover; Claude may also proactively suggest running it when context looks degraded (long session, heavy compaction, many independent subtasks) — surface the suggestion in one line and wait for explicit go-ahead before invoking, never invoke silently.
+description: Produces a copy-pasteable handover document summarizing this session's goal, progress, decisions, and next step, so a fresh agent session (Claude Code or pi; no memory of this conversation) can resume without re-discovery. Output goes to chat only, as one fenced markdown block — never written to a file. User-invoked via /handover (/skill:handover in pi); the agent may also proactively suggest running it when context looks degraded (long session, heavy compaction, many independent subtasks) — surface the suggestion in one line and wait for explicit go-ahead before invoking, never invoke silently.
 argument-hint: [追加で残したいメモ (optional)]
 allowed-tools: Bash, Read, Grep, Glob
 ---
@@ -14,6 +14,11 @@ document's own section headers in English so they stay greppable across
 sessions.
 
 Launch argument (optional extra notes to fold into the doc): $ARGUMENTS
+
+<!-- pi does not substitute $ARGUMENTS; it appends the arguments after the
+skill body instead, so the literal fallback below keeps both harnesses working. -->
+If the line above shows a literal `$ARGUMENTS`, the notes (if any) are the
+text that follows this skill's instructions instead.
 
 ## Why this shape
 
@@ -74,7 +79,7 @@ the next session skimming it.
    outstanding, list the rest as a short queue below it — don't compress
    multiple remaining subtasks into one line.
 
-If `$ARGUMENTS` was given, fold it in as a short note near Goal or Open
+If launch notes were given, fold them in as a short note near Goal or Open
 questions, wherever it fits.
 
 *Done:* all 8 headers present in order, each body backed by something read
