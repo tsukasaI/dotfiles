@@ -28,3 +28,10 @@ pre-push:
     mod-test:
       glob: "claude-code/mod/**"
       run: claude plugin test claude-code/mod
+    shguard-parity-check-ci-home:
+      # Not redundant with shguard-parity-check: HOME-relative rules (~/.ssh/)
+      # can pass under the local HOME and fail under CI's HOME=/home/runner.
+      run: HOME=/nonexistent-ci-home bash tests/shguard-parity-check.sh
+    pi-test:
+      glob: "pi/**"
+      run: bun test pi/tests
