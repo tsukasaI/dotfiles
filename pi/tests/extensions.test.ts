@@ -124,6 +124,27 @@ describe("git-checkpoint", () => {
 		expect(sh(repo, "for-each-ref", "--format=%(refname)", "refs/pi-checkpoints/")).not.toContain("/s1/");
 		expect(sh(repo, "for-each-ref", "--format=%(refname)", "refs/pi-checkpoints/")).toContain("/s2/");
 	});
+
+	test("subagent call checkpoints in the parent; children register nothing", async () => {
+		const { api, emit } = fakePi();
+		gitCheckpoint(api);
+		const { ctx } = fakeCtx(repo, "s3");
+		writeFileSync(join(repo, "a.txt"), "before-subagent\n");
+		await emit("agent_start", {}, ctx);
+		await emit("tool_call", { toolName: "subagent" }, ctx);
+		expect(sh(repo, "for-each-ref", "--format=%(refname)", "refs/pi-checkpoints/s3/")).toBe("refs/pi-checkpoints/s3/0001");
+
+		process.env.PI_SUBAGENT = "1";
+		try {
+			const child = fakePi();
+			gitCheckpoint(child.api);
+			expect(child.commands.size).toBe(0);
+			await child.emit("tool_call", { toolName: "edit" }, fakeCtx(repo, "s4").ctx);
+			expect(sh(repo, "for-each-ref", "--format=%(refname)", "refs/pi-checkpoints/s4/")).toBe("");
+		} finally {
+			delete process.env.PI_SUBAGENT;
+		}
+	});
 });
 
 describe("usage-log", () => {

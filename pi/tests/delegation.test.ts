@@ -81,6 +81,8 @@ describe("subagent", () => {
 		expect(err).toMatchObject({ ok: false, error: "overloaded" });
 		const aborted = await sub.runTask("scout", "t", "/repo", fakeSpawner([], { code: null, aborted: true }).spawner);
 		expect(aborted.error).toBe("aborted");
+		const timedOut = await sub.runTask("scout", "t", "/repo", fakeSpawner([assistant("partial", 0)], { code: null, timedOut: true } as any).spawner);
+		expect(timedOut).toMatchObject({ ok: false, error: `timed out after ${sub.TASK_TIMEOUT_MS / 60_000} min` });
 	});
 
 	test("tool: runs tasks in the session cwd, aggregates usage, reports per agent", async () => {

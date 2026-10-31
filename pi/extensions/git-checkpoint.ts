@@ -1,11 +1,15 @@
 /**
  * git-checkpoint: snapshot the repo once per prompt, right before the first
- * mutating tool call (edit / write / bash), so a bad run can be undone.
+ * mutating tool call (edit / write / bash / subagent), so a bad run can be undone.
  *
  * Snapshot = a commit object built from a throwaway index (GIT_INDEX_FILE),
  * stored at refs/pi-checkpoints/<session-id>/<NNNN>. Unlike `git stash create`
  * (examples/extensions/git-checkpoint.ts) it includes untracked files, and it
  * never touches the working tree, the real index, the stash list, or hooks.
+ *
+ * Skipped in subagent children (PI_SUBAGENT=1): they run under the parent's
+ * prompt, whose checkpoint already covers them, and with --no-session each
+ * child would otherwise add its own ref under a fresh session id.
  *
  * /checkpoints [list [all] | diff <n> | restore <n> | prune]
  *   restore only prints commands; it never rewrites files itself.
@@ -16,8 +20,10 @@ import { copyFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { SUBAGENT_ENV } from "./usage-log.ts";
 
-const MUTATING_TOOLS = new Set(["edit", "write", "bash"]);
+// subagent: its children skip checkpoints, so the parent snapshots before any of them run.
+const MUTATING_TOOLS = new Set(["edit", "write", "bash", "subagent"]);
 const REF_ROOT = "refs/pi-checkpoints";
 // Fixed identity: snapshots must not depend on user.name/email being set, and
 // must not trigger GPG pinentry (see --no-gpg-sign below).
@@ -99,6 +105,7 @@ export async function createCheckpoint(cwd: string, sessionId: string, label: st
 }
 
 export default function gitCheckpoint(pi: ExtensionAPI) {
+	if (process.env[SUBAGENT_ENV] === "1") return;
 	let armed = false;
 	let label = "";
 	let pending: Promise<void> | undefined;

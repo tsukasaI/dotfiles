@@ -9,8 +9,9 @@
  *
  * Each child runs `pi --mode json -p --no-session` with the user's extensions,
  * so shguard and .claude/rules apply there too. PI_SUBAGENT=1 keeps the child
- * from registering these tools again (no recursion) and from logging its own
- * usage; the child's usage comes back as this tool's result usage instead.
+ * from registering these tools again (no recursion), from logging its own
+ * usage, and from taking git checkpoints (the parent's prompt already took
+ * one); the child's usage comes back as this tool's result usage instead.
  */
 
 import { spawn } from "node:child_process";
@@ -55,6 +56,9 @@ Finish with: files changed (one line each on what and why), verification command
 
 export const MAX_TASKS = 4;
 const MAX_OUTPUT_CHARS = 30_000;
+// A hung child would otherwise block the tool until the user aborts.
+export const TASK_TIMEOUT_MS = 30 * 60_000;
+const KILL_GRACE_MS = 5_000;
 
 export interface Usage {
 	input: number;
@@ -147,18 +151,31 @@ export function childArgs(spec: AgentSpec, task: string): string[] {
 export type Spawner = (
 	args: string[],
 	opts: { cwd: string; signal?: AbortSignal; onLine: (line: string) => void },
-) => Promise<{ code: number | null; stderr: string; aborted: boolean }>;
+) => Promise<{ code: number | null; stderr: string; aborted: boolean; timedOut?: boolean }>;
 
 const spawnPi: Spawner = (args, { cwd, signal, onLine }) =>
 	new Promise((resolve) => {
 		const proc = spawn("pi", args, { cwd, env: { ...process.env, [SUBAGENT_ENV]: "1" }, stdio: ["ignore", "pipe", "pipe"] });
+		// Decode as a stream: concatenating raw chunks splits multibyte characters.
+		proc.stdout.setEncoding("utf8");
+		proc.stderr.setEncoding("utf8");
 		let buf = "";
 		let stderr = "";
 		let aborted = false;
+		let timedOut = false;
+		let forceKill: ReturnType<typeof setTimeout> | undefined;
+		const stop = () => {
+			proc.kill("SIGTERM");
+			forceKill ??= setTimeout(() => proc.kill("SIGKILL"), KILL_GRACE_MS);
+		};
 		const kill = () => {
 			aborted = true;
-			proc.kill("SIGTERM");
+			stop();
 		};
+		const timer = setTimeout(() => {
+			timedOut = true;
+			stop();
+		}, TASK_TIMEOUT_MS);
 		signal?.addEventListener("abort", kill, { once: true });
 		proc.stdout.on("data", (d) => {
 			buf += d;
@@ -176,8 +193,10 @@ const spawnPi: Spawner = (args, { cwd, signal, onLine }) =>
 		});
 		proc.on("close", (code) => {
 			if (buf) onLine(buf);
+			clearTimeout(timer);
+			if (forceKill) clearTimeout(forceKill);
 			signal?.removeEventListener("abort", kill);
-			resolve({ code, stderr, aborted });
+			resolve({ code, stderr, aborted, timedOut });
 		});
 	});
 
@@ -192,7 +211,7 @@ export async function runTask(
 	const spec = AGENTS[agent];
 	if (!spec) return { agent, model: "-", ok: false, text: "", error: `unknown agent "${agent}"`, usage: emptyUsage(), turns: 0 };
 	const c = new EventCollector();
-	const { code, stderr, aborted } = await spawner(childArgs(spec, task), {
+	const { code, stderr, aborted, timedOut } = await spawner(childArgs(spec, task), {
 		cwd,
 		signal,
 		onLine: (line) => {
@@ -201,10 +220,12 @@ export async function runTask(
 			if (c.lastTool && c.lastTool !== before) onProgress?.(agent, c.lastTool);
 		},
 	});
-	const failed = aborted || code !== 0 || c.stopReason === "error" || c.stopReason === "aborted" || !c.lastText;
+	const failed = aborted || timedOut || code !== 0 || c.stopReason === "error" || c.stopReason === "aborted" || !c.lastText;
 	const error = aborted
 		? "aborted"
-		: c.errorMessage || (code !== 0 ? `exit ${code}: ${stderr.trim().slice(-500)}` : !c.lastText ? "no output" : undefined);
+		: timedOut
+			? `timed out after ${TASK_TIMEOUT_MS / 60_000} min`
+			: c.errorMessage || (code !== 0 ? `exit ${code}: ${stderr.trim().slice(-500)}` : !c.lastText ? "no output" : undefined);
 	return { agent, model: spec.model, ok: !failed, text: c.lastText, error: failed ? error : undefined, usage: c.usage, turns: c.turns };
 }
 
