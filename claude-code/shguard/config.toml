@@ -1,1552 +1,1103 @@
-# ask_outcome: floor every terminal Ask (structural fallback and rule-authored
-# alike) to a deny, in every permission_mode including default/plan/acceptEdits.
-# Using the bare-string form (not the [ask_outcome] table) deliberately: the
-# table leaves an absent/unrecognized permission_mode resolved to "ask", which
-# is a silent no-op if Claude Code ever renames/drops that hook field - a
-# fail-open gap the bare form doesn't have. An unresolved Ask can't be acted
-# on by an autonomous/auto-mode session anyway, and Ask is not a reliable
-# control under bypassPermissions (see docs/shguard-migration-deltas.md's
-# "Cutover caveat"), so flooring unconditionally is the correct fail-closed
-# read of this file's own security posture, not a weakening of it.
-ask_outcome = "deny"
-
-# shguard user policy for this machine.
+# shguard 0.10 user policy for this machine.
 #
 # Deployed to ~/.config/shguard/config.toml (shguard's default lookup path)
-# via a setup.sh symlink so it stays versioned and CI-testable. The
-# PreToolUse hook in settings.json runs bare `shguard`, which reads that path.
+# by a setup.sh symlink, so it stays versioned and CI-testable. Merged with
+# shguard's embedded catalog (catalog/*.toml in the shguard repository).
 #
-# Schema (see shguard's rules/blocklist.toml for the authoritative version):
-#   [[deny]]  - hard-blocks a command shape (id, reason, command/command_prefix,
-#               optional required_flags/required_tokens/targets)
-#   [[ask]]   - same shape, surfaces a confirmation instead of a hard block
-#   [[allow]] - can only downgrade an Ask that shguard's own structural
-#               analysis produced; it can never override a deny/ask match,
-#               built-in or defined here (see docs/shguard-migration-deltas.md)
+# How 0.10 decides: Allow needs every simple command covered by a catalog
+# row, with no rule hit. Anything without a row is Ask, and a [[rule]] can
+# only target a key some row covers. Allow is a claim about what shguard
+# read, not that a command is safe (shguard README, promises P1-P3).
 #
-# Precedence: deny > ask > allow, evaluated across the built-in blocklist and
-# this file together.
-#
-# This file ports the old blocklist.conf's categories (file since deleted) that aren't
-# already covered by shguard's built-in blocklist (rules/blocklist.toml).
-# Every `dotfiles-*` id below is namespaced to avoid colliding with a
-# built-in id (merge_user_config is additive-only: an id collision is a
-# load-time error, not an override).
-#
-# What's deliberately NOT here — see docs/shguard-migration-deltas.md for
-# the full list and reasoning: pipe-to-interpreter beyond the built-in
-# curl|wget -> sh pipeline, heredoc-fed interpreters (python <<EOF etc.),
-# the ANSI-C $'...' raw-string check, /dev/tcp|udp for arbitrary commands,
-# the general CREDENTIAL "any command mentioning secret/credential" case,
-# and full secret-file-reader path coverage (extension-suffix patterns
-# like *.pem/*.key aren't expressible with exact/prefix target matching).
-#
-# curl (localhost-only) / rsync (local-only) rules ARE included below
-# (dotfiles-network-curl-remote / dotfiles-network-rsync-remote), using the
-# value_flags field — see docs/shguard-migration-deltas.md #2/#19 for history.
+# Migration from the 0.9 config (docs/shguard-migration-deltas.md, section 27):
+# - Every 0.9 [[deny]] on a command without a 0.10 row (sudo, curl, ssh,
+#   interpreters, find, most git/gh subcommands, ...) is now an Ask, which
+#   ask_outcome below turns into a deny. They are not rewritten here; a rule
+#   on them would be a load error (no row can match its key).
+# - Rules below restore the 0.9 denies on commands the embedded catalog
+#   allows. 0.10 rules carry no reason text: the id is the reason.
 
-# Privilege escalation floor (issue #35): denies sudo/doas/su/pkexec/run0
-# outright regardless of whether the wrapped command independently trips
-# a rule. "allow" is rejected at config load (fail-closed, no way to
-# disable this). See docs/shguard-migration-deltas.md #11.
-escalation_floor = "deny"
+# Every Ask is refused: an unresolved Ask stalls an autonomous session, and
+# Ask is not a reliable control under bypassPermissions.
+ask_outcome = "deny"
 
 # =====================================================================
-# Privilege escalation
+# Rows: commands the embedded catalog does not cover. Each widens Allow.
 # =====================================================================
 
-# NOTE: these three rules are now REDUNDANT (not deactivated) given the
-# escalation_floor above: the floor denies sudo/doas/su outright via its
-# own mechanism, independent of argv[0] rule matching. Kept in place
-# anyway as documentation of intent — see docs/shguard-migration-deltas.md #11.
-[[deny]]
-id = "dotfiles-privilege-sudo"
-reason = "sudo grants root-level access"
-command = "sudo"
+# The filter is jq's own language: it cannot write files or run programs,
+# and reads other files only through `import`/`include` from the default
+# module path (~/.jq; -L is left out), so it is inert; the rest are input
+# files. User-owned risk: `jq -n env` /
+# `$ENV` prints the environment, which can hold API keys. Left out:
+# -f/--from-file, -L/--library-path, --slurpfile/--rawfile (read files
+# into variables), --arg/--argjson (two values each, which the grammar
+# cannot express), --args/--jsonargs (turn the rest into values), --seq,
+# --stream*.
+[[row]]
+key = ["jq"]
+source = "https://jqlang.org/manual/v1.8/#invoking-jq"
+order = "permute"
+dashdash = "ends"
+positionals = ["inert"]
+rest = "path"
+[[row.opt]]
+short = "n"
+long = "null-input"
+[[row.opt]]
+short = "R"
+long = "raw-input"
+[[row.opt]]
+short = "s"
+long = "slurp"
+[[row.opt]]
+short = "c"
+long = "compact-output"
+[[row.opt]]
+short = "r"
+long = "raw-output"
+[[row.opt]]
+long = "raw-output0"
+[[row.opt]]
+short = "j"
+long = "join-output"
+[[row.opt]]
+short = "a"
+long = "ascii-output"
+[[row.opt]]
+short = "S"
+long = "sort-keys"
+[[row.opt]]
+short = "C"
+long = "color-output"
+[[row.opt]]
+short = "M"
+long = "monochrome-output"
+[[row.opt]]
+long = "tab"
+[[row.opt]]
+long = "indent"
+value = { takes = "inert" }
+[[row.opt]]
+long = "unbuffered"
+[[row.opt]]
+short = "e"
+long = "exit-status"
 
-[[deny]]
-id = "dotfiles-privilege-su"
-reason = "su switches to another user account"
-command = "su"
+# ---------------------------------------------------------------------
+# git/gh write operations. The policy is "allow what reflog or GitHub can
+# undo, block what loses data for good": each row lists the safe options,
+# an option that discards work is listed too so a named [[rule]] below
+# blocks it (the id is the reason), and anything unlisted stays an Ask.
+# Not given rows on purpose: `git checkout` (a branch and `-- path`, which
+# discards edits, share one operand slot), `git restore` (a row cannot
+# require --staged; unstage with `git reset -- <path>`), `git clean`,
+# `git rm`, `git gc`, `git reflog`, `git update-ref`, `git filter-branch`.
+# `git branch` keeps the embedded listing-only row (a second row with the
+# same key is a load error), so branches are made with `git switch -c`.
+# ---------------------------------------------------------------------
 
-[[deny]]
-id = "dotfiles-privilege-doas"
-reason = "doas grants elevated privileges"
-command = "doas"
+# Left out: -f/--force (stages ignored files; gitleaks is the backstop
+# only for what it recognizes), -p/-i/-e (interactive, would hang).
+[[row]]
+key = ["git", "add"]
+source = "https://git-scm.com/docs/git-add"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "A", long = "all" },
+  { short = "u", long = "update" },
+  { short = "N", long = "intent-to-add" },
+  { short = "v", long = "verbose" },
+  { short = "n", long = "dry-run" },
+]
 
+# Not -n: in git commit it is --no-verify, which skips the pre-commit
+# gitleaks hook, so both spellings stay unlisted (asked, hence denied).
+# Not -F/--file: it reads any file (`-F .env`) into a message that a push
+# then publishes; repeat -m for a multi-paragraph message.
+[[row]]
+key = ["git", "commit"]
+source = "https://git-scm.com/docs/git-commit"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "m", long = "message", value = { takes = "inert" } },
+  { short = "a", long = "all" },
+  { long = "amend" },
+  { long = "no-edit" },
+  { long = "fixup", value = { takes = "inert" } },
+  { long = "squash", value = { takes = "inert" } },
+  { short = "s", long = "signoff" },
+  { long = "allow-empty" },
+  { long = "author", value = { takes = "inert" } },
+  { long = "date", value = { takes = "inert" } },
+  { short = "q", long = "quiet" },
+  { short = "v", long = "verbose" },
+]
+
+# The branch operand is a path word only so rules can see it. Switching
+# still overwrites ignored files the target branch tracks (git's default
+# --overwrite-ignore); that is accepted.
+[[row]]
+key = ["git", "switch"]
+source = "https://git-scm.com/docs/git-switch"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "c", long = "create", value = { takes = "inert" } },
+  { short = "C", long = "force-create", value = { takes = "inert" } },
+  { short = "d", long = "detach" },
+  { short = "t", long = "track" },
+  { long = "no-track" },
+  { short = "q", long = "quiet" },
+  { short = "f", long = "force" },
+  { long = "discard-changes" },
+]
+
+[[row]]
+key = ["git", "reset"]
+source = "https://git-scm.com/docs/git-reset"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { long = "soft" },
+  { long = "mixed" },
+  { short = "q", long = "quiet" },
+  { long = "hard" },
+  { long = "merge" },
+  { long = "keep" },
+]
+
+# Left out: -i/--interactive (waits for an editor), -x/--exec (runs a
+# command), -s/-X (strategies).
+[[row]]
+key = ["git", "rebase"]
+source = "https://git-scm.com/docs/git-rebase"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { long = "onto", value = { takes = "path" } },
+  { long = "root" },
+  { long = "continue" },
+  { long = "abort" },
+  { long = "skip" },
+  { long = "quit" },
+  { long = "autosquash" },
+  { long = "no-autosquash" },
+  { long = "autostash" },
+  { long = "update-refs" },
+  { short = "q", long = "quiet" },
+]
+
+[[row]]
+key = ["git", "merge"]
+source = "https://git-scm.com/docs/git-merge"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { long = "ff" },
+  { long = "ff-only" },
+  { long = "no-ff" },
+  { long = "squash" },
+  { long = "abort" },
+  { long = "continue" },
+  { long = "quit" },
+  { short = "m", value = { takes = "inert" } },
+  { long = "no-edit" },
+  { short = "q", long = "quiet" },
+]
+
+[[row]]
+key = ["git", "cherry-pick"]
+source = "https://git-scm.com/docs/git-cherry-pick"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { long = "continue" },
+  { long = "abort" },
+  { long = "skip" },
+  { long = "quit" },
+  { short = "n", long = "no-commit" },
+  { short = "x" },
+  { short = "s", long = "signoff" },
+  { long = "ff" },
+]
+
+[[row]]
+key = ["git", "revert"]
+source = "https://git-scm.com/docs/git-revert"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { long = "continue" },
+  { long = "abort" },
+  { long = "skip" },
+  { long = "quit" },
+  { short = "n", long = "no-commit" },
+  { long = "no-edit" },
+  { short = "s", long = "signoff" },
+]
+
+# drop and clear are allowed (owner decision): stash entries are scratch
+# state. A stash ref with braces must be quoted ('stash@{1}') or given as
+# its index (`git stash pop 1`).
+[[row]]
+key = ["git", "stash"]
+source = "https://git-scm.com/docs/git-stash"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+opt = [
+  { short = "u", long = "include-untracked" },
+  { short = "m", long = "message", value = { takes = "inert" } },
+  { short = "k", long = "keep-index" },
+  { short = "q", long = "quiet" },
+]
+
+[[row]]
+key = ["git", "stash", "push"]
+source = "https://git-scm.com/docs/git-stash"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "u", long = "include-untracked" },
+  { short = "m", long = "message", value = { takes = "inert" } },
+  { short = "k", long = "keep-index" },
+  { short = "S", long = "staged" },
+  { short = "q", long = "quiet" },
+]
+
+[[row]]
+key = ["git", "stash", "pop"]
+source = "https://git-scm.com/docs/git-stash"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["inert"]
+opt = [{ long = "index" }, { short = "q", long = "quiet" }]
+
+[[row]]
+key = ["git", "stash", "apply"]
+source = "https://git-scm.com/docs/git-stash"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["inert"]
+opt = [{ long = "index" }, { short = "q", long = "quiet" }]
+
+[[row]]
+key = ["git", "stash", "list"]
+source = "https://git-scm.com/docs/git-stash"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+
+[[row]]
+key = ["git", "stash", "show"]
+source = "https://git-scm.com/docs/git-stash"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["inert"]
+opt = [{ short = "p", long = "patch" }, { long = "stat" }, { short = "u", long = "include-untracked" }]
+
+[[row]]
+key = ["git", "stash", "drop"]
+source = "https://git-scm.com/docs/git-stash"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["inert"]
+opt = [{ short = "q", long = "quiet" }]
+
+[[row]]
+key = ["git", "stash", "clear"]
+source = "https://git-scm.com/docs/git-stash"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+
+# The remote and refspecs are path words so the embedded URL and
+# absolute-path rules on `git` see them.
+[[row]]
+key = ["git", "fetch"]
+source = "https://git-scm.com/docs/git-fetch"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "p", long = "prune" },
+  { short = "t", long = "tags" },
+  { long = "all" },
+  { short = "q", long = "quiet" },
+  { short = "v", long = "verbose" },
+]
+
+# --rebase takes no value here: --rebase=interactive waits for an editor.
+[[row]]
+key = ["git", "pull"]
+source = "https://git-scm.com/docs/git-pull"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "r", long = "rebase" },
+  { long = "no-rebase" },
+  { long = "ff" },
+  { long = "ff-only" },
+  { long = "no-ff" },
+  { long = "autostash" },
+  { short = "q", long = "quiet" },
+  { short = "v", long = "verbose" },
+]
+
+[[row]]
+key = ["git", "worktree"]
+source = "https://git-scm.com/docs/git-worktree"
+cwd_sensitive = true
+order = "strict"
+dashdash = "ends"
+
+[[row]]
+key = ["git", "worktree", "add"]
+source = "https://git-scm.com/docs/git-worktree"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "b", value = { takes = "inert" } },
+  { long = "no-track" },
+  { long = "track" },
+  { short = "d", long = "detach" },
+  { short = "q", long = "quiet" },
+]
+
+[[row]]
+key = ["git", "worktree", "list"]
+source = "https://git-scm.com/docs/git-worktree"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+opt = [{ long = "porcelain" }, { short = "v", long = "verbose" }]
+
+[[row]]
+key = ["git", "worktree", "remove"]
+source = "https://git-scm.com/docs/git-worktree"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [{ short = "f", long = "force" }]
+
+[[row]]
+key = ["git", "worktree", "prune"]
+source = "https://git-scm.com/docs/git-worktree"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+opt = [{ short = "n", long = "dry-run" }, { short = "v", long = "verbose" }]
+
+# Left out: -f/--force (moves an existing tag), -s/-u (gpg).
+[[row]]
+key = ["git", "tag"]
+source = "https://git-scm.com/docs/git-tag"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "a", long = "annotate" },
+  { short = "m", long = "message", value = { takes = "inert" } },
+  { short = "l", long = "list" },
+  { long = "sort", value = { takes = "inert" } },
+  { long = "contains", value = { takes = "inert" } },
+  { short = "d", long = "delete" },
+]
+
+# Left out: -f/--force (overwrites the destination).
+[[row]]
+key = ["git", "mv"]
+source = "https://git-scm.com/docs/git-mv"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [{ short = "n", long = "dry-run" }, { short = "v", long = "verbose" }, { short = "k" }]
+
+# ---- gh writes ----
+# Every body file is a path word so dotfiles-gh-upload-path sees it. Left
+# out everywhere: -w/--web (opens a browser), --attach (uploads files),
+# -e/--editor (waits for an editor).
+
+[[row]]
+key = ["gh", "pr", "create"]
+source = "https://cli.github.com/manual/gh_pr_create"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+opt = [
+  { short = "t", long = "title", value = { takes = "inert" } },
+  { short = "b", long = "body", value = { takes = "inert" } },
+  { short = "F", long = "body-file", value = { takes = "path" } },
+  { short = "B", long = "base", value = { takes = "inert" } },
+  { short = "H", long = "head", value = { takes = "inert" } },
+  { short = "d", long = "draft" },
+  { short = "f", long = "fill" },
+  { long = "fill-first" },
+  { long = "fill-verbose" },
+  { short = "l", long = "label", value = { takes = "inert" } },
+  { short = "a", long = "assignee", value = { takes = "inert" } },
+  { short = "r", long = "reviewer", value = { takes = "inert" } },
+  { short = "m", long = "milestone", value = { takes = "inert" } },
+  { long = "no-maintainer-edit" },
+  { long = "dry-run" },
+]
+
+[[row]]
+key = ["gh", "pr", "edit"]
+source = "https://cli.github.com/manual/gh_pr_edit"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { short = "t", long = "title", value = { takes = "inert" } },
+  { short = "b", long = "body", value = { takes = "inert" } },
+  { short = "F", long = "body-file", value = { takes = "path" } },
+  { short = "B", long = "base", value = { takes = "inert" } },
+  { long = "add-label", value = { takes = "inert" } },
+  { long = "remove-label", value = { takes = "inert" } },
+  { long = "add-reviewer", value = { takes = "inert" } },
+  { long = "remove-reviewer", value = { takes = "inert" } },
+  { long = "add-assignee", value = { takes = "inert" } },
+  { long = "remove-assignee", value = { takes = "inert" } },
+  { short = "m", long = "milestone", value = { takes = "inert" } },
+]
+
+# Left out: --delete-last (deletes a comment for good).
+[[row]]
+key = ["gh", "pr", "comment"]
+source = "https://cli.github.com/manual/gh_pr_comment"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { short = "b", long = "body", value = { takes = "inert" } },
+  { short = "F", long = "body-file", value = { takes = "path" } },
+  { long = "edit-last" },
+]
+
+[[row]]
+key = ["gh", "pr", "ready"]
+source = "https://cli.github.com/manual/gh_pr_ready"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [{ long = "undo" }]
+
+# -d deletes the head branch; GitHub keeps a "Restore branch" button on
+# the closed PR.
+[[row]]
+key = ["gh", "pr", "close"]
+source = "https://cli.github.com/manual/gh_pr_close"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { short = "c", long = "comment", value = { takes = "inert" } },
+  { short = "d", long = "delete-branch" },
+]
+
+[[row]]
+key = ["gh", "pr", "reopen"]
+source = "https://cli.github.com/manual/gh_pr_reopen"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [{ short = "c", long = "comment", value = { takes = "inert" } }]
+
+[[row]]
+key = ["gh", "pr", "checkout"]
+source = "https://cli.github.com/manual/gh_pr_checkout"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { short = "b", long = "branch", value = { takes = "inert" } },
+  { long = "detach" },
+  { short = "f", long = "force" },
+]
+
+# Merging is allowed (owner decision): review-gate in CLAUDE.md decides
+# when. A merge can be reverted; --admin bypasses branch protection.
+[[row]]
+key = ["gh", "pr", "merge"]
+source = "https://cli.github.com/manual/gh_pr_merge"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { short = "s", long = "squash" },
+  { short = "m", long = "merge" },
+  { short = "r", long = "rebase" },
+  { short = "d", long = "delete-branch" },
+  { long = "auto" },
+  { long = "disable-auto" },
+  { long = "match-head-commit", value = { takes = "inert" } },
+  { short = "t", long = "subject", value = { takes = "inert" } },
+  { short = "b", long = "body", value = { takes = "inert" } },
+  { short = "F", long = "body-file", value = { takes = "path" } },
+  { long = "admin" },
+]
+
+[[row]]
+key = ["gh", "issue", "create"]
+source = "https://cli.github.com/manual/gh_issue_create"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+opt = [
+  { short = "t", long = "title", value = { takes = "inert" } },
+  { short = "b", long = "body", value = { takes = "inert" } },
+  { short = "F", long = "body-file", value = { takes = "path" } },
+  { short = "l", long = "label", value = { takes = "inert" } },
+  { short = "a", long = "assignee", value = { takes = "inert" } },
+  { short = "m", long = "milestone", value = { takes = "inert" } },
+]
+
+# Left out: --delete-last.
+[[row]]
+key = ["gh", "issue", "comment"]
+source = "https://cli.github.com/manual/gh_issue_comment"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { short = "b", long = "body", value = { takes = "inert" } },
+  { short = "F", long = "body-file", value = { takes = "path" } },
+  { long = "edit-last" },
+]
+
+[[row]]
+key = ["gh", "issue", "edit"]
+source = "https://cli.github.com/manual/gh_issue_edit"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { short = "t", long = "title", value = { takes = "inert" } },
+  { short = "b", long = "body", value = { takes = "inert" } },
+  { short = "F", long = "body-file", value = { takes = "path" } },
+  { long = "add-label", value = { takes = "inert" } },
+  { long = "remove-label", value = { takes = "inert" } },
+  { long = "add-assignee", value = { takes = "inert" } },
+  { long = "remove-assignee", value = { takes = "inert" } },
+  { short = "m", long = "milestone", value = { takes = "inert" } },
+]
+
+[[row]]
+key = ["gh", "issue", "close"]
+source = "https://cli.github.com/manual/gh_issue_close"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { short = "c", long = "comment", value = { takes = "inert" } },
+  { short = "r", long = "reason", value = { takes = "inert" } },
+]
+
+[[row]]
+key = ["gh", "issue", "reopen"]
+source = "https://cli.github.com/manual/gh_issue_reopen"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [{ short = "c", long = "comment", value = { takes = "inert" } }]
+
+[[row]]
+key = ["gh", "label"]
+source = "https://cli.github.com/manual/gh_label"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+
+[[row]]
+key = ["gh", "label", "create"]
+source = "https://cli.github.com/manual/gh_label_create"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["inert"]
+opt = [
+  { short = "c", long = "color", value = { takes = "inert" } },
+  { short = "d", long = "description", value = { takes = "inert" } },
+  { short = "f", long = "force" },
+]
+
+[[row]]
+key = ["gh", "run", "rerun"]
+source = "https://cli.github.com/manual/gh_run_rerun"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { long = "failed" },
+  { short = "j", long = "job", value = { takes = "inert" } },
+  { short = "d", long = "debug" },
+]
+
+[[row]]
+key = ["gh", "run", "watch"]
+source = "https://cli.github.com/manual/gh_run_watch"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { long = "exit-status" },
+  { short = "i", long = "interval", value = { takes = "inert" } },
+]
+
+# GET only: -X/--method, -f/-F/--field/--raw-field and --input are left
+# out because any of them sends a write (a field alone switches gh to
+# POST). Also left out: --hostname (another host), --verbose.
+[[row]]
+key = ["gh", "api"]
+source = "https://cli.github.com/manual/gh_api"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { long = "paginate" },
+  { long = "slurp" },
+  { short = "H", long = "header", value = { takes = "inert" } },
+  { short = "i", long = "include" },
+  { long = "cache", value = { takes = "inert" } },
+  { short = "t", long = "template", value = { takes = "inert" } },
+  { long = "silent" },
+]
 # =====================================================================
-# File destruction (beyond the built-in rm-rf-dangerous-target rule)
+# Rules: 0.9 denies on commands the embedded catalog covers.
 # =====================================================================
 
-[[deny]]
+# 0.9 dotfiles-file-rm: every rm is refused, not only the catalog's
+# dangerous targets.
+[[rule]]
 id = "dotfiles-file-rm"
-reason = "rm permanently deletes files"
-command = "rm"
-
-[[deny]]
-id = "dotfiles-file-truncate"
-reason = "truncate zeroes out file contents"
-command = "truncate"
-
-[[deny]]
-id = "dotfiles-file-unlink"
-reason = "unlink deletes a file (POSIX equivalent of rm)"
-command = "unlink"
-
-[[deny]]
-id = "dotfiles-file-rmdir"
-reason = "rmdir removes directories"
-command = "rmdir"
-
-# =====================================================================
-# Disk operations (beyond the built-in dd-write-device/mkfs-any-filesystem rules)
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-disk-dd"
-reason = "dd can overwrite raw disk blocks"
-command = "dd"
-
-[[deny]]
-id = "dotfiles-disk-mkfs-bare"
-reason = "mkfs creates a new filesystem, destroying data (bare invocation; built-in rule only covers the mkfs.* family)"
-command = "mkfs"
-
-[[deny]]
-id = "dotfiles-disk-fdisk"
-reason = "fdisk edits partition tables"
-command = "fdisk"
-
-[[deny]]
-id = "dotfiles-disk-gdisk"
-reason = "gdisk edits partition tables"
-command = "gdisk"
-
-[[deny]]
-id = "dotfiles-disk-parted"
-reason = "parted edits partition tables"
-command = "parted"
-
-[[deny]]
-id = "dotfiles-disk-diskutil-erase"
-reason = "diskutil erase permanently destroys disk data"
-command = "diskutil"
-required_tokens = ["erase"]
-
-# eraseDisk/eraseVolume are distinct verbs, not "erase" plus an argument.
-[[deny]]
-id = "dotfiles-disk-diskutil-erasedisk"
-reason = "diskutil eraseDisk destroys all data on a disk"
-command = "diskutil"
-required_tokens = ["eraseDisk"]
-
-[[deny]]
-id = "dotfiles-disk-diskutil-erasevolume"
-reason = "diskutil eraseVolume destroys all data on a volume"
-command = "diskutil"
-required_tokens = ["eraseVolume"]
-
-# The three erase rules above are now subsumed by this one; kept for their ids.
-# except_targets must cover every positional (a rule is excepted only when all
-# targets match), so the device-name forms are listed alongside list/info and
-# any other verb in the argv still denies.
-[[deny]]
-id = "dotfiles-disk-diskutil-mutating"
-reason = "diskutil verbs other than list/info repartition, unmount, erase or otherwise modify disks"
-command = "diskutil"
-except_targets = [
-  { exact = "list" }, { exact = "info" },
-  { prefix = "/dev/" }, { prefix = "disk" }, { exact = "/" }, { prefix = "/Volumes/" },
-]
-
-# =====================================================================
-# Network
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-network-curl-remote"
-reason = "curl to a non-localhost address can exfiltrate data"
-command = "curl"
-# Never add K/--config here: its file can carry `url =` targets, so the
-# flag's value is itself a network destination (deltas #23).
-value_flags = ["o", "w", "m", "d", "X", "H", "A", "e", "u", "b", "c", "T", "F"]
-attached_value_flags = ["x"]
-except_targets = [
-  # url_host only — never add exact/prefix entries alongside: except_targets
-  # are OR'd, and a retained prefix entry reopens the userinfo bypass this
-  # fix closes (see #23 in docs/shguard-migration-deltas.md). Scheme-blind
-  # by design (excepts http/https/ws/wss/ftp alike).
-  { url_host = "localhost" },
-  { url_host = "127.0.0.1" },
-  { url_host = "[::1]" },
-]
-[[deny]]
-id = "dotfiles-network-rsync-remote"
-reason = "rsync to/from a remote host can transfer files over the network"
-command = "rsync"
-value_flags = ["exclude"]
-except_targets = [
-  { prefix = "/" },
-  { prefix = "./" },
-  { prefix = "../" },
-  { prefix = "~" },
-  { exact = "." },
-]
-
-[[deny]]
-id = "dotfiles-network-netcat"
-reason = "netcat opens raw TCP/UDP connections"
-command = "netcat"
-
-[[deny]]
-id = "dotfiles-network-nc"
-reason = "nc (netcat alias) opens raw TCP/UDP connections"
-command = "nc"
-
-[[deny]]
-id = "dotfiles-network-wget"
-reason = "wget can download or exfiltrate data to/from external hosts"
-command = "wget"
-
-[[deny]]
-id = "dotfiles-network-telnet"
-reason = "telnet opens raw TCP connections to remote hosts"
-command = "telnet"
-
-[[deny]]
-id = "dotfiles-network-ncat"
-reason = "ncat (nmap netcat) opens raw TCP/UDP connections"
-command = "ncat"
-
-[[deny]]
-id = "dotfiles-network-socat"
-reason = "socat opens arbitrary network channels and reverse shells"
-command = "socat"
-
-[[deny]]
-id = "dotfiles-network-dig"
-reason = "dig can leak data to attacker-controlled DNS via subdomain queries"
-command = "dig"
-
-[[deny]]
-id = "dotfiles-network-nslookup"
-reason = "nslookup can leak data via subdomain DNS queries"
-command = "nslookup"
-
-[[deny]]
-id = "dotfiles-network-host"
-reason = "host can leak data via subdomain DNS queries"
-command = "host"
-
-[[deny]]
-id = "dotfiles-network-drill"
-reason = "drill can leak data via subdomain DNS queries"
-command = "drill"
-
-[[deny]]
-id = "dotfiles-network-delv"
-reason = "delv can leak data via subdomain DNS queries"
-command = "delv"
-
-[[deny]]
-id = "dotfiles-network-getent-hosts"
-reason = "getent hosts triggers DNS resolution that can leak data"
-command = "getent"
-required_tokens = ["hosts"]
-
-# =====================================================================
-# Process / service manipulation
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-process-kill"
-reason = "kill terminates system or user processes"
-command = "kill"
-
-[[deny]]
-id = "dotfiles-process-pkill"
-reason = "pkill terminates processes by name"
-command = "pkill"
-
-[[deny]]
-id = "dotfiles-process-killall"
-reason = "killall terminates all matching processes"
-command = "killall"
-
-[[deny]]
-id = "dotfiles-service-launchctl-load"
-reason = "launchctl load can load/alter macOS system services"
-command = "launchctl"
-required_tokens = ["load"]
-
-[[deny]]
-id = "dotfiles-service-launchctl-unload"
-reason = "launchctl unload can unload macOS system services"
-command = "launchctl"
-required_tokens = ["unload"]
-
-[[deny]]
-id = "dotfiles-service-launchctl-bootstrap"
-reason = "launchctl bootstrap loads a service into a launchd domain"
-command = "launchctl"
-required_tokens = ["bootstrap"]
-
-[[deny]]
-id = "dotfiles-service-launchctl-submit"
-reason = "launchctl submit runs an arbitrary command as a launchd job"
-command = "launchctl"
-required_tokens = ["submit"]
-
-[[deny]]
-id = "dotfiles-service-systemctl-enable"
-reason = "systemctl enable can alter Linux system services"
-command = "systemctl"
-required_tokens = ["enable"]
-
-[[deny]]
-id = "dotfiles-service-systemctl-start"
-reason = "systemctl start can start Linux system services"
-command = "systemctl"
-required_tokens = ["start"]
-
-[[deny]]
-id = "dotfiles-service-systemctl-stop"
-reason = "systemctl stop can stop Linux system services"
-command = "systemctl"
-required_tokens = ["stop"]
-
-[[deny]]
-id = "dotfiles-service-systemctl-disable"
-reason = "systemctl disable can disable Linux system services"
-command = "systemctl"
-required_tokens = ["disable"]
-
-# =====================================================================
-# Credential/secret references — best-effort partial port.
-# The old rule matched a bare "secret"/"credential" word on ANY command;
-# shguard rules require a command name, so only the specific subcommand
-# shapes the old rule's own comment called out are ported here. See
-# docs/shguard-migration-deltas.md for the general-case gap.
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-credential-docker-secret"
-reason = "docker secret exposes or manipulates Docker secrets"
-command = "docker"
-required_tokens = ["secret"]
-
-[[deny]]
-id = "dotfiles-credential-kubectl-secret"
-reason = "kubectl secret/secrets exposes or manipulates Kubernetes secrets"
-command = "kubectl"
-required_tokens = ["secret"]
-
-[[deny]]
-id = "dotfiles-credential-kubectl-secrets"
-reason = "kubectl secrets exposes or manipulates Kubernetes secrets"
-command = "kubectl"
-required_tokens = ["secrets"]
-
-# required_tokens matches from the first positional, so the two rules above
-# miss the common `kubectl get secret` shape (same class as deltas #21).
-[[deny]]
-id = "dotfiles-credential-kubectl-get-secret"
-reason = "kubectl get secret exposes Kubernetes secrets"
-command = "kubectl"
-required_tokens = ["get", "secret"]
-
-[[deny]]
-id = "dotfiles-credential-kubectl-get-secrets"
-reason = "kubectl get secrets exposes Kubernetes secrets"
-command = "kubectl"
-required_tokens = ["get", "secrets"]
-
-# =====================================================================
-# Environment variable exfiltration
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-env-printenv"
-reason = "printenv dumps env vars that may include secrets"
-command = "printenv"
-
-# =====================================================================
-# Shell escape / code injection
-#
-# Shell interpreters get BLANKET deny rules (no required_flags): every
-# invocation is denied, both `<shell> script.sh` (shguard doesn't read the
-# file) and `<shell> -c '<string>'`. Since shguard #695 a user deny on an
-# interpreter or eval is honored even though shguard also recurses into the
-# -c/eval string; before that, the recursion's early return skipped the deny
-# and `bash -c`/`eval` were silently allowed. Don't narrow these to
-# script-only: the rule schema can't say "unless -c", and `targets` can't
-# match an arbitrary script path. See docs/shguard-migration-deltas.md
-# #12/#16.
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-code-eval"
-reason = "eval executes arbitrary strings as shell code"
-command = "eval"
-
-[[deny]]
-id = "dotfiles-code-bash"
-reason = "bash runs an unreviewed script file or an inline -c string; run the inner command directly instead"
-command = "bash"
-
-[[deny]]
-id = "dotfiles-code-sh"
-reason = "sh runs an unreviewed script file or an inline -c string; run the inner command directly instead"
-command = "sh"
-
-[[deny]]
-id = "dotfiles-code-zsh"
-reason = "zsh runs an unreviewed script file or an inline -c string; run the inner command directly instead"
-command = "zsh"
-
-[[deny]]
-id = "dotfiles-code-dash"
-reason = "dash runs an unreviewed script file or an inline -c string; run the inner command directly instead"
-command = "dash"
-
-[[deny]]
-id = "dotfiles-code-ksh"
-reason = "ksh runs an unreviewed script file or an inline -c string; run the inner command directly instead"
-command = "ksh"
-
-[[deny]]
-id = "dotfiles-code-fish"
-reason = "fish runs an unreviewed script file or an inline -c/-C string; run the inner command directly instead"
-command = "fish"
-
-[[deny]]
-id = "dotfiles-code-tcsh"
-reason = "tcsh runs an unreviewed script file or an inline -c string; run the inner command directly instead"
-command = "tcsh"
-
-[[deny]]
-id = "dotfiles-code-csh"
-reason = "csh runs an unreviewed script file or an inline -c string; run the inner command directly instead"
-command = "csh"
-
-[[deny]]
-id = "dotfiles-code-ash"
-reason = "ash runs an unreviewed script file or an inline -c string; run the inner command directly instead"
-command = "ash"
-
-[[deny]]
-id = "dotfiles-code-xargs"
-reason = "xargs can invoke arbitrary executables (e.g. xargs sh -c)"
-command = "xargs"
-
-[[deny]]
-id = "dotfiles-code-python-c"
-reason = "python -c executes an arbitrary string as Python"
-command = "python"
-required_flags = ["c"]
-
-[[deny]]
-id = "dotfiles-code-python3-c"
-reason = "python3 -c executes an arbitrary string as Python"
-command = "python3"
-required_flags = ["c"]
-
-# `command` is an exact argv[0] match, so each versioned or alternate Python
-# needs its own entry.
-[[deny]]
-id = "dotfiles-code-python2-c"
-reason = "python2 -c executes an arbitrary string as Python"
-command = "python2"
-required_flags = ["c"]
-
-[[deny]]
-id = "dotfiles-code-python312-c"
-reason = "python3.12 -c executes an arbitrary string as Python"
-command = "python3.12"
-required_flags = ["c"]
-
-[[deny]]
-id = "dotfiles-code-python313-c"
-reason = "python3.13 -c executes an arbitrary string as Python"
-command = "python3.13"
-required_flags = ["c"]
-
-[[deny]]
-id = "dotfiles-code-pypy-c"
-reason = "pypy -c executes an arbitrary string as Python"
-command = "pypy"
-required_flags = ["c"]
-
-[[deny]]
-id = "dotfiles-code-pypy3-c"
-reason = "pypy3 -c executes an arbitrary string as Python"
-command = "pypy3"
-required_flags = ["c"]
-
-[[deny]]
-id = "dotfiles-code-uv-run-python-c"
-reason = "uv run python -c executes an arbitrary string as Python"
-command = "uv"
-required_tokens = ["run", "python"]
-required_flags = ["c"]
-
-[[deny]]
-id = "dotfiles-code-uvx-python-c"
-reason = "uvx python -c executes an arbitrary string as Python"
-command = "uvx"
-required_tokens = ["python"]
-required_flags = ["c"]
-
-[[deny]]
-id = "dotfiles-code-node-e"
-reason = "node -e/--eval/-p/--print executes an arbitrary string as JavaScript"
-command = "node"
-required_flags = ["e|--eval|p|--print"]
-
-[[deny]]
-id = "dotfiles-code-bun-e"
-reason = "bun -e/--eval/-p/--print executes an arbitrary string as JavaScript"
-command = "bun"
-required_flags = ["e|--eval|p|--print"]
-
-[[deny]]
-id = "dotfiles-code-deno-eval"
-reason = "deno eval executes an arbitrary string as JavaScript/TypeScript"
-command = "deno"
-required_tokens = ["eval"]
-
-# -ne/-pe stay denied: they cluster -e and run the code once per input line.
-[[deny]]
-id = "dotfiles-code-perl-e"
-reason = "perl -e/-E executes an arbitrary string as Perl"
-command = "perl"
-required_flags = ["e|E"]
-
-[[deny]]
-id = "dotfiles-code-ruby-e"
-reason = "ruby -e executes an arbitrary string as Ruby"
-command = "ruby"
-required_flags = ["e"]
-
-[[deny]]
-id = "dotfiles-code-php-r"
-reason = "php -r executes an arbitrary string as PHP"
-command = "php"
-required_flags = ["r"]
-
-[[deny]]
-id = "dotfiles-code-source"
-reason = "source loads and executes a file's contents in the current shell"
-command = "source"
-
-[[deny]]
-id = "dotfiles-code-osascript"
-reason = "osascript runs AppleScript, including \"do shell script\" which can shell out"
-command = "osascript"
-
-# =====================================================================
-# Permission / user modification
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-permission-chmod"
-reason = "chmod changes file permissions"
-command = "chmod"
-
-[[deny]]
-id = "dotfiles-permission-chown"
-reason = "chown changes file ownership"
-command = "chown"
-
-[[deny]]
-id = "dotfiles-user-passwd"
-reason = "passwd changes user account passwords"
-command = "passwd"
-
-[[deny]]
-id = "dotfiles-user-useradd"
-reason = "useradd creates user accounts"
-command = "useradd"
-
-[[deny]]
-id = "dotfiles-user-userdel"
-reason = "userdel deletes user accounts"
-command = "userdel"
-
-# =====================================================================
-# Git — destructive operations beyond the built-in blocklist
-# (git push --force, reset --hard, clean, commit --amend/-n/--no-verify,
-# checkout --, rebase, branch -D, stash drop/clear, tag -d/-D/--delete/-f
-# are already covered by shguard's built-in rules)
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-git-reset-merge"
-reason = "git reset --merge irreversibly discards changes from a conflicted merge"
-command = "git"
-required_tokens = ["reset"]
-required_flags = ["--merge"]
-
-[[deny]]
-id = "dotfiles-git-restore"
-reason = "git restore discards uncommitted working tree changes"
-command = "git"
-required_tokens = ["restore"]
-
-[[deny]]
-id = "dotfiles-git-rm"
-reason = "git rm -f/--force removes tracked files even when they have uncommitted changes"
-command = "git"
-required_tokens = ["rm"]
-required_flags = ["f|--force"]
-
-# Remote and config edits redirect where an unsandboxed push/fetch goes or
-# what it runs. Read forms (git remote -v/get-url, git config <key> reads of
-# other keys) stay allowed. Key matching is case-sensitive (`prefix` has no
-# case_insensitive option, and git keys are case-insensitive), so only the
-# two common spellings of the hook/command keys are listed.
-[[deny]]
-id = "dotfiles-git-remote-add"
-reason = "git remote add registers a new push/fetch destination"
-command = "git"
-required_tokens = ["remote", "add"]
-
-[[deny]]
-id = "dotfiles-git-remote-set-url"
-reason = "git remote set-url repoints a remote at another destination"
-command = "git"
-required_tokens = ["remote", "set-url"]
-
-[[deny]]
-id = "dotfiles-git-remote-rename"
-reason = "git remote rename changes the remote that push/fetch rules and hooks name"
-command = "git"
-required_tokens = ["remote", "rename"]
-
-[[deny]]
-id = "dotfiles-git-config-dangerous-keys"
-reason = "git config of core.hooksPath/sshCommand/fsmonitor or remote.*/url.*/credential.*/include.* makes git run a chosen command or redirects its network target"
-command = "git"
-required_tokens = ["config"]
-targets = [
-  { prefix = "core.hooksPath" }, { prefix = "core.hookspath" },
-  { prefix = "core.sshCommand" }, { prefix = "core.sshcommand" },
-  { prefix = "core.fsmonitor" },
-  { prefix = "remote." }, { prefix = "url." }, { prefix = "credential." },
-  { prefix = "include." }, { prefix = "includeIf." }, { prefix = "includeif." },
-]
-
-[[deny]]
-id = "dotfiles-git-config-scope-edit"
-reason = "git config --global/--system/-e/--edit changes configuration shared beyond this repository"
-command = "git"
-required_tokens = ["config"]
-required_flags = ["--global|--system|e|--edit"]
-
-# =====================================================================
-# GitHub CLI destructive operations
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-github-issue-delete"
-reason = "gh issue delete permanently deletes a remote issue"
-command = "gh"
-required_tokens = ["issue", "delete"]
-
-[[deny]]
-id = "dotfiles-github-repo-delete"
-reason = "gh repo delete permanently deletes a remote repository"
-command = "gh"
-required_tokens = ["repo", "delete"]
-
-[[deny]]
-id = "dotfiles-github-repo-archive"
-reason = "gh repo archive makes a remote repository read-only"
-command = "gh"
-required_tokens = ["repo", "archive"]
-
-[[deny]]
-id = "dotfiles-github-repo-rename"
-reason = "gh repo rename breaks every clone URL and link to the repository"
-command = "gh"
-required_tokens = ["repo", "rename"]
-
-[[deny]]
-id = "dotfiles-github-release-create"
-reason = "gh release create publishes an outward-facing release (tag/notifications persist even if deleted)"
-command = "gh"
-required_tokens = ["release", "create"]
-
-[[deny]]
-id = "dotfiles-github-release-delete"
-reason = "gh release delete removes a published release"
-command = "gh"
-required_tokens = ["release", "delete"]
-
-[[deny]]
-id = "dotfiles-github-ssh-key-add"
-reason = "gh ssh-key add grants a key access to the GitHub account"
-command = "gh"
-required_tokens = ["ssh-key", "add"]
-
-[[deny]]
-id = "dotfiles-github-gpg-key-add"
-reason = "gh gpg-key add registers a signing key on the GitHub account"
-command = "gh"
-required_tokens = ["gpg-key", "add"]
-
-# Best-effort: catches DELETE/delete as a standalone token anywhere in argv
-# (position-independent via `targets`, so `-X DELETE`, `--method DELETE`, and
-# path-first orderings like `gh api repos/x/y -X DELETE` all match).
-# The attached forms (-XDELETE, --method=DELETE) are one flag token, so they
-# are matched by dotfiles-github-api-delete-attached below instead.
-[[deny]]
-id = "dotfiles-github-api-delete-upper"
-reason = "gh api -X DELETE / --method DELETE issues a destructive HTTP DELETE request"
-command = "gh"
-required_tokens = ["api"]
-targets = [{ exact = "DELETE" }]
-
-[[deny]]
-id = "dotfiles-github-api-delete-lower"
-reason = "gh api -X delete / --method delete issues a destructive HTTP DELETE request"
-command = "gh"
-required_tokens = ["api"]
-targets = [{ exact = "delete" }]
-
-# `exact` has no case_insensitive option, so only the likely casings are
-# listed; arbitrary casings (dElEtE) remain an accepted gap (deltas #26).
-[[deny]]
-id = "dotfiles-github-api-delete-title"
-reason = "gh api -X Delete / --method Delete issues a destructive HTTP DELETE request"
-command = "gh"
-required_tokens = ["api"]
-targets = [{ exact = "Delete" }]
-
-[[deny]]
-id = "dotfiles-github-api-delete-attached"
-reason = "gh api -XDELETE / --method=DELETE issues a destructive HTTP DELETE request"
-command = "gh"
-required_tokens = ["api"]
-required_flags = ["-XDELETE|-Xdelete|-XDelete|--method=DELETE|--method=delete|--method=Delete"]
-
-# =====================================================================
-# History manipulation
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-history-clear"
-reason = "history -c/-d clears or deletes shell command history"
-command = "history"
-required_flags = ["c|d"]
-
-# =====================================================================
-# Cron / scheduling
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-scheduling-crontab-edit"
-reason = "crontab -e edits the user crontab"
-command = "crontab"
-required_flags = ["e"]
-
-[[deny]]
-id = "dotfiles-scheduling-crontab-remove"
-reason = "crontab -r removes the user crontab"
-command = "crontab"
-required_flags = ["r"]
-
-# =====================================================================
-# macOS system settings
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-macos-defaults-write"
-reason = "defaults write modifies macOS system/app preferences"
-command = "defaults"
-required_tokens = ["write"]
-
-[[deny]]
-id = "dotfiles-macos-defaults-delete"
-reason = "defaults delete removes macOS system/app preferences"
-command = "defaults"
-required_tokens = ["delete"]
-
-# =====================================================================
-# Docker outward-facing
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-docker-push"
-reason = "docker push publishes images to a registry"
-command = "docker"
-required_tokens = ["push"]
-
-[[deny]]
-id = "dotfiles-docker-image-push"
-reason = "docker image push publishes images to a registry"
-command = "docker"
-required_tokens = ["image", "push"]
-
-[[deny]]
-id = "dotfiles-docker-buildx-push"
-reason = "docker buildx build --push publishes images to a registry"
-command = "docker"
-required_tokens = ["buildx", "build"]
-required_flags = ["--push"]
-
-# =====================================================================
-# SSH / remote access
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-ssh-ssh"
-reason = "ssh connects to remote hosts"
-command = "ssh"
-
-[[deny]]
-id = "dotfiles-ssh-scp"
-reason = "scp transfers files to/from remote hosts via SSH"
-command = "scp"
-
-[[deny]]
-id = "dotfiles-ssh-sftp"
-reason = "sftp transfers files to/from remote hosts via SSH"
-command = "sftp"
-
-# =====================================================================
-# Tool policy: prefer gitignore-aware tools
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-tool-policy-find"
-reason = "find ignores .gitignore and walks into node_modules / dist / target — use fd (or the built-in Glob tool)"
-command = "find"
-
-# =====================================================================
-# Secret-file readers — best-effort partial port.
-# Old rule matched by filename SUFFIX/extension across any directory depth
-# (e.g. any path ending in .pem, .env*, or containing "secret"/"credential"
-# with any extension). shguard's `targets` only supports exact/prefix
-# matching on the whole argv token, so directory-prefixed paths and
-# extension-suffix patterns (*.pem, *.key, *.p12) aren't expressible here —
-# only common bare filenames/prefixes are covered. See
-# docs/shguard-migration-deltas.md.
-#
-# The trailing normalized_prefix entries fold case (APFS is case-insensitive)
-# and expand `~`, so they also match the absolute /Users/<me>/ spelling.
-# normalized_basename takes no case_insensitive option, so `.ENV` stays a gap.
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-secret-read-cat"
-reason = "cat reads a file that looks like a secret/credential store"
-command = "cat"
-targets = [
-    { normalized_basename = ".env" },
-    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
-    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
-    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
-    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
-    { exact = ".npmrc" }, { exact = "~/.npmrc" },
-    { exact = ".netrc" }, { exact = "~/.netrc" },
-    { exact = ".pgpass" }, { exact = "~/.pgpass" },
-    { prefix = ".aws/" }, { prefix = "~/.aws/" },
-    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
-    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
-    { normalized_prefix = "~/.ssh/", case_insensitive = true },
-    { normalized_prefix = "~/.aws/", case_insensitive = true },
-    { normalized_prefix = "~/.kube/config", case_insensitive = true },
-    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
-    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
-    { normalized_prefix = "~/.npmrc", case_insensitive = true },
-    { normalized_prefix = "~/.netrc", case_insensitive = true },
-    { normalized_prefix = "~/.pgpass", case_insensitive = true },
-]
-
-[[deny]]
-id = "dotfiles-secret-read-head"
-reason = "head reads a file that looks like a secret/credential store"
-command = "head"
-targets = [
-    { normalized_basename = ".env" },
-    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
-    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
-    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
-    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
-    { exact = ".npmrc" }, { exact = "~/.npmrc" },
-    { exact = ".netrc" }, { exact = "~/.netrc" },
-    { exact = ".pgpass" }, { exact = "~/.pgpass" },
-    { prefix = ".aws/" }, { prefix = "~/.aws/" },
-    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
-    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
-    { normalized_prefix = "~/.ssh/", case_insensitive = true },
-    { normalized_prefix = "~/.aws/", case_insensitive = true },
-    { normalized_prefix = "~/.kube/config", case_insensitive = true },
-    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
-    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
-    { normalized_prefix = "~/.npmrc", case_insensitive = true },
-    { normalized_prefix = "~/.netrc", case_insensitive = true },
-    { normalized_prefix = "~/.pgpass", case_insensitive = true },
-]
-
-[[deny]]
-id = "dotfiles-secret-read-tail"
-reason = "tail reads a file that looks like a secret/credential store"
-command = "tail"
-targets = [
-    { normalized_basename = ".env" },
-    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
-    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
-    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
-    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
-    { exact = ".npmrc" }, { exact = "~/.npmrc" },
-    { exact = ".netrc" }, { exact = "~/.netrc" },
-    { exact = ".pgpass" }, { exact = "~/.pgpass" },
-    { prefix = ".aws/" }, { prefix = "~/.aws/" },
-    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
-    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
-    { normalized_prefix = "~/.ssh/", case_insensitive = true },
-    { normalized_prefix = "~/.aws/", case_insensitive = true },
-    { normalized_prefix = "~/.kube/config", case_insensitive = true },
-    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
-    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
-    { normalized_prefix = "~/.npmrc", case_insensitive = true },
-    { normalized_prefix = "~/.netrc", case_insensitive = true },
-    { normalized_prefix = "~/.pgpass", case_insensitive = true },
-]
-
-[[deny]]
-id = "dotfiles-secret-read-less"
-reason = "less reads a file that looks like a secret/credential store"
-command = "less"
-targets = [
-    { normalized_basename = ".env" },
-    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
-    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
-    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
-    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
-    { exact = ".npmrc" }, { exact = "~/.npmrc" },
-    { exact = ".netrc" }, { exact = "~/.netrc" },
-    { exact = ".pgpass" }, { exact = "~/.pgpass" },
-    { prefix = ".aws/" }, { prefix = "~/.aws/" },
-    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
-    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
-    { normalized_prefix = "~/.ssh/", case_insensitive = true },
-    { normalized_prefix = "~/.aws/", case_insensitive = true },
-    { normalized_prefix = "~/.kube/config", case_insensitive = true },
-    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
-    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
-    { normalized_prefix = "~/.npmrc", case_insensitive = true },
-    { normalized_prefix = "~/.netrc", case_insensitive = true },
-    { normalized_prefix = "~/.pgpass", case_insensitive = true },
-]
-
-[[deny]]
-id = "dotfiles-secret-read-more"
-reason = "more reads a file that looks like a secret/credential store"
-command = "more"
-targets = [
-    { normalized_basename = ".env" },
-    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
-    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
-    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
-    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
-    { exact = ".npmrc" }, { exact = "~/.npmrc" },
-    { exact = ".netrc" }, { exact = "~/.netrc" },
-    { exact = ".pgpass" }, { exact = "~/.pgpass" },
-    { prefix = ".aws/" }, { prefix = "~/.aws/" },
-    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
-    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
-    { normalized_prefix = "~/.ssh/", case_insensitive = true },
-    { normalized_prefix = "~/.aws/", case_insensitive = true },
-    { normalized_prefix = "~/.kube/config", case_insensitive = true },
-    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
-    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
-    { normalized_prefix = "~/.npmrc", case_insensitive = true },
-    { normalized_prefix = "~/.netrc", case_insensitive = true },
-    { normalized_prefix = "~/.pgpass", case_insensitive = true },
-]
-
-[[deny]]
-id = "dotfiles-secret-read-bat"
-reason = "bat reads a file that looks like a secret/credential store"
-command = "bat"
-targets = [
-    { normalized_basename = ".env" },
-    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
-    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
-    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
-    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
-    { exact = ".npmrc" }, { exact = "~/.npmrc" },
-    { exact = ".netrc" }, { exact = "~/.netrc" },
-    { exact = ".pgpass" }, { exact = "~/.pgpass" },
-    { prefix = ".aws/" }, { prefix = "~/.aws/" },
-    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
-    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
-    { normalized_prefix = "~/.ssh/", case_insensitive = true },
-    { normalized_prefix = "~/.aws/", case_insensitive = true },
-    { normalized_prefix = "~/.kube/config", case_insensitive = true },
-    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
-    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
-    { normalized_prefix = "~/.npmrc", case_insensitive = true },
-    { normalized_prefix = "~/.netrc", case_insensitive = true },
-    { normalized_prefix = "~/.pgpass", case_insensitive = true },
-]
-
-[[deny]]
-id = "dotfiles-secret-read-nano"
-reason = "nano opens a file that looks like a secret/credential store"
-command = "nano"
-targets = [
-    { normalized_basename = ".env" },
-    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
-    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
-    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
-    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
-    { exact = ".npmrc" }, { exact = "~/.npmrc" },
-    { exact = ".netrc" }, { exact = "~/.netrc" },
-    { exact = ".pgpass" }, { exact = "~/.pgpass" },
-    { prefix = ".aws/" }, { prefix = "~/.aws/" },
-    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
-    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
-    { normalized_prefix = "~/.ssh/", case_insensitive = true },
-    { normalized_prefix = "~/.aws/", case_insensitive = true },
-    { normalized_prefix = "~/.kube/config", case_insensitive = true },
-    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
-    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
-    { normalized_prefix = "~/.npmrc", case_insensitive = true },
-    { normalized_prefix = "~/.netrc", case_insensitive = true },
-    { normalized_prefix = "~/.pgpass", case_insensitive = true },
-]
-
-[[deny]]
-id = "dotfiles-secret-read-vim"
-reason = "vim opens a file that looks like a secret/credential store"
-command = "vim"
-targets = [
-    { normalized_basename = ".env" },
-    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
-    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
-    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
-    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
-    { exact = ".npmrc" }, { exact = "~/.npmrc" },
-    { exact = ".netrc" }, { exact = "~/.netrc" },
-    { exact = ".pgpass" }, { exact = "~/.pgpass" },
-    { prefix = ".aws/" }, { prefix = "~/.aws/" },
-    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
-    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
-    { normalized_prefix = "~/.ssh/", case_insensitive = true },
-    { normalized_prefix = "~/.aws/", case_insensitive = true },
-    { normalized_prefix = "~/.kube/config", case_insensitive = true },
-    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
-    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
-    { normalized_prefix = "~/.npmrc", case_insensitive = true },
-    { normalized_prefix = "~/.netrc", case_insensitive = true },
-    { normalized_prefix = "~/.pgpass", case_insensitive = true },
-]
-
-[[deny]]
-id = "dotfiles-secret-read-nvim"
-reason = "nvim opens a file that looks like a secret/credential store"
-command = "nvim"
-targets = [
-    { normalized_basename = ".env" },
-    { exact = "id_rsa" }, { exact = "~/.ssh/id_rsa" },
-    { exact = "id_ed25519" }, { exact = "~/.ssh/id_ed25519" },
-    { exact = "id_ecdsa" }, { exact = "~/.ssh/id_ecdsa" },
-    { exact = "id_dsa" }, { exact = "~/.ssh/id_dsa" },
-    { exact = "kubeconfig" }, { prefix = ".kube/config" }, { prefix = "~/.kube/config" },
-    { exact = ".npmrc" }, { exact = "~/.npmrc" },
-    { exact = ".netrc" }, { exact = "~/.netrc" },
-    { exact = ".pgpass" }, { exact = "~/.pgpass" },
-    { prefix = ".aws/" }, { prefix = "~/.aws/" },
-    { exact = ".docker/config.json" }, { exact = "~/.docker/config.json" },
-    { prefix = ".config/gcloud/" }, { prefix = "~/.config/gcloud/" },
-    { normalized_prefix = "~/.ssh/", case_insensitive = true },
-    { normalized_prefix = "~/.aws/", case_insensitive = true },
-    { normalized_prefix = "~/.kube/config", case_insensitive = true },
-    { normalized_prefix = "~/.config/gcloud/", case_insensitive = true },
-    { normalized_prefix = "~/.docker/config.json", case_insensitive = true },
-    { normalized_prefix = "~/.npmrc", case_insensitive = true },
-    { normalized_prefix = "~/.netrc", case_insensitive = true },
-    { normalized_prefix = "~/.pgpass", case_insensitive = true },
-]
-
-# =====================================================================
-# Allowlisted security scanners (ported from allowlist.conf).
-# These tools legitimately read secret-looking files as their normal job.
-# NOTE: this is NOT an override mechanism — [[allow]] can never rescue a
-# match against a deny rule above. It works here only because none of the
-# targets lists above match these four tools' own argv[0] (secretlint/
-# detect-secrets/gitleaks/trufflehog aren't cat/head/tail/etc., and none of
-# the other deny rules' command names match them either). Kept as explicit
-# [[allow]] entries for documentation/audit-trail purposes and to downgrade
-# any structural Ask shguard's parser might otherwise raise on their
-# invocations (e.g. an argument containing "$(...)").
-# =====================================================================
-
-[[allow]]
-id = "dotfiles-allow-secretlint"
-reason = "secretlint is a secret-scanning tool, not a threat"
-command = "secretlint"
-
-[[allow]]
-id = "dotfiles-allow-detect-secrets"
-reason = "detect-secrets is a secret-scanning tool, not a threat"
-command = "detect-secrets"
-
-[[allow]]
-id = "dotfiles-allow-gitleaks"
-reason = "gitleaks is a secret-scanning tool, not a threat"
-command = "gitleaks"
-
-[[allow]]
-id = "dotfiles-allow-trufflehog"
-reason = "trufflehog is a secret-scanning tool, not a threat"
-command = "trufflehog"
-# =====================================================================
-# Exec-capable search tools (fd/rg are allow-listed in settings.json)
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-code-fd-exec"
-reason = "fd -x/-X/--exec/--exec-batch runs an arbitrary command per match (same class as xargs)"
-command = "fd"
-required_flags = ["x|X|--exec|--exec-batch"]
-
-# =====================================================================
-# Credentials (push-to-turso.sh is intentionally manual)
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-gh-auth-token"
-reason = "gh auth token prints the GitHub token"
-command = "gh"
-required_tokens = ["auth", "token"]
-
-[[deny]]
-id = "dotfiles-gh-auth-status-show-token"
-reason = "gh auth status -t/--show-token prints the GitHub token"
-command = "gh"
-required_tokens = ["auth", "status"]
-required_flags = ["t|--show-token"]
-
-[[deny]]
-id = "dotfiles-turso"
-reason = "turso credentials are deliberately kept out of Claude's process tree; run push-to-turso.sh manually"
-command = "turso"
-
-# =====================================================================
-# Exfiltration via gh file uploads (gh runs outside the sandbox)
-# =====================================================================
-
-# A multi-line -b argument makes Claude Code run the line sandboxed (newlines
-# split it, so it no longer matches sandbox.excludedCommands) and gh then
-# fails on the keychain, so multi-line bodies must go through --body-file.
-# Only a file under the session scratchpad is allowed as the body source.
-# target_flags makes the body-file value the only candidate (issue/PR numbers
-# and URLs are positionals); resolve_symlinks stops a scratchpad symlink from
-# pointing it elsewhere. gh (pflag) has no long-option abbreviation, so the
-# two spellings listed are all of them.
-[[deny]]
-id = "dotfiles-gh-issue-body-file"
-reason = "gh issue --body-file uploads a local file; write the body under /private/tmp/claude-501/ first"
-command = "gh"
-required_tokens = ["issue"]
-required_flags = ["F|--body-file"]
-value_flags = ["t", "title", "b", "body", "R", "repo", "l", "label", "a", "assignee", "m", "milestone", "p", "project", "T", "template"]
-target_flags = ["--body-file", "-F"]
-except_targets = [{ prefix = "/private/tmp/claude-501/" }]
-resolve_symlinks = true
-
-[[deny]]
-id = "dotfiles-gh-pr-body-file"
-reason = "gh pr --body-file uploads a local file; write the body under /private/tmp/claude-501/ first"
-command = "gh"
-required_tokens = ["pr"]
-required_flags = ["F|--body-file"]
-value_flags = ["t", "title", "b", "body", "R", "repo", "B", "base", "H", "head", "l", "label", "a", "assignee", "r", "reviewer", "m", "milestone", "p", "project", "T", "template"]
-target_flags = ["--body-file", "-F"]
-except_targets = [{ prefix = "/private/tmp/claude-501/" }]
-resolve_symlinks = true
-
-# =====================================================================
-# Unsandboxed git (push/fetch/pull/ls-remote run outside the Seatbelt
-# sandbox for SSH; see claude-code/settings.json sandbox.excludedCommands)
-# =====================================================================
-
-[[deny]]
+key = ["rm"]
+outcome = "block"
+
+# 0.9 dotfiles-git-push-url-target: the catalog asks URL and absolute-path
+# remotes but allows the scp form (`git@host:path`) and `.`.
+[[rule]]
 id = "dotfiles-git-push-url-target"
-reason = "git push to a URL or local path instead of a named remote can exfiltrate history or run a local receive-pack"
-command = "git"
-required_tokens = ["push"]
+key = ["git", "push"]
 targets = [
-  { prefix = "https://" }, { prefix = "http://" }, { prefix = "ssh://" },
-  { prefix = "git://" }, { prefix = "git@" }, { prefix = "file://" },
-  { prefix = "ext::" }, { prefix = "/" }, { prefix = "." }, { prefix = "~" },
+  { pat = "git@", kind = "prefix" },
+  { pat = ".", kind = "exact" },
 ]
+outcome = "block"
 
-[[deny]]
-id = "dotfiles-git-push-delete-refspec"
-reason = "git push <remote> :ref deletes the remote ref"
-command = "git"
-required_tokens = ["push"]
-targets = [{ prefix = ":" }]
-
-[[deny]]
-id = "dotfiles-git-push-destructive-flags"
-reason = "git push --delete/--mirror/--prune deletes remote refs; --receive-pack/--exec runs a chosen command"
-command = "git"
-required_tokens = ["push"]
-required_flags = ["d|--delete|--mirror|--prune|--receive-pack|--exec"]
-
-[[deny]]
-id = "dotfiles-git-fetch-upload-pack"
-reason = "git fetch --upload-pack runs a chosen command"
-command = "git"
-required_tokens = ["fetch"]
-required_flags = ["--upload-pack"]
-
-[[deny]]
-id = "dotfiles-git-pull-upload-pack"
-reason = "git pull --upload-pack runs a chosen command"
-command = "git"
-required_tokens = ["pull"]
-required_flags = ["--upload-pack"]
-
-[[deny]]
-id = "dotfiles-git-ls-remote-upload-pack"
-reason = "git ls-remote --upload-pack (or its hidden alias --exec) runs a chosen command"
-command = "git"
-required_tokens = ["ls-remote"]
-required_flags = ["--upload-pack|--exec"]
-
-# clone/archive run inside the sandbox (not in excludedCommands), but the
-# chosen command still runs on this machine for a local-path remote.
-[[deny]]
-id = "dotfiles-git-clone-upload-pack"
-reason = "git clone -u/--upload-pack runs a chosen command"
-command = "git"
-required_tokens = ["clone"]
-required_flags = ["u|--upload-pack"]
-
-[[deny]]
-id = "dotfiles-git-archive-exec"
-reason = "git archive --remote --exec runs a chosen command"
-command = "git"
-required_tokens = ["archive"]
-required_flags = ["--exec"]
-
-[[deny]]
-id = "dotfiles-git-fetch-pack-upload-pack"
-reason = "git fetch-pack --upload-pack/--exec runs a chosen command"
-command = "git"
-required_tokens = ["fetch-pack"]
-required_flags = ["--upload-pack|--exec"]
-
-[[deny]]
-id = "dotfiles-git-send-pack-receive-pack"
-reason = "git send-pack --receive-pack/--exec runs a chosen command"
-command = "git"
-required_tokens = ["send-pack"]
-required_flags = ["--receive-pack|--exec"]
-
-[[deny]]
-id = "dotfiles-git-fetch-url-source"
-reason = "git fetch from a URL or local path pulls unreviewed content outside the sandbox"
-command = "git"
-required_tokens = ["fetch"]
-targets = [
-  { prefix = "https://" }, { prefix = "http://" }, { prefix = "ssh://" },
-  { prefix = "git://" }, { prefix = "git@" }, { prefix = "file://" },
-  { prefix = "ext::" }, { prefix = "/" }, { prefix = "." }, { prefix = "~" },
-]
-
-[[deny]]
-id = "dotfiles-git-pull-url-source"
-reason = "git pull from a URL or local path merges unreviewed content into the worktree outside the sandbox"
-command = "git"
-required_tokens = ["pull"]
-targets = [
-  { prefix = "https://" }, { prefix = "http://" }, { prefix = "ssh://" },
-  { prefix = "git://" }, { prefix = "git@" }, { prefix = "file://" },
-  { prefix = "ext::" }, { prefix = "/" }, { prefix = "." }, { prefix = "~" },
-]
-
-# =====================================================================
-# Unsandboxed gh: execution, uploads, downloads
-# =====================================================================
-
-[[deny]]
-id = "dotfiles-gh-extension"
-reason = "gh extension install/exec/upgrade runs third-party code outside the sandbox"
-command = "gh"
-required_tokens = ["extension"]
-
-[[deny]]
-id = "dotfiles-gh-ext-alias"
-reason = "gh ext is the short form of gh extension"
-command = "gh"
-required_tokens = ["ext"]
-
-[[deny]]
-id = "dotfiles-gh-gist"
-reason = "gh gist create uploads local files; gh gist clone writes files outside the sandbox"
-command = "gh"
-required_tokens = ["gist"]
-
-[[deny]]
-id = "dotfiles-gh-api-file-input"
-reason = "gh api -F/--field (reads @file) and --input upload local file contents"
-command = "gh"
-required_tokens = ["api"]
-required_flags = ["F|--field|--input"]
-
-[[deny]]
-id = "dotfiles-gh-release-upload"
-reason = "gh release upload sends local files to a release"
-command = "gh"
-required_tokens = ["release", "upload"]
-
-[[deny]]
-id = "dotfiles-gh-release-download"
-reason = "gh release download writes files outside the sandbox's write protections"
-command = "gh"
-required_tokens = ["release", "download"]
-
-[[deny]]
-id = "dotfiles-gh-run-download"
-reason = "gh run download writes artifacts outside the sandbox's write protections"
-command = "gh"
-required_tokens = ["run", "download"]
-# gh subcommands that write the worktree outside the sandbox.
-[[deny]]
-id = "dotfiles-gh-pr-checkout"
-reason = "gh pr checkout writes PR-authored files into the worktree outside the sandbox (a later git push runs its pre-push hook)"
-command = "gh"
-required_tokens = ["pr", "checkout"]
-
-[[deny]]
-id = "dotfiles-gh-co"
-reason = "gh co is the short form of gh pr checkout"
-command = "gh"
-required_tokens = ["co"]
-
-[[deny]]
-id = "dotfiles-gh-repo-clone"
-reason = "gh repo clone writes files outside the sandbox"
-command = "gh"
-required_tokens = ["repo", "clone"]
-
-[[deny]]
-id = "dotfiles-gh-repo-fork"
-reason = "gh repo fork --clone writes files outside the sandbox"
-command = "gh"
-required_tokens = ["repo", "fork"]
-
-[[deny]]
-id = "dotfiles-gh-repo-sync"
-reason = "gh repo sync rewrites local branches outside the sandbox"
-command = "gh"
-required_tokens = ["repo", "sync"]
-
-# Redirect writes into files that unsandboxed processes execute. Defense in
-# depth: Claude Code runs a line with a redirect or pipe inside the sandbox
-# even when its command is in sandbox.excludedCommands (verified 2026-09-26),
-# so sandbox.filesystem.denyWrite is the primary control. shguard accepts
-# case_insensitive only on normalized/normalized_prefix, so only the absolute
-# forms fold case; the relative and basename forms are case-sensitive.
-[[redirect]]
-id = "dotfiles-redirect-live-config"
-reason = "redirect into a dotfiles path that an unsandboxed process executes (hooks, lefthook, tests, git/ssh/zsh/nvim/mise config, .git remotes)"
-decision = "block"
-targets = [
-  { normalized_basename = "lefthook.yaml" },
-  { normalized_basename = "lefthook.yml" },
-  { normalized_basename = "lefthook.json" },
-  { normalized_basename = "lefthook.toml" },
-  { normalized_basename = "lefthook-local.yaml" },
-  { normalized_basename = "lefthook-local.yml" },
-  { normalized_basename = "lefthook-local.json" },
-  { normalized_basename = "lefthook-local.toml" },
-  { normalized_basename = ".lefthook.yaml" },
-  { normalized_basename = ".lefthook.yml" },
-  { normalized_basename = ".lefthook.json" },
-  { normalized_basename = ".lefthook.toml" },
-  { normalized_basename = ".lefthook-local.yaml" },
-  { normalized_basename = ".lefthook-local.yml" },
-  { normalized_basename = ".lefthook-local.json" },
-  { normalized_basename = ".lefthook-local.toml" },
-  { normalized_prefix = "~/dotfiles/", case_insensitive = true },
-  { normalized_prefix = "/Users/inouetsukasa/dotfiles/", case_insensitive = true },
-  # Relative forms: shguard has no cwd, so these are raw prefixes that assume
-  # the repo root as cwd. `../`-ascent forms fall to shguard's own
-  # unknown-cwd floor.
-  { prefix = "tests/" }, { prefix = "./tests/" },
-  { prefix = "git/" }, { prefix = "./git/" },
-  { prefix = "ssh/" }, { prefix = "./ssh/" },
-  { prefix = "zsh/" }, { prefix = "./zsh/" },
-  { prefix = "nvim/" }, { prefix = "./nvim/" },
-  { prefix = "wezterm/" }, { prefix = "./wezterm/" },
-  { prefix = "ghostty/" }, { prefix = "./ghostty/" },
-  { prefix = "karabiner/" }, { prefix = "./karabiner/" },
-  { prefix = "nix-darwin/" }, { prefix = "./nix-darwin/" },
-  { prefix = "claude-code/" }, { prefix = "./claude-code/" },
-  { prefix = "mise/" }, { prefix = "./mise/" },
-  { prefix = ".git/" }, { prefix = "./.git/" },
-  { prefix = ".lefthook/" }, { prefix = ".lefthook-local/" },
-  { exact = "setup.sh" }, { exact = "./setup.sh" },
-]
-
-# git push --repo=<url|path> overrides the remote positional. It already falls
-# outside sandbox.excludedCommands (runs sandboxed); defense in depth.
-[[deny]]
-id = "dotfiles-git-push-repo-flag"
-reason = "git push --repo names an arbitrary destination instead of a configured remote"
-command = "git"
-required_tokens = ["push"]
-required_flags = ["--repo"]
-
-# gh subcommands that execute, persist config, or change repo/credential state
-# (gh runs outside the sandbox).
-[[deny]]
-id = "dotfiles-gh-alias"
-reason = "gh alias set/import can define '!'-prefixed shell aliases"
-command = "gh"
-required_tokens = ["alias"]
-
-[[deny]]
-id = "dotfiles-gh-config-set"
-reason = "gh config set pager/editor/browser runs a chosen command on later gh calls"
-command = "gh"
-required_tokens = ["config", "set"]
-
-[[deny]]
-id = "dotfiles-gh-secret"
-reason = "gh secret uploads local values to repository secrets"
-command = "gh"
-required_tokens = ["secret"]
-
-[[deny]]
-id = "dotfiles-gh-variable"
-reason = "gh variable uploads local values to repository variables"
-command = "gh"
-required_tokens = ["variable"]
-
-[[deny]]
-id = "dotfiles-gh-repo-edit"
-reason = "gh repo edit can change visibility or settings of any owned repo"
-command = "gh"
-required_tokens = ["repo", "edit"]
-
-[[deny]]
-id = "dotfiles-gh-repo-create"
-reason = "gh repo create --source --push publishes local content"
-command = "gh"
-required_tokens = ["repo", "create"]
-
-[[deny]]
-id = "dotfiles-gh-auth-login"
-reason = "gh auth login replaces the stored credential"
-command = "gh"
-required_tokens = ["auth", "login"]
-
-[[deny]]
-id = "dotfiles-gh-auth-setup-git"
-reason = "gh auth setup-git rewrites the global git credential helper"
-command = "gh"
-required_tokens = ["auth", "setup-git"]
-
-[[deny]]
-id = "dotfiles-gh-auth-refresh"
-reason = "gh auth refresh changes token scopes (and inside the sandbox the keyring error is not a broken login)"
-command = "gh"
-required_tokens = ["auth", "refresh"]
-
-[[deny]]
-id = "dotfiles-gh-release-edit"
-reason = "gh release edit --notes-file uploads a local file"
-command = "gh"
-required_tokens = ["release", "edit"]
-
-[[deny]]
-id = "dotfiles-gh-workflow-run"
-reason = "gh workflow run triggers CI with repository credentials"
-command = "gh"
-required_tokens = ["workflow", "run"]
-
-[[deny]]
-id = "dotfiles-gh-codespace"
-reason = "gh codespace runs remote shells and copies files"
-command = "gh"
-required_tokens = ["codespace"]
-
-[[deny]]
-id = "dotfiles-gh-cs"
-reason = "gh cs is the short form of gh codespace"
-command = "gh"
-required_tokens = ["cs"]
-
-# Renaming, linking or copying over a directory that CONTAINS protected paths
-# defeats path-literal protection (Seatbelt denyWrite and Claude Code's own
-# .git/config, .git/hooks, .claude/settings*.json checks): rename it away,
-# edit inside, rename it back. Renaming a denyWrite path itself is already
-# denied by Seatbelt; these rules cover the unlisted ancestors, in either
-# direction and in any repo. Python/node rename() from a sandboxed script is
-# not covered (accepted, see docs/shguard-migration-deltas.md #26).
-[[deny]]
-id = "dotfiles-rename-protected-ancestor-mv"
-reason = "mv of .git/.claude/claude-code swaps a directory holding protected files"
-command = "mv"
-targets = [{ normalized_basename = ".git" }, { normalized_basename = ".claude" }, { normalized_basename = "claude-code" }]
-
-[[deny]]
-id = "dotfiles-rename-protected-ancestor-git-mv"
-reason = "git mv of .claude/claude-code swaps a directory holding protected files"
-command = "git"
-required_tokens = ["mv"]
-targets = [{ normalized_basename = ".git" }, { normalized_basename = ".claude" }, { normalized_basename = "claude-code" }]
-
-[[deny]]
-id = "dotfiles-rename-protected-ancestor-ln"
-reason = "ln onto .git/.claude/claude-code substitutes a directory holding protected files"
-command = "ln"
-targets = [{ normalized_basename = ".git" }, { normalized_basename = ".claude" }, { normalized_basename = "claude-code" }]
-
-[[deny]]
+# 0.9 dotfiles-rename-protected-ancestor-cp: the catalog blocks cp onto or
+# out of .git and .claude, not claude-code (relative paths only; absolute
+# and `~` paths are already asked by cp-ask-nonlocal-target).
+[[rule]]
 id = "dotfiles-rename-protected-ancestor-cp"
-reason = "cp onto or out of .git/.claude/claude-code recreates a directory holding protected files"
-command = "cp"
-targets = [{ normalized_basename = ".git" }, { normalized_basename = ".claude" }, { normalized_basename = "claude-code" }]
+key = ["cp"]
+targets = [{ pat = "claude-code", kind = "under" }]
+outcome = "block"
 
-[[deny]]
-id = "dotfiles-rename-protected-ancestor-ditto"
-reason = "ditto onto .git/.claude/claude-code recreates a directory holding protected files"
-command = "ditto"
-targets = [{ normalized_basename = ".git" }, { normalized_basename = ".claude" }, { normalized_basename = "claude-code" }]
+# 0.9 dotfiles-secret-read-*: the catalog asks `~/...` credential paths and
+# `.env`, but has no HOME, so the absolute spelling of the same paths, and
+# the bare names the 0.9 rules listed, are allowed. The kernel folds ASCII
+# case. Not expressible: a basename at any depth (`sub/.env`, `*.pem`).
+# rg and grep take the pattern as a path word, so the bare names would also
+# hit `rg id_rsa`: they get the absolute targets only (rg already asks every
+# /Users path through rg-ask-broad, so it gets no rule).
+[[rule]]
+id = "dotfiles-secret-read-cat"
+key = ["cat"]
+outcome = "block"
+targets = [
+  { pat = "/Users/inouetsukasa/.ssh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.gnupg", kind = "under" },
+  { pat = "/Users/inouetsukasa/.aws", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gcloud", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude.json", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.kube", kind = "under" },
+  { pat = "/Users/inouetsukasa/.docker", kind = "under" },
+  { pat = "/Users/inouetsukasa/.netrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.npmrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pypirc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pgpass", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.zsh_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.bash_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pi/agent/auth.json", kind = "exact" },
+  { pat = "id_rsa", kind = "exact" },
+  { pat = "id_ed25519", kind = "exact" },
+  { pat = "id_ecdsa", kind = "exact" },
+  { pat = "id_dsa", kind = "exact" },
+  { pat = "kubeconfig", kind = "exact" },
+  { pat = ".kube", kind = "under" },
+  { pat = ".npmrc", kind = "exact" },
+  { pat = ".netrc", kind = "exact" },
+  { pat = ".pgpass", kind = "exact" },
+  { pat = ".aws", kind = "under" },
+  { pat = ".docker/config.json", kind = "exact" },
+  { pat = ".config/gcloud", kind = "under" },
+]
 
+[[rule]]
+id = "dotfiles-secret-read-head"
+key = ["head"]
+outcome = "block"
+targets = [
+  { pat = "/Users/inouetsukasa/.ssh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.gnupg", kind = "under" },
+  { pat = "/Users/inouetsukasa/.aws", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gcloud", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude.json", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.kube", kind = "under" },
+  { pat = "/Users/inouetsukasa/.docker", kind = "under" },
+  { pat = "/Users/inouetsukasa/.netrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.npmrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pypirc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pgpass", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.zsh_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.bash_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pi/agent/auth.json", kind = "exact" },
+  { pat = "id_rsa", kind = "exact" },
+  { pat = "id_ed25519", kind = "exact" },
+  { pat = "id_ecdsa", kind = "exact" },
+  { pat = "id_dsa", kind = "exact" },
+  { pat = "kubeconfig", kind = "exact" },
+  { pat = ".kube", kind = "under" },
+  { pat = ".npmrc", kind = "exact" },
+  { pat = ".netrc", kind = "exact" },
+  { pat = ".pgpass", kind = "exact" },
+  { pat = ".aws", kind = "under" },
+  { pat = ".docker/config.json", kind = "exact" },
+  { pat = ".config/gcloud", kind = "under" },
+]
+
+[[rule]]
+id = "dotfiles-secret-read-tail"
+key = ["tail"]
+outcome = "block"
+targets = [
+  { pat = "/Users/inouetsukasa/.ssh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.gnupg", kind = "under" },
+  { pat = "/Users/inouetsukasa/.aws", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gcloud", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude.json", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.kube", kind = "under" },
+  { pat = "/Users/inouetsukasa/.docker", kind = "under" },
+  { pat = "/Users/inouetsukasa/.netrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.npmrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pypirc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pgpass", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.zsh_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.bash_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pi/agent/auth.json", kind = "exact" },
+  { pat = "id_rsa", kind = "exact" },
+  { pat = "id_ed25519", kind = "exact" },
+  { pat = "id_ecdsa", kind = "exact" },
+  { pat = "id_dsa", kind = "exact" },
+  { pat = "kubeconfig", kind = "exact" },
+  { pat = ".kube", kind = "under" },
+  { pat = ".npmrc", kind = "exact" },
+  { pat = ".netrc", kind = "exact" },
+  { pat = ".pgpass", kind = "exact" },
+  { pat = ".aws", kind = "under" },
+  { pat = ".docker/config.json", kind = "exact" },
+  { pat = ".config/gcloud", kind = "under" },
+]
+
+[[rule]]
+id = "dotfiles-secret-read-wc"
+key = ["wc"]
+outcome = "block"
+targets = [
+  { pat = "/Users/inouetsukasa/.ssh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.gnupg", kind = "under" },
+  { pat = "/Users/inouetsukasa/.aws", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gcloud", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude.json", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.kube", kind = "under" },
+  { pat = "/Users/inouetsukasa/.docker", kind = "under" },
+  { pat = "/Users/inouetsukasa/.netrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.npmrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pypirc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pgpass", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.zsh_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.bash_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pi/agent/auth.json", kind = "exact" },
+  { pat = "id_rsa", kind = "exact" },
+  { pat = "id_ed25519", kind = "exact" },
+  { pat = "id_ecdsa", kind = "exact" },
+  { pat = "id_dsa", kind = "exact" },
+  { pat = "kubeconfig", kind = "exact" },
+  { pat = ".kube", kind = "under" },
+  { pat = ".npmrc", kind = "exact" },
+  { pat = ".netrc", kind = "exact" },
+  { pat = ".pgpass", kind = "exact" },
+  { pat = ".aws", kind = "under" },
+  { pat = ".docker/config.json", kind = "exact" },
+  { pat = ".config/gcloud", kind = "under" },
+]
+
+[[rule]]
+id = "dotfiles-secret-read-sort"
+key = ["sort"]
+outcome = "block"
+targets = [
+  { pat = "/Users/inouetsukasa/.ssh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.gnupg", kind = "under" },
+  { pat = "/Users/inouetsukasa/.aws", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gcloud", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude.json", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.kube", kind = "under" },
+  { pat = "/Users/inouetsukasa/.docker", kind = "under" },
+  { pat = "/Users/inouetsukasa/.netrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.npmrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pypirc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pgpass", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.zsh_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.bash_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pi/agent/auth.json", kind = "exact" },
+  { pat = "id_rsa", kind = "exact" },
+  { pat = "id_ed25519", kind = "exact" },
+  { pat = "id_ecdsa", kind = "exact" },
+  { pat = "id_dsa", kind = "exact" },
+  { pat = "kubeconfig", kind = "exact" },
+  { pat = ".kube", kind = "under" },
+  { pat = ".npmrc", kind = "exact" },
+  { pat = ".netrc", kind = "exact" },
+  { pat = ".pgpass", kind = "exact" },
+  { pat = ".aws", kind = "under" },
+  { pat = ".docker/config.json", kind = "exact" },
+  { pat = ".config/gcloud", kind = "under" },
+]
+
+[[rule]]
+id = "dotfiles-secret-read-grep"
+key = ["grep"]
+outcome = "block"
+targets = [
+  { pat = "/Users/inouetsukasa/.ssh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.gnupg", kind = "under" },
+  { pat = "/Users/inouetsukasa/.aws", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gcloud", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude.json", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.kube", kind = "under" },
+  { pat = "/Users/inouetsukasa/.docker", kind = "under" },
+  { pat = "/Users/inouetsukasa/.netrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.npmrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pypirc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pgpass", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.zsh_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.bash_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pi/agent/auth.json", kind = "exact" },
+]
+
+[[rule]]
+id = "dotfiles-secret-read-jq"
+key = ["jq"]
+outcome = "block"
+targets = [
+  { pat = "/Users/inouetsukasa/.ssh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.gnupg", kind = "under" },
+  { pat = "/Users/inouetsukasa/.aws", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gh", kind = "under" },
+  { pat = "/Users/inouetsukasa/.config/gcloud", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude", kind = "under" },
+  { pat = "/Users/inouetsukasa/.claude.json", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.kube", kind = "under" },
+  { pat = "/Users/inouetsukasa/.docker", kind = "under" },
+  { pat = "/Users/inouetsukasa/.netrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.npmrc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pypirc", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pgpass", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.zsh_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.bash_history", kind = "exact" },
+  { pat = "/Users/inouetsukasa/.pi/agent/auth.json", kind = "exact" },
+  { pat = "id_rsa", kind = "exact" },
+  { pat = "id_ed25519", kind = "exact" },
+  { pat = "id_ecdsa", kind = "exact" },
+  { pat = "id_dsa", kind = "exact" },
+  { pat = "kubeconfig", kind = "exact" },
+  { pat = ".kube", kind = "under" },
+  { pat = ".npmrc", kind = "exact" },
+  { pat = ".netrc", kind = "exact" },
+  { pat = ".pgpass", kind = "exact" },
+  { pat = ".aws", kind = "under" },
+  { pat = ".docker/config.json", kind = "exact" },
+  { pat = ".config/gcloud", kind = "under" },
+]
 # =====================================================================
-# Pi factory API key (pi/pi-factory). Claude's Bash sandbox can read the
-# Keychain, so these keep the key and its spend user-only.
+# Rules: git/gh operations that lose work for good.
 # =====================================================================
 
-[[deny]]
-id = "dotfiles-pi-factory"
-reason = "pi-factory spends the factory API key; the user runs it (! pi-factory ...)"
-command = "pi-factory"
+[[rule]]
+id = "dotfiles-git-reset-discard-worktree"
+key = ["git", "reset"]
+opts = [["--hard", "--merge", "--keep"]]
+outcome = "block"
 
-# Blanket on purpose: the narrower find-generic-password/find-internet-password/
-# dump-keychain rules left export, add-*, delete-* and any future verb open.
-[[deny]]
-id = "dotfiles-keychain-security"
-reason = "the security CLI reads and modifies Keychain items (e.g. the claude-factory API key); the sandbox lets it through without a prompt"
-command = "security"
+[[rule]]
+id = "dotfiles-git-switch-discard"
+key = ["git", "switch"]
+opts = [["-f", "--force", "--discard-changes"]]
+outcome = "block"
+
+[[rule]]
+id = "dotfiles-git-worktree-remove-force"
+key = ["git", "worktree", "remove"]
+opts = [["-f", "--force"]]
+outcome = "block"
+
+[[rule]]
+id = "dotfiles-git-tag-delete"
+key = ["git", "tag"]
+opts = [["-d", "--delete"]]
+outcome = "block"
+
+[[rule]]
+id = "dotfiles-gh-pr-checkout-force"
+key = ["gh", "pr", "checkout"]
+opts = [["-f", "--force"]]
+outcome = "block"
+
+[[rule]]
+id = "dotfiles-gh-pr-merge-admin"
+key = ["gh", "pr", "merge"]
+opts = [["--admin"]]
+outcome = "block"
+
+# Same as dotfiles-git-push-url-target: a URL or scp-form remote pulls
+# code from a host the repository's remotes may not name.
+[[rule]]
+id = "dotfiles-git-fetch-url-remote"
+key = ["git", "fetch"]
+targets = [
+  { pat = "https:", kind = "prefix" },
+  { pat = "http:", kind = "prefix" },
+  { pat = "ssh:", kind = "prefix" },
+  { pat = "git:", kind = "prefix" },
+  { pat = "file:", kind = "prefix" },
+  { pat = "ext::", kind = "prefix" },
+  { pat = "git@", kind = "prefix" },
+]
+outcome = "block"
+
+[[rule]]
+id = "dotfiles-git-pull-url-remote"
+key = ["git", "pull"]
+targets = [
+  { pat = "https:", kind = "prefix" },
+  { pat = "http:", kind = "prefix" },
+  { pat = "ssh:", kind = "prefix" },
+  { pat = "git:", kind = "prefix" },
+  { pat = "file:", kind = "prefix" },
+  { pat = "ext::", kind = "prefix" },
+  { pat = "git@", kind = "prefix" },
+]
+outcome = "block"
+
+# Same as dotfiles-rename-protected-ancestor-cp: renaming a protected
+# directory away defeats path-literal protection.
+[[rule]]
+id = "dotfiles-rename-protected-ancestor-git-mv"
+key = ["git", "mv"]
+targets = [
+  { pat = "claude-code", kind = "under" },
+  { pat = ".claude", kind = "under" },
+  { pat = ".git", kind = "under" },
+]
+outcome = "block"
+
+# gh runs outside the Bash sandbox (sandbox.excludedCommands), so a
+# --body-file is uploaded with no read restriction. A rule cannot say "only
+# under /private/tmp", so every other root entry is listed; a new root
+# directory needs root on macOS (sealed system volume). The `/.vol`,
+# `/.resolve` and `/.nofollow` entries are aliases that reach any file. Not
+# expressible: a basename at any depth (`sub/.env`).
+[[rule]]
+id = "dotfiles-gh-upload-path"
+key = ["gh"]
+targets = [
+  { pat = "/.vol", kind = "under" },
+  { pat = "/.resolve", kind = "under" },
+  { pat = "/.nofollow", kind = "under" },
+  { pat = "/.file", kind = "under" },
+  { pat = "/Applications", kind = "under" },
+  { pat = "/bin", kind = "under" },
+  { pat = "/cores", kind = "under" },
+  { pat = "/dev", kind = "under" },
+  { pat = "/etc", kind = "under" },
+  { pat = "/home", kind = "under" },
+  { pat = "/Library", kind = "under" },
+  { pat = "/nix", kind = "under" },
+  { pat = "/opt", kind = "under" },
+  { pat = "/pkg", kind = "under" },
+  { pat = "/run", kind = "under" },
+  { pat = "/sbin", kind = "under" },
+  { pat = "/System", kind = "under" },
+  { pat = "/Users", kind = "under" },
+  { pat = "/usr", kind = "under" },
+  { pat = "/var", kind = "under" },
+  { pat = "/Volumes", kind = "under" },
+  { pat = "/private/etc", kind = "under" },
+  { pat = "/private/var", kind = "under" },
+  { pat = "/private/tftpboot", kind = "under" },
+  { pat = "~", kind = "prefix" },
+  { pat = "..", kind = "under" },
+  { pat = ".env", kind = "prefix" },
+]
+outcome = "block"

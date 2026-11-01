@@ -2,14 +2,15 @@
 - Commit messages must be in English, regardless of conversation language.
 - Use plain `git add` / `git commit` / `git status` inside the current project — the cwd is already the repo. Reserve `-C <path>` for a genuinely different repository.
 - `git push/fetch/pull/ls-remote`, `gh`, and `go mod download`/`go mod tidy`/`go get` run outside the Bash sandbox (`sandbox.excludedCommands` in `settings.json`): inside it, SSH remotes can't resolve `github.com` and `gh` can't read the keychain.
+  - shguard allows everyday git/gh writes (commit, rebase, `reset --soft`, switch, stash, fetch/pull, push to a named remote, `gh pr create|merge|comment`, `gh issue create|comment`, GET-only `gh api`) and refuses what loses work for good or has no row (`reset --hard`, `checkout`, `restore`, `clean`, `branch -d`, `gh pr merge --admin`, `gh api` writes). Unstage with `git reset -- <path>`; for a refused command, stop and give me the command.
   - Only the exact prefixes listed there are excluded: for git, the bare form or `origin` after the subcommand or one of the listed flags (`git push`, `git push origin <branch>`, `git push -u origin <branch>`, `git fetch --prune origin`, `git pull --rebase origin main`). Any other form, and any line with a redirect or pipe, runs sandboxed and fails SSH, so put other flags after `origin`.
   - Every other git command, `git commit` included, runs sandboxed (GPG reaches its agent via `sandbox.network.allowUnixSockets`).
   - Run excluded commands standalone, not chained after `cd`/`&&`, because every command in a chain must match the exclusion or the whole line runs sandboxed.
-  - A newline inside an argument splits the line the same way, so a multi-line `gh pr create -b`/`gh issue create -b` fails on the keychain: write the body to a file under the scratchpad (`/private/tmp/claude-501/...`) and pass `--body-file`; shguard allows `--body-file` only from there.
+  - A newline inside an argument splits the line the same way, so a multi-line `gh pr create -b`/`gh issue create -b` fails on the keychain: write the body to a file under the scratchpad (`/private/tmp/claude-501/...`) and pass `--body-file`.
   - A backquote anywhere in the line, even inside single quotes or escaped in double quotes, also drops the exclusion (8 of 8 observed `gh` calls ran sandboxed): keep backquotes out of `--title`/`--body`/`--comment` and put Markdown text in a `--body-file`.
   - If `gh auth status` inside the sandbox reports an invalid keyring token, that is the sandbox, not a broken login; never run `gh auth refresh` for it.
 - "commitして" with no scope = commit ONLY files changed in this session. If the working tree has unrelated changes mixed in, list them and confirm instead of guessing.
-- Commit after each completed subtask; never start the next subtask while pre-commit fails — fix the check first. Bypass flags (`--no-verify`, `git push --force`) are hook-blocked; use `--force-with-lease` when force is genuinely needed.
+- Commit after each completed subtask; never start the next subtask while pre-commit fails — fix the check first. Bypass flags (`--no-verify`, `git push --force`, `--force-with-lease`) are hook-blocked; when force is genuinely needed, give me the `--force-with-lease` command.
 - Git workflow by repo:
   - `dotfiles` and `ops` → commit directly to main and push once a subtask is complete, no explicit "commit" instruction needed.
   - Every other repo → NEVER commit to main: create a branch (`<type>/<short-slug>`), open a PR. Merge via `gh pr merge --squash --delete-branch` once the `code-reviewer` review approves (see the `review-gate` skill); if no review ran, or it did not approve, stop and wait for me to say so.
@@ -28,7 +29,7 @@
     - `learned(scope)`: discovered quirks / gotchas
 - Editor: nvim
 - When a Bash command is blocked by a PreToolUse hook, never retry with an equivalent shell command (`unlink` for `rm`, piping around a block, etc.); repeat it verbatim in a fenced bash block so I can `/copy` it. A dedicated tool (Read, Grep, Glob, Edit, Write) that does the job is fine to use; otherwise just stop.
-  - Exception: `dotfiles-tool-policy-*` rules (`find`) are tool preferences, not safety blocks, so retry immediately with the named replacement (`fd`/Glob).
+  - Exception: when shguard refuses `find`, use the Glob tool at once (fd is refused too).
   - A blocked Edit/Write still needs presenting by you.
 - Before setup work that ends in a hook-protected action (editing linter/formatter configs, destructive git ops), check the protection first — don't discover it after installing/initializing.
 - Enter plan mode when the change spans multiple files/subsystems or involves an architectural decision; single-file fixes don't need a plan. I'll ask when I want more than this default. If the approach breaks down mid-task, stop and re-plan.

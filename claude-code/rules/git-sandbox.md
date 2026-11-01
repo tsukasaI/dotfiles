@@ -9,6 +9,6 @@ Patterns that the sandbox or shguard denies by mechanism, not by policy:
   `git worktree add --no-track -b <b> <path> origin/main`): the sandbox
   write-protects `.git/config`, so recording the upstream fails. Set the
   upstream with the unsandboxed `git push -u origin <b>` instead.
-- `gh pr|issue --body-file` takes an absolute path to a file that already
-  exists under `/private/tmp/claude-501/`: shguard resolves symlinks, so a
-  relative path (including after `cd`) or a not-yet-written file is denied.
+- shguard refuses a `gh` body file outside `/private/tmp` and the repository
+  (`dotfiles-gh-upload-path`: gh runs unsandboxed and uploads it), and
+  `gh api` with `-X`/`-f`/`-F`/`--input`, which turn it into a write.

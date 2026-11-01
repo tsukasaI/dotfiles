@@ -5,6 +5,13 @@
 from `claude-code/settings.json`'s PreToolUse/Bash hook (inline command
 `shguard || exit 2`, `SHGUARD_STRICT_CONFIG=1`, no wrapper script), is now
 the sole enforcer.
+
+**0.10.0 (2026-10-31).** shguard was rebuilt upstream; this machine moved
+from 0.9.5 to 0.10.0. The hook command, the config schema and the decision
+model all changed, so most of the 0.9-specific mechanics below (`[[deny]]`
+matchers, `value_flags`, `escalation_floor`, `SHGUARD_STRICT_CONFIG`) are
+history. See section 27 at the end.
+
 This file stays as the historical record of every place shguard's behavior
 was found not to reproduce `block-dangerous.sh` exactly, per
 `claude-code/rules/security.md`'s "a weakened control must be visible, not
@@ -1059,3 +1066,95 @@ Still open (accepted):
 - `git restore --staged` and `git rm --cached` stay denied (B12): shguard
   can't express "unless only `--staged`", so the rules stay fail-closed.
   `perl -ne/-pe` denies are correct, not false positives: they cluster `-e`.
+
+## 27. shguard 0.10.0 (rebuild), 2026-10-31
+
+shguard 0.10.0 is a rebuild (upstream CHANGELOG; the 0.9 engine is the tag
+`legacy-v0.9.5`). What changed here:
+
+- **Install.** shguard's flake has no `packages.default`
+  (tsukasaI/shguard#1114), so `nix-darwin/shguard.nix` builds the binary
+  from the `shguard` input (`github:tsukasaI/shguard/v0.10.0`,
+  `flake = false`) with nixpkgs' rustc. CI builds the same derivation
+  (`./nix-darwin#packages.x86_64-linux.shguard`).
+- **Hook.** `settings.json` runs `/run/current-system/sw/bin/shguard` with
+  `args: []` and `onFailure: "block"` instead of `shguard || exit 2`.
+  `SHGUARD_STRICT_CONFIG` is gone: 0.10 never reads it, and a config that
+  fails to load always denies every Bash call (parity cases cover malformed
+  TOML and a 0.9-format file).
+- **Decision model.** Allow needs every simple command covered by a catalog
+  row with no rule hit; everything else is Ask, and `ask_outcome = "deny"`
+  (kept) refuses it. 0.9 allowed whatever no rule matched. Allow is a claim
+  about what shguard read (README promises P1-P3), not that a command is
+  safe.
+- **pi.** `pi/extensions/shguard.ts` pipes the PreToolUse JSON to
+  `shguard` on stdin and blocks anything but `allow`; `shguard check
+  <command> --json` no longer exists.
+
+How the 0.9 config was carried over (`claude-code/shguard/config.toml`):
+
+| 0.9 | 0.10 |
+|---|---|
+| ~150 `[[deny]]` on commands with no 0.10 row (sudo/su/doas, truncate/unlink/rmdir, dd/mkfs/diskutil, curl/rsync/nc/wget/dig/..., kill*, launchctl/systemctl, docker/kubectl, printenv, eval/shells/xargs/interpreter `-c`/source/osascript, chmod/chown, user admin, history, crontab, defaults, ssh/scp/sftp, find, less/more/bat/nano/vim/nvim, `fd -x`, turso, mv/ln/ditto, pi-factory, security, git subcommands other than log/diff/show/status/rev-parse/ls-files/blame/branch/push, every gh subcommand outside pr/issue/run view/list) | Dropped: Ask by construction, refused by `ask_outcome`. A `[[rule]]` on them is a load error (no row matches its key). |
+| `escalation_floor` | Dropped: `sudo`/`doas`/`su` can never get a row. |
+| `[[redirect]]` live-config | Dropped: every redirect but `2>&1`/`>&2`/`>/dev/null`/`2>/dev/null` is outside the parsed subset. |
+| `dotfiles-file-rm` | `[[rule]]` block on every `rm` (the catalog allows `rm foo`). |
+| `dotfiles-secret-read-*` | `[[rule]]` block for cat/head/tail/wc/sort/jq on absolute `/Users/inouetsukasa/...` credential paths and the bare names; grep gets the absolute paths only (its pattern is a path word); rg gets none (`rg-ask-broad` already asks every `/Users` path). The embedded rules only know `~`, and the kernel has no HOME (tsukasaI/shguard#1113). |
+| `dotfiles-git-push-url-target` | `[[rule]]` block on `git@` and `.` remotes (the catalog asks URL and absolute remotes, allows these two). |
+| `dotfiles-rename-protected-ancestor-cp` | `[[rule]]` block on `claude-code` (the catalog blocks `.git`/`.claude`). |
+| `[[allow]]` secretlint/detect-secrets/gitleaks/trufflehog | Dropped by decision; lefthook's `gitleaks git --staged` runs as a git hook child, not through shguard. |
+| (new) | `[[row]]`s for `git add`, `git commit -m` and `jq`, so an agent can commit and read JSON under `ask_outcome = "deny"`. |
+
+Accepted gaps and regressions (0.10 vs 0.9), tracked upstream where they
+can be fixed:
+
+- **gap (pending upstream)** `cat sub/.env`, `*.pem`: no basename targets
+  (tsukasaI/shguard#1113).
+- **gap (pending upstream)** rules carry no reason text, so the agent no
+  longer reads "use fd" style guidance (tsukasaI/shguard#1112);
+  `blocked-band.tsx` points a refused `find` at the Glob tool instead.
+- **regression (pending upstream)** `fd`, `bun`, `sed`, `awk` and other
+  denylisted heads cannot get a row even from the user config, so agents
+  cannot run `fd` or `bun test` (tsukasaI/shguard#1111); the other missing
+  rows (`git log -5`, `git fetch`, `gh api`, `nix build`, ...) are
+  tsukasaI/shguard#1115.
+- **gap (permanent, user-owned)** `jq -n env` prints the environment; the
+  `jq` row accepts it by decision.
+- **gap (permanent)** a bare `git commit` is allowed and opens
+  `core.editor`: a row cannot require `-m`.
+
+The 0.9 cases in `tests/shguard-parity-check.sh` were kept, with 0.10
+expectations: 47 flipped (46 allow->deny because the command has no row,
+and `cat foo/.env.local` deny->allow, the basename gap above).
+
+## 28. git/gh write rows: block only what loses work for good, 2026-11-01
+
+Owner decision: agents run commit, rebase, reset, push and gh PR work
+themselves; shguard blocks only operations that reflog or GitHub cannot
+undo. `config.toml` gains rows for `git add|commit|switch|reset|rebase|merge|cherry-pick|revert|stash|fetch|pull|worktree|tag|mv`
+and `gh pr create|edit|comment|ready|close|reopen|checkout|merge`,
+`gh issue create|comment|edit|close|reopen`, `gh label create`,
+`gh run rerun|watch` and a GET-only `gh api`. A destructive option is
+listed in its row and blocked by a named rule (`dotfiles-git-reset-discard-worktree`,
+`-switch-discard`, `-worktree-remove-force`, `-tag-delete`,
+`dotfiles-gh-pr-checkout-force`, `-pr-merge-admin`); `git checkout`,
+`restore`, `clean`, `rm` get no row. Also allowed by decision: `gh pr merge`
+(review-gate decides when) and `git stash drop|clear`.
+
+- **gap (pending upstream)** `git push --force-with-lease` stays refused
+  although the owner wants it: the embedded `git-push-force-with-lease` is
+  an Ask, and a user config can neither disable an embedded rule nor
+  lift one Ask without `ask_outcome = "ask"` everywhere.
+- **gap (permanent)** `git branch -d` stays refused: the embedded
+  `["git","branch"]` row is listing-only and a second row with that key is
+  a load error.
+- **new rule** `dotfiles-gh-upload-path`: gh runs outside the sandbox, so
+  a `--body-file` is limited to `/private/tmp`, `/tmp` and the repository
+  by listing every other root entry (plus the `/.vol`, `/.resolve`,
+  `/.nofollow`, `/.file` aliases). The parity case `--body-file
+  /x/.netrc` became `/etc/x/.netrc`: a new root directory needs root.
+- `git commit -F` stays unlisted (it reads any file into a message a push
+  publishes); `git fetch|pull` from a URL or scp remote is blocked like
+  push (`dotfiles-git-fetch-url-remote`, `-pull-url-remote`); `git mv`
+  onto a protected ancestor is blocked like cp
+  (`dotfiles-rename-protected-ancestor-git-mv`).
