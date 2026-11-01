@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+  :root {
+    --bg: #fff; --surface: #fff; --ink: #1f2328; --muted: #656d76; --line: #d0d7de; --code-bg: #f6f8fa;
+    --added: #1a7f37; --changed: #b08800; --removed: #cf222e; --base: #8c959f;
+    --added-bg: #dafbe1; --changed-bg: #fff8c5; --removed-bg: #ffebe9; --focus: #0969da; --on-badge: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1117; --surface: #161b22; --ink: #e6edf3; --muted: #8b949e; --line: #30363d; --code-bg: #161b22;
+      --added: #3fb950; --changed: #d29922; --removed: #f85149; --base: #8b949e;
+      --added-bg: #12261e; --changed-bg: #272115; --removed-bg: #2d1618; --focus: #58a6ff; --on-badge: #0d1117;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1117; --surface: #161b22; --ink: #e6edf3; --muted: #8b949e; --line: #30363d; --code-bg: #161b22;
+    --added: #3fb950; --changed: #d29922; --removed: #f85149; --base: #8b949e;
+    --added-bg: #12261e; --changed-bg: #272115; --removed-bg: #2d1618; --focus: #58a6ff; --on-badge: #0d1117;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 14px/1.5 -apple-system, "Hiragino Sans", sans-serif; color: var(--ink); background: var(--bg); }
+  header, main, section { padding: 12px 20px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 16px 0 8px; }
+  .muted { color: var(--muted); }
+  #banner { display: none; border: 2px solid var(--removed); background: var(--removed-bg); padding: 8px 12px; margin: 8px 20px; border-radius: 6px; }
+  #banner ul { margin: 4px 0 0; padding-left: 20px; }
+  #stage { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; }
+  #canvas { overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+  #controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  #controls button { padding: 4px 12px; }
+  #frame-title { font-weight: 600; }
+  #legend span { display: inline-block; margin-right: 12px; }
+  #legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 4px; }
+  #panel { border: 1px solid var(--line); border-radius: 6px; padding: 12px; align-self: start; position: sticky; top: 8px; max-height: 95vh; overflow: auto; }
+  #panel pre { background: var(--code-bg); padding: 8px; overflow: auto; font-size: 12px; white-space: pre; }
+  .status-ok { color: var(--added); } .status-bad { color: var(--removed); font-weight: 600; }
+  svg text { font-size: 12px; pointer-events: none; fill: var(--ink); }
+  .node rect { fill: var(--surface); stroke: var(--base); stroke-width: 1.5; cursor: pointer; }
+  .node.proposed rect { stroke-dasharray: 6 3; }
+  .node.deep rect { stroke-width: 4; }
+  .edge path { fill: none; stroke: var(--base); stroke-width: 1.5; }
+  .edge .hit { stroke: transparent; stroke-width: 12; cursor: pointer; }
+  .edge.proposed path.line { stroke-dasharray: 6 3; }
+  .edge text { paint-order: stroke; stroke: var(--bg); stroke-width: 4px; fill: var(--muted); }
+  .m-base { fill: var(--base); } .m-added { fill: var(--added); } .m-changed { fill: var(--changed); } .m-removed { fill: var(--removed); }
+  .c-added rect, .c-added path.line { stroke: var(--added); } .c-added rect { fill: var(--added-bg); }
+  .c-changed rect, .c-changed path.line { stroke: var(--changed); } .c-changed rect { fill: var(--changed-bg); }
+  .c-removed rect, .c-removed path.line { stroke: var(--removed); } .c-removed rect { fill: var(--removed-bg); }
+  .c-removed { opacity: 0.85; }
+  .selected rect, .selected path.line { filter: drop-shadow(0 0 3px var(--focus)); }
+  .badge { fill: var(--removed); } .badge-text { fill: var(--on-badge); font-weight: 700; }
+  fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 12px; min-width: 0; }
+  fieldset label { display: block; padding: 2px 0; }
+  .other-text { width: 80%; }
+  .right { color: var(--added); } .wrong { color: var(--removed); }
+  #result { width: 100%; height: 160px; font: 12px ui-monospace, monospace; color: var(--ink); background: var(--code-bg); }
+  @media (max-width: 719px) {
+    header, main, section { padding-left: 16px; padding-right: 16px; }
+    #banner { margin: 8px 16px; }
+    #stage { grid-template-columns: minmax(0, 1fr); }
+    #panel { position: static; max-height: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title"></h1>
+  <div id="summary" class="muted"></div>
+</header>
+<div id="banner"><strong>図の参照がコードと一致しない箇所があります。図を信用する前に確認してください。</strong><ul id="banner-list"></ul></div>
+<main>
+  <div id="controls">
+    <button id="prev" type="button">← 前へ</button>
+    <button id="next" type="button">次へ →</button>
+    <span id="counter" class="muted"></span>
+    <span id="frame-title"></span>
+  </div>
+  <div id="frame-desc"></div>
+  <div id="legend" class="muted">
+    <span id="leg-changes">
+      <span><i style="background:var(--added)"></i>追加</span>
+      <span><i style="background:var(--changed)"></i>変更</span>
+      <span><i style="background:var(--removed)"></i>削除</span>
+    </span>
+    <span><i style="background:var(--base)"></i>既存</span>
+    <span id="leg-proposed" hidden>破線 = 提案（未実装）</span>
+    <span id="leg-deep" hidden>太枠 = 深掘り</span>
+  </div>
+  <div id="stage">
+    <div id="canvas"></div>
+    <aside id="panel"><span class="muted">図の要素をクリックすると、詳細を表示します。</span></aside>
+  </div>
+</main>
+<section id="boundaries-sec" hidden>
+  <h2>深掘り対象外と判断した境界</h2>
+  <ul id="boundaries"></ul>
+</section>
+<section id="quiz-sec" hidden>
+  <h2>理解確認</h2>
+  <form id="quiz"></form>
+  <div id="difficulty" hidden><strong>難易度（任意）:</strong></div>
+  <p><button id="score" type="button" disabled>採点する</button></p>
+  <div id="score-out"></div>
+</section>
+<script type="application/json" id="data">__DATA__</script>
+<script>
+/*__CORE__*/
+</script>
+<script>
+"use strict";
+const { diagram: D, checks } = JSON.parse(document.getElementById("data").textContent);
+const SVG = "http://www.w3.org/2000/svg";
+const COL = 250, ROW = 100, W = 200, H = 60, PAD = 30, TOP = 40;
+const PERSPECTIVE = { flow: "フロー・IF", deepDive: "深掘り", rejected: "却下案", evidence: "根拠コード" };
+const CATEGORY = {
+  "input-validation": "外部入力の検証", auth: "認証・権限", secrets: "秘密情報", "process-exec": "シェル・プロセス実行",
+  "guard-sandbox": "ガード・サンドボックス", crypto: "暗号", destructive: "破壊的操作",
+};
+const STATUS = {
+  ok: "照合OK", moved: "行ずれ", mismatch: "不一致: 抜粋がファイル内に見つからない",
+  missing: "ファイルがない、または読めない", outside: "repo 外のパス（照合を拒否）",
+};
+const IS_PLAN = D.mode === "plan";
+const GATED = typeof gateQuiz === "function" && typeof resultBlock === "function";
+const checkById = new Map(checks.map(c => [c.id, c]));
+const nodeById = new Map(D.nodes.map(n => [n.id, n]));
+const edges = D.edges || [];
+const steps = D.steps || [];
+const quiz = D.quiz || [];
+const el = (tag, attrs = {}, text) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text !== undefined) e.textContent = text;
+  return e;
+};
+const svgEl = (tag, attrs = {}) => {
+  const e = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+  return e;
+};
+
+document.getElementById("title").textContent = D.title;
+document.getElementById("summary").textContent = D.summary || "";
+
+const bad = checks.filter(c => c.status !== "ok");
+if (bad.length > 0) {
+  document.getElementById("banner").style.display = "block";
+  for (const c of bad) {
+    const extra = c.foundAt ? `（${c.foundAt} 行目で一致）` : "";
+    document.getElementById("banner-list").append(el("li", {}, `${c.id}: ${c.file}:${c.line} — ${STATUS[c.status]}${extra}`));
+  }
+}
+
+const animated = steps.length > 0;
+if (!animated) {
+  for (const id of ["controls", "frame-desc", "leg-changes"]) document.getElementById(id).hidden = true;
+}
+document.getElementById("leg-proposed").hidden = ![...D.nodes, ...edges].some(x => x.kind === "proposed");
+document.getElementById("leg-deep").hidden = !D.nodes.some(n => n.deepDive);
+
+const frames = animated
+  ? [{ title: "現状", description: D.summary || "変更前の状態", changes: {} }, ...steps]
+  : [{ title: "全体像", description: D.summary || "", changes: {} }];
+const allIds = [...D.nodes, ...edges].map(x => x.id);
+const kindOf = new Map([...D.nodes, ...edges].map(x => [x.id, x.kind]));
+const frameStates = (() => {
+  const present = new Map(allIds.map(id => [id, kindOf.get(id) === "existing"]));
+  return frames.map(f => {
+    const snap = new Map();
+    for (const id of allIds) {
+      // hasOwn, not f.changes[id]: an id such as "constructor" would read Object.prototype.
+      const change = Object.hasOwn(f.changes, id) ? f.changes[id] : null;
+      let visible = present.get(id);
+      if (change === "added") { present.set(id, true); visible = true; }
+      if (change === "removed") { present.set(id, false); visible = true; }
+      snap.set(id, { visible, change });
+    }
+    return snap;
+  });
+})();
+
+const laneIndex = new Map(D.lanes.map((l, i) => [l.id, i]));
+const pos = n => ({ x: PAD + laneIndex.get(n.lane) * COL, y: TOP + n.order * ROW });
+const maxOrder = Math.max(...D.nodes.map(n => n.order));
+const svg = svgEl("svg", { width: PAD * 2 + D.lanes.length * COL - (COL - W), height: TOP + (maxOrder + 1) * ROW + PAD });
+const defs = svgEl("defs");
+for (const name of ["base", "added", "changed", "removed"]) {
+  const m = svgEl("marker", { id: `arrow-${name}`, viewBox: "0 0 10 10", refX: 10, refY: 5, markerWidth: 8, markerHeight: 8, orient: "auto-start-reverse" });
+  m.append(svgEl("path", { d: "M0,0 L10,5 L0,10 z", class: `m-${name}` }));
+  defs.append(m);
+}
+svg.append(defs);
+D.lanes.forEach((l, i) => {
+  const t = svgEl("text", { x: PAD + i * COL + W / 2, y: 20, "text-anchor": "middle", "font-weight": 600 });
+  t.textContent = l.label;
+  svg.append(t);
+});
+
+function wrap(text, perLine = 15, maxLines = 3) {
+  const chars = [...text];
+  const lines = [];
+  for (let i = 0; i < chars.length && lines.length < maxLines; i += perLine) lines.push(chars.slice(i, i + perLine).join(""));
+  if (chars.length > perLine * maxLines) lines[maxLines - 1] = lines[maxLines - 1].slice(0, -1) + "…";
+  return lines;
+}
+
+function clip(cx, cy, tx, ty) {
+  const dx = tx - cx, dy = ty - cy;
+  if (dx === 0 && dy === 0) return [cx, cy];
+  const s = Math.min(Math.abs((W / 2) / (dx || 1e-9)), Math.abs((H / 2) / (dy || 1e-9)));
+  return [cx + dx * s, cy + dy * s];
+}
+
+const shapes = new Map();
+const edgeLayer = svgEl("g");
+const nodeLayer = svgEl("g");
+svg.append(edgeLayer, nodeLayer);
+
+for (const e of edges) {
+  const a = pos(nodeById.get(e.from)), b = pos(nodeById.get(e.to));
+  const ac = [a.x + W / 2, a.y + H / 2], bc = [b.x + W / 2, b.y + H / 2];
+  const [x1, y1] = clip(ac[0], ac[1], bc[0], bc[1]);
+  const [x2, y2] = clip(bc[0], bc[1], ac[0], ac[1]);
+  const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+  const mx = (x1 + x2) / 2 - ((y2 - y1) / len) * 18, my = (y1 + y2) / 2 + ((x2 - x1) / len) * 18;
+  const d = `M${x1},${y1} Q${mx},${my} ${x2},${y2}`;
+  const g = svgEl("g", { class: `edge ${e.kind}` });
+  const line = svgEl("path", { d, class: "line" });
+  const hit = svgEl("path", { d, class: "hit" });
+  const label = svgEl("text", { x: mx, y: my, "text-anchor": "middle" });
+  label.textContent = e.data;
+  const title = svgEl("title");
+  title.textContent = e.data;
+  g.append(title, line, hit, label);
+  g.addEventListener("click", () => select(e.id));
+  edgeLayer.append(g);
+  shapes.set(e.id, { g, line });
+}
+
+for (const n of D.nodes) {
+  const { x, y } = pos(n);
+  const g = svgEl("g", { class: `node ${n.kind}${n.deepDive ? " deep" : ""}` });
+  const title = svgEl("title");
+  title.textContent = n.label;
+  g.append(title, svgEl("rect", { x, y, width: W, height: H, rx: 6 }));
+  const lines = wrap(n.label);
+  lines.forEach((line, i) => {
+    const t = svgEl("text", { x: x + W / 2, y: y + H / 2 + (i - (lines.length - 1) / 2) * 15 + 4, "text-anchor": "middle" });
+    t.textContent = line;
+    g.append(t);
+  });
+  const c = checkById.get(n.id);
+  if (c && c.status !== "ok") {
+    g.append(svgEl("circle", { cx: x + W, cy: y, r: 9, class: "badge" }));
+    const t = svgEl("text", { x: x + W, y: y + 4, "text-anchor": "middle", class: "badge-text" });
+    t.textContent = "!";
+    g.append(t);
+  }
+  g.addEventListener("click", () => select(n.id));
+  nodeLayer.append(g);
+  shapes.set(n.id, { g });
+}
+document.getElementById("canvas").append(svg);
+
+let current = 0;
+let selected = null;
+function show(i) {
+  current = Math.max(0, Math.min(frames.length - 1, i));
+  const snap = frameStates[current];
+  for (const [id, { g, line }] of shapes) {
+    const { visible, change } = snap.get(id);
+    g.style.display = visible ? "" : "none";
+    g.classList.remove("c-added", "c-changed", "c-removed");
+    if (change) g.classList.add(`c-${change}`);
+    if (line) line.setAttribute("marker-end", `url(#arrow-${change || "base"})`);
+  }
+  document.getElementById("counter").textContent = `${current + 1} / ${frames.length}`;
+  document.getElementById("frame-title").textContent = frames[current].title;
+  document.getElementById("frame-desc").textContent = frames[current].description;
+  document.getElementById("prev").disabled = current === 0;
+  document.getElementById("next").disabled = current === frames.length - 1;
+}
+
+function select(id) {
+  if (selected) shapes.get(selected).g.classList.remove("selected");
+  selected = id;
+  shapes.get(id).g.classList.add("selected");
+  const item = nodeById.get(id) || edges.find(e => e.id === id);
+  const panel = document.getElementById("panel");
+  panel.replaceChildren();
+  const isEdge = !nodeById.has(id);
+  panel.append(el("h2", {}, isEdge ? `${nodeById.get(item.from).label} → ${nodeById.get(item.to).label}` : item.label));
+  if (isEdge) panel.append(el("div", {}, `渡すもの: ${item.data}`));
+  panel.append(el("div", { class: "muted" }, item.kind === "proposed" ? "提案（未実装のため照合対象外）" : "既存"));
+  if (item.deepDive) {
+    panel.append(el("h2", {}, `深掘り: ${CATEGORY[item.deepDive.category] || item.deepDive.category}`));
+    panel.append(el("div", {}, item.deepDive.why));
+  }
+  if (item.ref) {
+    const c = checkById.get(id);
+    const loc = `${item.ref.file}:${item.ref.line}`;
+    panel.append(el("h2", {}, "根拠のコード"));
+    const row = el("div");
+    row.append(el("code", {}, loc), " ");
+    const copy = el("button", { type: "button" }, "コピー");
+    copy.addEventListener("click", () => copyText(loc, copy));
+    row.append(copy);
+    panel.append(row);
+    const extra = c.foundAt ? `（${c.foundAt} 行目で一致）` : "";
+    panel.append(el("div", { class: c.status === "ok" ? "status-ok" : "status-bad" }, STATUS[c.status] + extra));
+    panel.append(el("pre", {}, item.ref.excerpt));
+  } else if (item.kind === "existing" && IS_PLAN) {
+    panel.append(el("div", { class: "muted" }, "参照なし（照合されていない）"));
+  }
+}
+
+async function copyText(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+    button.textContent = "コピーしました";
+  } catch {
+    button.textContent = "コピー失敗: 手動で選択してください";
+  }
+}
+
+document.getElementById("prev").addEventListener("click", () => show(current - 1));
+document.getElementById("next").addEventListener("click", () => show(current + 1));
+document.addEventListener("keydown", ev => {
+  if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement) return;
+  if (ev.key === "ArrowLeft") show(current - 1);
+  if (ev.key === "ArrowRight") show(current + 1);
+});
+
+if (IS_PLAN) {
+  document.getElementById("boundaries-sec").hidden = false;
+  for (const b of D.boundaries || []) document.getElementById("boundaries").append(el("li", {}, `${b.label} — ${b.reason}`));
+  if ((D.boundaries || []).length === 0) document.getElementById("boundaries").append(el("li", { class: "muted" }, "なし"));
+}
+
+const form = document.getElementById("quiz");
+const scoreButton = document.getElementById("score");
+const difficulty = document.getElementById("difficulty");
+if (quiz.length > 0) document.getElementById("quiz-sec").hidden = false;
+quiz.forEach((q, i) => {
+  const fs = el("fieldset");
+  const tag = q.perspective ? ` [${PERSPECTIVE[q.perspective]}]` : "";
+  fs.append(el("legend", {}, `Q${i + 1}${tag} ${q.question}`));
+  if (q.about) {
+    const look = el("button", { type: "button" }, "図で見る");
+    look.addEventListener("click", () => select(q.about));
+    fs.append(look);
+  }
+  // Shuffled because a model writing the quiz tends to put the answer first.
+  const order = q.options.map((_, k) => k);
+  for (let k = order.length - 1; k > 0; k--) {
+    const j = Math.floor(Math.random() * (k + 1));
+    [order[k], order[j]] = [order[j], order[k]];
+  }
+  for (const k of order) {
+    const label = el("label");
+    label.append(el("input", { type: "radio", name: `q${i}`, value: String(k) }), ` ${q.options[k]}`);
+    fs.append(label);
+  }
+  const other = el("label");
+  other.append(el("input", { type: "radio", name: `q${i}`, value: "other" }), " Other（妥当な選択肢がない: 考慮不足を書く） ");
+  other.append(el("input", { type: "text", class: "other-text", "data-q": String(i), maxlength: "300" }));
+  fs.append(other);
+  form.append(fs);
+});
+if (GATED) {
+  difficulty.hidden = false;
+  for (const v of ["易", "適", "難"]) {
+    const label = el("label");
+    label.append(el("input", { type: "radio", name: "difficulty", value: v }), ` ${v} `);
+    difficulty.append(label);
+  }
+}
+
+function collect() {
+  return quiz.map((_, i) => {
+    const picked = form.querySelector(`input[name="q${i}"]:checked`);
+    if (!picked) return null;
+    if (picked.value !== "other") return { choice: Number(picked.value) };
+    const text = form.querySelector(`input[data-q="${i}"]`).value.trim();
+    return text ? { other: text } : null;
+  });
+}
+form.addEventListener("input", () => { scoreButton.disabled = collect().some(a => a === null); });
+
+scoreButton.addEventListener("click", () => {
+  const answers = collect();
+  if (answers.some(a => a === null)) return;
+  const score = scoreQuiz(quiz, answers);
+  const gate = GATED ? gateQuiz(quiz, answers) : null;
+  for (const input of document.querySelectorAll("#quiz input, #difficulty input")) input.disabled = true;
+  scoreButton.disabled = true;
+  const out = document.getElementById("score-out");
+  out.replaceChildren();
+  if (gate) out.append(el("h2", { class: gate.passed ? "right" : "wrong" }, gate.passed ? "合格" : "不合格"));
+  out.append(el("h2", {}, `${score.correct} / ${score.scored} 正解`));
+  quiz.forEach((q, i) => {
+    const a = answers[i];
+    if (typeof a.other === "string") {
+      out.append(el("div", {}, `Q${i + 1} - 考慮不足を指摘: ${a.other}`));
+    } else {
+      const ok = a.choice === q.answer;
+      out.append(el("div", { class: ok ? "right" : "wrong" }, `Q${i + 1} ${ok ? "✓" : "✗"} ${q.question}`));
+    }
+    out.append(el("div", { class: "muted" }, `正解: ${q.options[q.answer]} / 解説: ${q.explanation}`));
+  });
+  if (gate) {
+    const picked = document.querySelector('input[name="difficulty"]:checked');
+    const text = resultBlock(D.slug, quiz, answers, gate, picked ? picked.value : "");
+    out.append(el("h2", {}, "この結果をチャットに貼ってください"));
+    const area = el("textarea", { id: "result", readonly: "" });
+    area.value = text;
+    const copy = el("button", { type: "button" }, "結果をコピー");
+    copy.addEventListener("click", () => { area.select(); copyText(text, copy); });
+    out.append(area, copy);
+  }
+});
+
+show(0);
+</script>
+</body>
+</html>

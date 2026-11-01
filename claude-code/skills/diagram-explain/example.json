@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "slug": "example-url-shortener",
+  "title": "例: URL 短縮サービスを段階的に組み立てる",
+  "summary": "client → API → DB の最小構成から出発し、読み取りの多さ、ID 採番、クリック集計という3つの要求に応えて部品を足していく system design の練習例。",
+  "lanes": [
+    { "id": "client", "label": "クライアント" },
+    { "id": "app", "label": "アプリケーション層" },
+    { "id": "data", "label": "データ層" }
+  ],
+  "nodes": [
+    { "id": "client", "lane": "client", "order": 0, "label": "ブラウザ" },
+    { "id": "api", "lane": "app", "order": 0, "label": "API サーバー: 短縮とリダイレクト" },
+    { "id": "db", "lane": "data", "order": 0, "label": "DB: 短縮コード → 元 URL" },
+    { "id": "cache", "lane": "data", "order": 1, "kind": "proposed", "label": "キャッシュ（Redis など）" },
+    { "id": "idgen", "lane": "app", "order": 1, "kind": "proposed", "label": "ID 生成器: 連番 → base62" },
+    { "id": "queue", "lane": "app", "order": 2, "kind": "proposed", "label": "クリックイベントのキュー" },
+    { "id": "stats", "lane": "data", "order": 2, "kind": "proposed", "label": "集計ストア" }
+  ],
+  "edges": [
+    { "id": "e-client-api", "from": "client", "to": "api", "data": "短縮要求 / 短縮URLへのアクセス" },
+    { "id": "e-api-db", "from": "api", "to": "db", "data": "コードと URL の読み書き" },
+    { "id": "e-api-cache", "from": "api", "to": "cache", "kind": "proposed", "data": "コードで先に引く" },
+    { "id": "e-api-idgen", "from": "api", "to": "idgen", "kind": "proposed", "data": "新しい ID を採番" },
+    { "id": "e-api-queue", "from": "api", "to": "queue", "kind": "proposed", "data": "クリックを記録" },
+    { "id": "e-queue-stats", "from": "queue", "to": "stats", "kind": "proposed", "data": "非同期で集計" }
+  ],
+  "steps": [
+    {
+      "title": "読み取りをキャッシュで受ける",
+      "description": "リダイレクトは書き込みよりずっと多く、人気のコードにアクセスが偏る。API はまずキャッシュを引き、外れたときだけ DB を読む。",
+      "changes": { "cache": "added", "e-api-cache": "added", "e-api-db": "changed" }
+    },
+    {
+      "title": "ID を採番器で作る",
+      "description": "乱数でコードを作ると衝突確認のための DB 往復が要る。連番を base62 にすれば、確認なしで一意で短いコードが得られる。",
+      "changes": { "idgen": "added", "e-api-idgen": "added" }
+    },
+    {
+      "title": "クリック集計を非同期にする",
+      "description": "リダイレクトの応答内で集計を書くと遅くなる。イベントをキューに積み、別の処理が集計ストアへ書く。",
+      "changes": { "queue": "added", "stats": "added", "e-api-queue": "added", "e-queue-stats": "added" }
+    }
+  ],
+  "quiz": [
+    {
+      "about": "cache",
+      "question": "キャッシュを DB の前に置く主な理由はどれか。",
+      "options": [
+        "DB への書き込みを速くするため",
+        "リダイレクトの読み取りが大半で、同じコードへのアクセスが偏るため",
+        "短縮コードを短くするため",
+        "クリック数を正確に数えるため"
+      ],
+      "answer": 1,
+      "explanation": "読み取りが多く偏りがあるほど、キャッシュの当たる率が高く効果が大きい。書き込みの速度や ID の長さとは関係がない。"
+    },
+    {
+      "about": "idgen",
+      "question": "乱数でコードを作る代わりに連番を base62 にする利点はどれか。",
+      "options": [
+        "コードが推測されにくくなる",
+        "衝突の確認のための DB 往復が要らない",
+        "キャッシュの当たる率が上がる",
+        "URL の長さを問わず同じコードになる"
+      ],
+      "answer": 1,
+      "explanation": "連番は定義上一意なので衝突確認が不要。推測されやすい点は欠点で、必要なら別途ずらす。"
+    },
+    {
+      "about": "queue",
+      "question": "クリック集計をリダイレクトの応答内で同期的に書くと、何が起きるか。",
+      "options": [
+        "リダイレクトの遅延が集計ストアの書き込み性能に引きずられる",
+        "キャッシュが使えなくなる",
+        "短縮コードが重複する",
+        "DB の容量が足りなくなる"
+      ],
+      "answer": 0,
+      "explanation": "集計はユーザーの応答に不要な処理なので、キューで切り離して応答時間への影響をなくす。"
+    },
+    {
+      "about": "e-api-cache",
+      "question": "キャッシュに載っているリダイレクト先を後から変更・削除したとき、必要になる対策はどれか。",
+      "options": [
+        "キャッシュのサイズを増やす",
+        "ID 生成器を再起動する",
+        "キャッシュを無効化する（削除や TTL）",
+        "集計を止める"
+      ],
+      "answer": 2,
+      "explanation": "古い値が残ると、変更後も旧 URL へ飛ばしてしまう。更新時の削除や短い TTL で古さを抑える。"
+    }
+  ]
+}
