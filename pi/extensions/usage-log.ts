@@ -111,13 +111,30 @@ export function readMonth(d: Date): UsageRecord[] {
 	return out;
 }
 
-/** Cost logged today and this month (local time), main calls plus nested tool usage. One file read. */
+/** UTC calendar month (`YYYY-MM`), the period Anthropic's API billing resets on. */
+const utcMonth = (d: Date): string => d.toISOString().slice(0, 7);
+
+const inUtcMonth = (r: UsageRecord, month: string): boolean => typeof r.ts === "string" && r.ts.startsWith(month);
+
+/**
+ * Records that can belong to the current UTC month or local day. Files are
+ * bucketed by local month, so the UTC month can span two of them (e.g. the
+ * first hours of a local month east of UTC still belong to the previous UTC
+ * month); the local day always sits in the current file.
+ */
+export function readCurrent(now = new Date()): UsageRecord[] {
+	const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+	return monthFile(start) === monthFile(now) ? readMonth(now) : [...readMonth(start), ...readMonth(now)];
+}
+
+/** Cost logged today (local day) and this month (UTC month), main calls plus nested tool usage. */
 export function costTotals(now = new Date()): { today: number; month: number } {
 	const today = localDate(now);
+	const month = utcMonth(now);
 	const t = { today: 0, month: 0 };
-	for (const r of readMonth(now)) {
+	for (const r of readCurrent(now)) {
 		const c = r.cost.total + r.toolCost;
-		t.month += c;
+		if (inUtcMonth(r, month)) t.month += c;
 		if (localDate(new Date(r.ts)) === today) t.today += c;
 	}
 	return t;
@@ -149,7 +166,7 @@ export function summarize(recs: UsageRecord[], sessionId: string, now = new Date
 	return [
 		line("session", sum(recs.filter((r) => r.sessionId === sessionId))),
 		line("today", sum(todays)),
-		line("month", sum(recs)),
+		line("month UTC", sum(recs.filter((r) => inUtcMonth(r, utcMonth(now))))),
 		...[...byModel].map(([model, rs]) => `  ${model}: $${sum(rs).cost.toFixed(4)} (${rs.length} turns)`),
 		`log: ${monthFile(now)}`,
 	].join("\n");
@@ -177,9 +194,9 @@ export default function usageLog(pi: ExtensionAPI) {
 	pi.registerCommand("usage", {
 		description: "Show token usage and cost for this session, today, and this month",
 		handler: async (_args, ctx) => {
-			// Session totals only count this month's file; a session spanning a
-			// month boundary shows its current-month part.
-			const text = summarize(readMonth(new Date()), ctx.sessionManager.getSessionId());
+			// Session totals only count the files readCurrent loads; a session
+			// older than that shows its recent part.
+			const text = summarize(readCurrent(), ctx.sessionManager.getSessionId());
 			if (ctx.hasUI) ctx.ui.notify(text, "info");
 			else console.log(text);
 		},

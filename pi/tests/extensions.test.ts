@@ -209,3 +209,41 @@ describe("usage-log", () => {
 		expect(readMonth(new Date())).toHaveLength(2);
 	});
 });
+
+describe("usage-log month is the UTC month", () => {
+	let dir: string;
+	const tz = process.env.TZ;
+	beforeAll(() => {
+		dir = mkdtempSync(join(tmpdir(), "pi-usage-utc-test-"));
+		process.env.PI_USAGE_LOG_DIR = dir;
+		process.env.TZ = "Asia/Tokyo";
+	});
+	afterAll(() => {
+		delete process.env.PI_USAGE_LOG_DIR;
+		if (tz === undefined) delete process.env.TZ;
+		else process.env.TZ = tz;
+		rmSync(dir, { recursive: true, force: true });
+	});
+
+	const rec = (ts: string, total: number) => JSON.stringify({ ts, cost: { total }, toolCost: 0 });
+
+	test("spans two local-month files and keeps today local", () => {
+		// Files are named by JST month; UTC October ends at 2026-11-01 09:00 JST.
+		writeFileSync(
+			join(dir, "2026-10.jsonl"),
+			`${rec("2026-09-30T14:00:00.000Z", 1)}\n${rec("2026-10-15T00:00:00.000Z", 2)}\n`,
+		);
+		writeFileSync(join(dir, "2026-11.jsonl"), `${rec("2026-10-31T15:30:00.000Z", 4)}\n`);
+
+		// 2026-11-01 00:40 JST: local month is November, UTC month is still October.
+		const t = costTotals(new Date("2026-10-31T15:40:00.000Z"));
+		expect(t.month).toBe(6);
+		expect(t.today).toBe(4);
+
+		writeFileSync(join(dir, "2026-11.jsonl"), `${rec("2026-10-31T15:30:00.000Z", 4)}\n${rec("2026-11-01T01:00:00.000Z", 8)}\n`);
+		// 2026-11-01 10:10 JST: both months are November.
+		const u = costTotals(new Date("2026-11-01T01:10:00.000Z"));
+		expect(u.month).toBe(8);
+		expect(u.today).toBe(12);
+	});
+});
