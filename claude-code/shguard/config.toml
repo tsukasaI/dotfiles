@@ -1,39 +1,10 @@
-# shguard 0.11 user policy for this machine.
-#
-# Deployed to ~/.config/shguard/config.toml (shguard's default lookup path)
-# by a setup.sh symlink, so it stays versioned and CI-testable. Merged with
-# shguard's embedded catalog (catalog/*.toml in the shguard repository).
-#
-# How shguard decides: Allow needs every simple command covered by a catalog
-# row, with no rule hit. Anything without a row is Ask, and a [[rule]] can
-# only target a key some row covers. Allow is a claim about what shguard
-# read, not that a command is safe (shguard README, promises P1-P3).
-#
-# Migration from the 0.9 config (docs/shguard-migration-deltas.md, section 27):
-# - Every 0.9 [[deny]] on a command without a 0.10 row (sudo, curl, ssh,
-#   interpreters, find, most git/gh subcommands, ...) is now an Ask, which
-#   ask_outcome below turns into a deny. They are not rewritten here; a rule
-#   on them would be a load error (no row can match its key).
-# - Rules below restore the 0.9 denies on commands the embedded catalog
-#   allows. 0.10 rules carry no reason text: the id is the reason.
-
-# Every Ask is refused: an unresolved Ask stalls an autonomous session, and
-# Ask is not a reliable control under bypassPermissions.
+# Not "ask": an unresolved Ask stalls an autonomous session, and Ask is not a
+# reliable control under bypassPermissions.
 ask_outcome = "deny"
 
-# =====================================================================
-# Rows: commands the embedded catalog does not cover. Each widens Allow.
-# =====================================================================
-
-# The filter is jq's own language: it cannot write files or run programs,
-# and reads other files only through `import`/`include` from the default
-# module path (~/.jq; -L is left out), so it is inert; the rest are input
-# files. User-owned risk: `jq -n env` /
-# `$ENV` prints the environment, which can hold API keys. Left out:
-# -f/--from-file, -L/--library-path, --slurpfile/--rawfile (read files
-# into variables), --arg/--argjson (two values each, which the grammar
-# cannot express), --args/--jsonargs (turn the rest into values), --seq,
-# --stream*.
+# Left out: -f/--from-file, -L/--library-path, --slurpfile/--rawfile (read
+# other files), --arg/--argjson (two values each, which the grammar cannot
+# express), --args/--jsonargs, --seq, --stream*.
 [[row]]
 key = ["jq"]
 source = "https://jqlang.org/manual/v1.8/#invoking-jq"
@@ -84,18 +55,20 @@ long = "unbuffered"
 short = "e"
 long = "exit-status"
 
-# ---------------------------------------------------------------------
-# git/gh write operations. The policy is "allow what reflog or GitHub can
-# undo, block what loses data for good": each row lists the safe options,
-# an option that discards work is listed too so a named [[rule]] below
-# blocks it (the id is the reason), and anything unlisted stays an Ask.
-# Not given rows on purpose: `git checkout` (a branch and `-- path`, which
-# discards edits, share one operand slot), `git restore` (a row cannot
-# require --staged; unstage with `git reset -- <path>`), `git clean`,
-# `git rm`, `git gc`, `git reflog`, `git update-ref`, `git filter-branch`.
-# `git branch` keeps the embedded listing-only row (a second row with the
-# same key is a load error), so branches are made with `git switch -c`.
-# ---------------------------------------------------------------------
+# No operand and no option: `shguard init` writes a config and `shguard check`
+# reads arbitrary files.
+[[row]]
+key = ["shguard"]
+source = "https://github.com/tsukasaI/shguard#readme"
+order = "strict"
+dashdash = "literal"
+
+# No rows on purpose: `git checkout` (a branch and `-- path`, which discards
+# edits, share one operand slot), `git restore` (a row cannot require
+# --staged; unstage with `git reset -- <path>`), `git clean`, `git rm`,
+# `git gc`, `git reflog`, `git update-ref`, `git filter-branch`. `git branch`
+# keeps the embedded listing-only row (a second row with the same key is a
+# load error), so branches are made with `git switch -c`.
 
 [[row]]
 key = ["git", "reset"]
@@ -191,9 +164,6 @@ opt = [
   { short = "s", long = "signoff" },
 ]
 
-# drop and clear are allowed (owner decision): stash entries are scratch
-# state. A stash ref with braces must be quoted ('stash@{1}') or given as
-# its index (`git stash pop 1`).
 [[row]]
 key = ["git", "stash", "push"]
 source = "https://git-scm.com/docs/git-stash"
@@ -225,7 +195,7 @@ cwd_sensitive = true
 order = "permute"
 dashdash = "ends"
 
-# --rebase takes no value here: --rebase=interactive waits for an editor.
+# --rebase takes no value: --rebase=interactive waits for an editor.
 [[row]]
 key = ["git", "pull"]
 source = "https://git-scm.com/docs/git-pull"
@@ -318,9 +288,8 @@ dashdash = "ends"
 rest = "path"
 opt = [{ short = "n", long = "dry-run" }, { short = "v", long = "verbose" }, { short = "k" }]
 
-# ---- gh writes ----
-# Every body file is a path word so dotfiles-gh-upload-path sees it. Left
-# out everywhere: -w/--web (opens a browser), --attach (uploads files),
+# Body files take "path", not "inert", so dotfiles-gh-upload-path sees them.
+# Left out everywhere: -w/--web (opens a browser), --attach (uploads files),
 # -e/--editor (waits for an editor).
 
 [[row]]
@@ -391,8 +360,7 @@ dashdash = "ends"
 positionals = ["path"]
 opt = [{ long = "undo" }]
 
-# -d deletes the head branch; GitHub keeps a "Restore branch" button on
-# the closed PR.
+# -d is not blocked: GitHub keeps a "Restore branch" button on the closed PR.
 [[row]]
 key = ["gh", "pr", "close"]
 source = "https://cli.github.com/manual/gh_pr_close"
@@ -427,8 +395,6 @@ opt = [
   { short = "f", long = "force" },
 ]
 
-# Merging is allowed (owner decision): review-gate in CLAUDE.md decides
-# when. A merge can be reverted; --admin bypasses branch protection.
 [[row]]
 key = ["gh", "pr", "merge"]
 source = "https://cli.github.com/manual/gh_pr_merge"
@@ -563,19 +529,13 @@ opt = [
   { short = "i", long = "interval", value = { takes = "inert" } },
 ]
 
-# =====================================================================
-# Rules: 0.9 denies on commands the embedded catalog covers.
-# =====================================================================
-
-# 0.9 dotfiles-file-rm: every rm is refused, not only the catalog's
-# dangerous targets.
 [[rule]]
 id = "dotfiles-file-rm"
 key = ["rm"]
 outcome = "block"
 
-# 0.9 dotfiles-git-push-url-target: the catalog asks URL and absolute-path
-# remotes but allows the scp form (`git@host:path`) and `.`.
+# Not URL prefixes too: the catalog already asks URL and absolute-path
+# remotes, and misses only the scp form (`git@host:path`) and `.`.
 [[rule]]
 id = "dotfiles-git-push-url-target"
 key = ["git", "push"]
@@ -585,22 +545,17 @@ targets = [
 ]
 outcome = "block"
 
-# 0.9 dotfiles-rename-protected-ancestor-cp: the catalog blocks cp onto or
-# out of .git and .claude, not claude-code (relative paths only; absolute
-# and `~` paths are already asked by cp-ask-nonlocal-target).
+# Not .git or .claude: the catalog already blocks cp onto or out of them.
 [[rule]]
 id = "dotfiles-rename-protected-ancestor-cp"
 key = ["cp"]
 targets = [{ pat = "claude-code", kind = "under" }]
 outcome = "block"
 
-# 0.9 dotfiles-secret-read-*: the catalog asks `~/...` credential paths and
-# `.env`, but has no HOME, so the absolute spelling of the same paths, and
-# the bare names the 0.9 rules listed, are allowed. The kernel folds ASCII
-# case. Not expressible: a basename at any depth (`sub/.env`, `*.pem`).
-# rg and grep take the pattern as a path word, so the bare names would also
-# hit `rg id_rsa`: they get the absolute targets only (rg already asks every
-# /Users path through rg-ask-broad, so it gets no rule).
+# The catalog asks `~/...` credential paths but has no HOME, so the absolute
+# spelling needs its own targets. grep gets no bare names (the pattern is a
+# path word, so `grep id_rsa` would hit), and rg gets no rule (rg-ask-broad
+# already asks every /Users path).
 [[rule]]
 id = "dotfiles-secret-read-cat"
 key = ["cat"]
@@ -833,9 +788,6 @@ targets = [
   { pat = ".docker/config.json", kind = "exact" },
   { pat = ".config/gcloud", kind = "under" },
 ]
-# =====================================================================
-# Rules: git/gh operations that lose work for good.
-# =====================================================================
 
 [[rule]]
 id = "dotfiles-git-reset-discard-worktree"
@@ -867,8 +819,6 @@ key = ["gh", "pr", "merge"]
 opts = [["--admin"]]
 outcome = "block"
 
-# Same as dotfiles-git-push-url-target: a URL or scp-form remote pulls
-# code from a host the repository's remotes may not name.
 [[rule]]
 id = "dotfiles-git-fetch-url-remote"
 key = ["git", "fetch"]
@@ -897,8 +847,6 @@ targets = [
 ]
 outcome = "block"
 
-# Same as dotfiles-rename-protected-ancestor-cp: renaming a protected
-# directory away defeats path-literal protection.
 [[rule]]
 id = "dotfiles-rename-protected-ancestor-git-mv"
 key = ["git", "mv"]
@@ -909,12 +857,9 @@ targets = [
 ]
 outcome = "block"
 
-# gh runs outside the Bash sandbox (sandbox.excludedCommands), so a
-# --body-file is uploaded with no read restriction. A rule cannot say "only
-# under /private/tmp", so every other root entry is listed; a new root
-# directory needs root on macOS (sealed system volume). The `/.vol`,
-# `/.resolve` and `/.nofollow` entries are aliases that reach any file. Not
-# expressible: a basename at any depth (`sub/.env`).
+# Not an allowlist of /private/tmp: a rule cannot say "only under", so every
+# other root entry is listed (a new root directory needs root on macOS).
+# /.vol, /.resolve, /.nofollow and /.file are aliases that reach any file.
 [[rule]]
 id = "dotfiles-gh-upload-path"
 key = ["gh"]

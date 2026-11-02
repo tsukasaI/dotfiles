@@ -397,6 +397,9 @@ case_ "gh run rerun --failed"            'gh run rerun 123 --failed'           a
 case_ "gh api -F field"                  'gh api repos/x/y/issues -F title=t'  deny "a field switches gh api to POST"
 case_ "gh api --input"                   'gh api repos/x/y --input body.json'  deny "the row lists no --input"
 case_ "gh api --hostname"                'gh api --hostname evil.example repos/x/y' deny "the row lists no --hostname"
+case_ "shguard synthetic payload"        "echo '{\"tool_input\":{\"command\":\"rm -rf foo\"}}' | shguard" allow "the shguard row: stdin only"
+case_ "shguard init"                     'shguard init'                        deny "the shguard row takes no operand (init writes a config)"
+case_ "shguard check"                    'shguard check x.toml'                deny "the shguard row takes no operand"
 case_ "jq filter on a file"              "jq -r '.name' package.json"          allow
 case_ "jq in a pipeline"                 'cat package.json | jq .name'         allow
 case_ "jq -f"                            'jq -f prog.jq x.json'                deny

@@ -51,11 +51,18 @@ narrow first, widen only on evidence.
    rule also hits a search pattern that is a path word (`rg id_rsa`).
 
 4. **Present the diff, don't try to apply it.** `config.toml` refuses
-   Claude's own Edit/Write. Show the exact before/after and let the user
-   apply it (a manual edit, confirmed with them first).
+   Claude's own Edit/Write. Write the candidate to the scratchpad and show
+   the exact before/after. Claude cannot test a candidate itself: shguard
+   refuses the `SHGUARD_CONFIG=` assignment and has no row for `bash`, so
+   ask the user to run
+   `SHGUARD_CONFIG=<absolute candidate path> tests/shguard-parity-check.sh`
+   (with the new cases added), then apply it by hand once it passes.
 
-5. **Run the test matrix** with the synthetic-payload one-liner (safe:
-   stdin/stdout only, no real command executes):
+5. **Run the test matrix** against the live config, after the user applied
+   the change, with the synthetic-payload one-liner (safe: stdin/stdout
+   only, no real command executes; the `shguard` row takes no argument, so
+   only this stdin form is allowed). Never probe a command you expect to
+   be denied by running it through the hook: if the rule is wrong, it runs.
    ```
    echo '{"tool_input":{"command":"<CMD>"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard
    ```
@@ -79,7 +86,9 @@ narrow first, widen only on evidence.
    echo '{"tool_input":{"command":"cat foo/.env.local"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard  # deny (basename targets since 0.11; tsukasaI/shguard#1113)
    ```
 
-6. **Run the full regression suite** before considering the change done:
+6. **Run the full regression suite** before considering the change done.
+   Claude cannot start it (no row for `bash` or a script path); it runs on
+   pre-push through lefthook, or the user runs it:
    ```
    tests/shguard-parity-check.sh
    ```
@@ -134,9 +143,9 @@ tests, don't relitigate a fixed case) still applies.
 ## Re-verify (run before trusting this file, and before/after any edit)
 
 ```
-tests/shguard-parity-check.sh
 echo '{"tool_input":{"command":"rm -rf foo"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard
 ```
-If the parity suite fails, or the `rm` case doesn't deny, stop, the
+The parity suite (`tests/shguard-parity-check.sh`) is the user's or
+pre-push's to run (step 6). If it fails, or the `rm` case doesn't deny, stop, the
 guardrail itself is broken and every subsequent Bash call in the session is
 affected.
