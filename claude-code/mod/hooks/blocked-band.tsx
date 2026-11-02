@@ -11,12 +11,14 @@ const REVIEW_LABEL = {
   clear: 'no critical/high',
 } as const
 
-// shguard's deny wording, both rule hits and unresolved-argument floors.
-const SHGUARD_DENY = /matches (?:blocklist )?rule "|could not be resolved to Allow|ask_outcome = "deny"/
-const RULE = /rule "([^"]+)"/
-// Rules that only steer toward a gitignore-aware tool (find → fd);
-// nothing unsafe is being stopped, so the model just switches tools.
-const TOOL_POLICY = /^dotfiles-tool-policy-/
+// shguard 0.10's deny wording: a Block rule hit, an Ask refused by
+// ask_outcome = "deny", a config that failed to load, a crash.
+const SHGUARD_DENY =
+  /rule `[^`]+` hit \(item |\(ask_outcome = deny\)|shguard cannot load its config or catalog|shguard: internal error/
+const RULE = /rule `([^`]+)` hit/
+// find can have no shguard row, so it is refused as unknown; nothing unsafe
+// is being stopped and the Glob tool does the job.
+const FIND = /^\s*find(?:\s|$)/
 
 const NOTE =
   'dotfiles-mod: do not route around the block with an equivalent shell command (`unlink` for ' +
@@ -24,9 +26,9 @@ const NOTE =
   'it; otherwise stop and let the user run it. When you stop, repeat the blocked command verbatim ' +
   'in a fenced bash code block in your reply: the user copies it from there with /copy.'
 
-const TOOL_POLICY_NOTE =
-  'dotfiles-mod: this is a tool-preference rule, not a safety block. Retry right away with ' +
-  'the tool the reason names (fd or the Glob tool for find).'
+const FIND_NOTE =
+  'dotfiles-mod: shguard refuses find because it cannot check its options, not because this ' +
+  'search is unsafe. Retry right away with the Glob tool (fd is refused too).'
 
 export function parseShguardDeny(text: string | undefined): { rule: string } | undefined {
   if (text === undefined || !SHGUARD_DENY.test(text)) return undefined
@@ -39,7 +41,7 @@ export function registerDenyNote(on: On): void {
     if (ran.isError !== true) return ran
     const hit = parseShguardDeny(ran.text)
     if (hit === undefined) return ran
-    const note = TOOL_POLICY.test(hit.rule) ? TOOL_POLICY_NOTE : NOTE
+    const note = FIND.test(e.command) ? FIND_NOTE : NOTE
     return { ...ran, context: [...(ran.context ?? []), note] }
   })
 }

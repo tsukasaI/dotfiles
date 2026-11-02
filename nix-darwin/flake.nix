@@ -15,12 +15,15 @@
     fini.inputs.nixpkgs.follows = "nixpkgs";
     herdr.url = "github:ogulcancelik/herdr";
     herdr.inputs.nixpkgs.follows = "nixpkgs";
-    shguard.url = "github:tsukasaI/shguard";
-    shguard.inputs.nixpkgs.follows = "nixpkgs";
+    # Source only, pinned to the release tag: ./shguard.nix builds it, since
+    # shguard's flake has no package output yet (tsukasaI/shguard#1114).
+    shguard.url = "github:tsukasaI/shguard/v0.11.1";
+    shguard.flake = false;
   };
 
-  outputs = { nix-darwin, ewc, fini, herdr, shguard, ... }:
+  outputs = { nixpkgs, nix-darwin, ewc, fini, herdr, shguard, ... }:
   let
+    shguardFor = pkgs: pkgs.callPackage ./shguard.nix { src = shguard; };
     # One function per host (#14): adding a second machine is one more mkHost
     # call under darwinConfigurations, not a copy of the configuration block.
     mkHost = { primaryUser, system }:
@@ -86,7 +89,7 @@
             popd
           '';
         }))
-        shguard.packages.${system}.default
+        (shguardFor pkgs)
       ] ++ (with pkgs; [
         # Modern CLI replacements
         bat
@@ -281,6 +284,11 @@
     };
   in
   {
+    # CI's parity job builds the same derivation on Linux from this lock.
+    packages = nixpkgs.lib.genAttrs [ "aarch64-darwin" "x86_64-linux" ] (system: {
+      shguard = shguardFor nixpkgs.legacyPackages.${system};
+    });
+
     darwinConfigurations."Ino-macbook-air" = mkHost {
       primaryUser = "inouetsukasa";
       system = "aarch64-darwin";

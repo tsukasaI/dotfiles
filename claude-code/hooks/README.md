@@ -8,7 +8,7 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 
 | Script | Matcher | Description |
 |---|---|---|
-| (inline) `shguard` | `Bash` | Deny dangerous shell commands per `claude-code/shguard/config.toml`. `SHGUARD_STRICT_CONFIG=1` (set in `settings.json`'s top-level `env`) makes a missing/malformed config deny instead of ask; see `docs/shguard-migration-deltas.md` |
+| (inline) `shguard` | `Bash` | Deny dangerous shell commands per `claude-code/shguard/config.toml`. Runs as `/run/current-system/sw/bin/shguard` with `args: []` and `onFailure: "block"` (a crash or timeout refuses the call); a config that fails to load denies every call; see `docs/shguard-migration-deltas.md` |
 | `block-config-edit.sh` | `Edit\|Write` | Block edits to linter/formatter config files (and `pyproject.toml` with a `[tool.ruff]` section), package-manager lockfiles, and the guardrail files themselves (this hook, `claude-code/{hooks,lib}/`, the mod's guard modules, shguard `config.toml`, `settings.json`, lefthook config in any project). Basenames match case-insensitively and a symlinked path is also checked by its resolved target. Requires an absolute, normalized `file_path`; anything else fails closed. |
 | `slop-guard.ts` | `Edit\|Write` | Deny prose edits (`.md`/`.mdx`/`.txt`) that newly introduce an em dash or a cliché phrase from `slop-phrases.conf`; only the net-new count vs. the pre-edit text is checked, never the whole file. `SLOP_GUARD_DISABLE=1` disables it. |
 | `agent-browser-guard.ts` | `mcp__agent-browser__.*` | Fail-closed argument guard for the unsandboxed agent-browser MCP: tool allowlist, forbidden launch/state keys, `path`/`output`/`baseline` confined to `/private/tmp/claude-501/`, http(s)/about:blank URLs only. |
@@ -57,7 +57,8 @@ guardrails stay here as settings hooks.
   shguard still decides.
 - **shguard deny note**: when shguard denies a Bash call, the model is told
   not to route around it and to repeat the command in a fenced block so the
-  user can `/copy` it (a tool-policy deny instead says to retry with fd/Glob).
+  user can `/copy` it (a refused `find` instead gets a note pointing at the
+  Glob tool).
 - **Rule guards**: deny an Agent call without `model:` (unless the agent
   definition pins one, or it is a fork); deny `git commit` on main/master
   outside `tsukasaI/dotfiles`/`ops`, and a `-m` message that isn't

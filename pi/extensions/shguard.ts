@@ -1,10 +1,15 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { canonicalize } from "../../claude-code/mod/hooks/shell-canon.ts";
 
 export type Verdict = { allow: true } | { allow: false; reason: string };
 
-/** Interprets `shguard check --json` output; anything but a well-formed Allow is a block. */
+/** The Claude Code PreToolUse input shguard reads on stdin (hook mode). */
+export function hookPayload(command: string): string {
+	return JSON.stringify({ tool_name: "Bash", tool_input: { command }, hook_event_name: "PreToolUse" });
+}
+
+/** Interprets shguard's hook output; anything but a well-formed allow is a block (Ask included: pi cannot answer one). */
 export function parseVerdict(stdout: string): Verdict {
 	let d: any;
 	try {
@@ -12,27 +17,36 @@ export function parseVerdict(stdout: string): Verdict {
 	} catch {
 		return { allow: false, reason: "shguard returned unparseable output" };
 	}
-	if (d?.decision === "Allow") return { allow: true };
-	const detail = [d?.deny_message, d?.reason].filter((s) => typeof s === "string" && s).join(" / ");
-	return { allow: false, reason: `shguard: ${d?.decision ?? "no decision"}${detail ? ` (${detail})` : ""}` };
+	const out = d?.hookSpecificOutput;
+	const decision = out?.permissionDecision;
+	if (decision === "allow") return { allow: true };
+	const reason = typeof out?.permissionDecisionReason === "string" ? out.permissionDecisionReason : "";
+	return { allow: false, reason: `shguard: ${typeof decision === "string" ? decision : "no decision"}${reason ? ` (${reason})` : ""}` };
 }
 
-export type Runner = (command: string) => Promise<{ stdout: string; error?: Error }>;
+export type Runner = (stdin: string) => Promise<{ stdout: string; error?: Error }>;
 
-// shguard exits 1 on Block while still printing the JSON verdict, so the exit
-// code alone says nothing; stdout is parsed either way.
-const runShguard: Runner = (command) =>
+// Hook mode: the payload goes in on stdin and the answer comes back on
+// stdout with exit 0; exit 2 means it could not write one. stdout is parsed
+// either way, and empty stdout blocks.
+const runShguard: Runner = (stdin) =>
 	new Promise((resolve) => {
-		execFile(
-			"shguard",
-			["check", command, "--json"],
-			{ timeout: 10_000, env: { ...process.env, SHGUARD_STRICT_CONFIG: "1" } },
-			(error, stdout) => resolve({ stdout: String(stdout ?? ""), error: error ?? undefined }),
-		);
+		const child = spawn("shguard", [], { stdio: ["pipe", "pipe", "ignore"], timeout: 10_000 });
+		let stdout = "";
+		let error: Error | undefined;
+		child.stdout.setEncoding("utf8");
+		child.stdout.on("data", (s: string) => (stdout += s));
+		child.on("error", (e) => (error = e));
+		child.on("close", (code, signal) => {
+			if (!error && code !== 0) error = new Error(signal ? `killed by ${signal}` : `exit ${code}`);
+			resolve({ stdout, error });
+		});
+		child.stdin.on("error", (e) => (error ??= e));
+		child.stdin.end(stdin);
 	});
 
 export async function checkCommand(command: string, run: Runner = runShguard): Promise<Verdict> {
-	const { stdout, error } = await run(command);
+	const { stdout, error } = await run(hookPayload(command));
 	if (!stdout.trim()) return { allow: false, reason: `shguard did not run: ${error?.message ?? "no output"}` };
 	return parseVerdict(stdout);
 }

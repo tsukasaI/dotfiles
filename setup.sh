@@ -44,10 +44,9 @@ link_with_backup "$DOTFILES/git/gitconfig" ~/.gitconfig
 mkdir -p ~/.config/git
 link_with_backup "$DOTFILES/git/ignore" ~/.config/git/ignore
 link_with_backup "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
-# shguard's own default config lookup path. The settings.json PreToolUse
-# hook runs bare `shguard` (no SHGUARD_CONFIG env - settings.json env values
-# aren't shell-expanded, so a $HOME-based path there is passed to shguard
-# literally unexpanded), relying on this symlink instead.
+# shguard's own default config lookup path (it does not read XDG_CONFIG_HOME).
+# The settings.json PreToolUse hook runs `shguard` without SHGUARD_CONFIG,
+# relying on this symlink instead.
 mkdir -p ~/.config/shguard
 link_with_backup "$DOTFILES/claude-code/shguard/config.toml" ~/.config/shguard/config.toml
 

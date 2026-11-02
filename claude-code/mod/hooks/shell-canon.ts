@@ -53,9 +53,9 @@ export function canonicalize(command: string, vars: CanonVars): string {
 
 let cachedVars: CanonVars | undefined
 
-// The Bash sandbox's TMPDIR, not this process's: shguard matches the
-// scratchpad prefix literally as /private/tmp/claude-<uid>/, so the host's
-// /var/folders/... value would still be denied.
+// The Bash sandbox's TMPDIR, not this process's: the sandboxed command runs
+// with /private/tmp/claude-<uid>, so the host's /var/folders/... value would
+// name a different directory.
 async function resolveVars($: EngineInterface): Promise<CanonVars> {
   if (cachedVars !== undefined) return cachedVars
   const found: CanonVars = {}
@@ -66,7 +66,7 @@ async function resolveVars($: EngineInterface): Promise<CanonVars> {
     const tmp = `/private/tmp/claude-${stdout.trim()}`
     if (exitCode === 0 && (await $.fs.exists(tmp))) found.TMPDIR = tmp
   } catch {
-    // No TMPDIR rewrite; shguard keeps denying $TMPDIR as before.
+    // No TMPDIR rewrite; $TMPDIR stays unresolved and shguard refuses it.
   }
   cachedVars = found
   return found

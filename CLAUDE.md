@@ -107,13 +107,20 @@ There is no staging or deploy step (hooks apply on the next tool call,
   the sandbox is a different mechanism. shguard denies the direct calls; a
   script file calling `security` is not caught.
 - **shguard is the PreToolUse Bash enforcer.** `claude-code/settings.json`
-  calls the `shguard` binary directly (`shguard || exit 2`, so a PATH-miss or
-  crash blocks; `SHGUARD_STRICT_CONFIG=1` so a missing/malformed config
-  denies instead of asking) against `claude-code/shguard/config.toml`, with
-  no separate wrapper script. `config.toml`
-  is Claude-edit-blocked like the other guard files. `ask` verdicts are not
-  a reliable control once a session runs under `bypassPermissions` mode
-  (see that doc's "Cutover caveat" section); re-audit before switching.
+  runs `/run/current-system/sw/bin/shguard` (installed by nix-darwin, built
+  from source by `nix-darwin/shguard.nix`) with `args: []` (no shell) and
+  `onFailure: "block"`, so a crash, timeout, or exit status other than 0/2
+  refuses the call (needs Claude Code 2.1.295+). It reads
+  `claude-code/shguard/config.toml`, with no separate wrapper script. In
+  0.10 a config that fails to load (malformed TOML, unknown key, a 0.9-format
+  file) denies every Bash call; that is built in, not an env setting.
+  Allow needs the whole command parsed and every simple command covered by a
+  catalog row, with no rule hit; everything else is Ask, and
+  `ask_outcome = "deny"` turns each Ask into deny. Allow is not a claim that
+  a command is safe. `config.toml` is Claude-edit-blocked like the other
+  guard files. `ask` verdicts are not a reliable control once a session runs
+  under `bypassPermissions` mode (see that doc's "Cutover caveat" section);
+  re-audit before switching.
 - **flake.nix specifics**: the unfree allowlist contains only `terraform`
   (any other unfree package fails eval until added). Homebrew
   `cleanup = "zap"` uninstalls anything not declared in the flake;

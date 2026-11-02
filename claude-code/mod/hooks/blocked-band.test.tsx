@@ -19,18 +19,25 @@ function stubEngine(on: On): void {
 }
 
 test('parseShguardDeny recognizes shguard wording only', async () => {
-  expect(parseShguardDeny('matches blocklist rule "dotfiles-file-rm": rm deletes')).toEqual({ rule: 'dotfiles-file-rm' })
-  expect(parseShguardDeny('command matches rule "dotfiles-code-rg-pre", but ... ask_outcome = "deny"')).toEqual({
-    rule: 'dotfiles-code-rg-pre',
+  expect(parseShguardDeny('rule `dotfiles-file-rm` hit (item 0, link 0, cmd 0)')).toEqual({ rule: 'dotfiles-file-rm' })
+  expect(parseShguardDeny('rule `git-push-delete-refspec` hit (item 0, link 0, cmd 0) (ask_outcome = deny)')).toEqual({
+    rule: 'git-push-delete-refspec',
   })
-  expect(parseShguardDeny('an argument ... could not be resolved to Allow; ask_outcome = "deny"')).toEqual({ rule: '' })
+  expect(
+    parseShguardDeny('no catalog row matches the command (item 0, link 0, cmd 0, word 0) (ask_outcome = deny)'),
+  ).toEqual({ rule: '' })
+  expect(parseShguardDeny('shguard cannot load its config or catalog: /x/config.toml: invalid TOML or schema')).toEqual({
+    rule: '',
+  })
+  expect(parseShguardDeny('shguard: internal error')).toEqual({ rule: '' })
+  expect(parseShguardDeny('matches blocklist rule "dotfiles-file-rm": rm deletes')).toBeUndefined()
   expect(parseShguardDeny('Exit code 1\nls: no such file')).toBeUndefined()
   expect(parseShguardDeny(undefined)).toBeUndefined()
 })
 
 test('a shguard deny tells the model to stop and repeat the command for /copy', async ($, on) => {
   stubEngine(on)
-  on('classic.PreToolUse', () => ({ deny: 'matches blocklist rule "dotfiles-file-rm": no' }))
+  on('classic.PreToolUse', () => ({ deny: 'rule `dotfiles-file-rm` hit (item 0, link 0, cmd 0)' }))
   const ran = await $.tool.call({ tool: 'Bash', command: 'rm -rf build' })
   expect(ran.isError).toBe(true)
   expect(ran.context?.some(c => c.includes('do not route around'))).toBe(true)
@@ -43,9 +50,11 @@ test('a shguard deny tells the model to stop and repeat the command for /copy', 
   }
 })
 
-test('a tool-policy deny points at the replacement tool', async ($, on) => {
+test('a find deny points at the Glob tool', async ($, on) => {
   stubEngine(on)
-  on('classic.PreToolUse', () => ({ deny: 'matches blocklist rule "dotfiles-tool-policy-find": use fd' }))
+  on('classic.PreToolUse', () => ({
+    deny: 'no catalog row matches the command (item 0, link 0, cmd 0, word 0) (ask_outcome = deny)',
+  }))
   const ran = await $.tool.call({ tool: 'Bash', command: 'find . -name x' })
   expect(ran.isError).toBe(true)
   expect(ran.context?.some(c => c.includes('Retry right away'))).toBe(true)

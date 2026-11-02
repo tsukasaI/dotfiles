@@ -29,8 +29,9 @@ pre-push:
       glob: "claude-code/mod/**"
       run: claude plugin test claude-code/mod
     shguard-parity-check-ci-home:
-      # Not redundant with shguard-parity-check: HOME-relative rules (~/.ssh/)
-      # can pass under the local HOME and fail under CI's HOME=/home/runner.
+      # shguard 0.10 rules never expand ~ against HOME (the kernel has no HOME
+      # input), so this guards against a HOME-dependent regression: a case
+      # that passes under the local HOME but not under CI's HOME=/home/runner.
       run: HOME=/nonexistent-ci-home bash tests/shguard-parity-check.sh
     pi-test:
       glob: "pi/**"

@@ -116,7 +116,7 @@ case_ "cat aws credentials"              'cat ~/.aws/credentials'              d
 case_ "cat kubeconfig"                   'cat ~/.kube/config'                  deny
 case_ "bat npmrc"                        'bat ~/.npmrc'                        deny
 case_ "cat .env"                         'cat .env'                            deny
-case_ "cat .env.local nested (#427)"     'cat foo/.env.local'                  allow "known gap: 0.10 targets have no basename match (shguard#1113)"
+case_ "cat .env.local nested (#427)"     'cat foo/.env.local'                  deny "0.11 targets match a basename at any depth (shguard#1113)"
 case_ "cat README"                       'cat README.md'                       allow
 case_ "cat abs ssh key"                  'cat /Users/inouetsukasa/.ssh/id_rsa' deny
 case_ "cat abs ssh key, case-folded"     'cat /USERS/INOUETSUKASA/.SSH/id_rsa' deny "the kernel folds ASCII case"
@@ -131,7 +131,7 @@ case_ "jq docker config"                 'jq . .docker/config.json'            d
 case_ "head tilde npmrc, case-folded"    'head ~/.NPMRC'                       deny
 # rg and grep take the pattern as a path word, so they get absolute
 # targets only: searching FOR a secret's name stays allowed.
-case_ "rg for the word id_rsa"           'rg id_rsa'                           allow
+case_ "rg for the word id_rsa"           'rg id_rsa'                           deny "accepted false positive: rg's pattern is a path word, so the 0.11 basename target sees it"
 case_ "grep for the word kubeconfig"     'grep -n kubeconfig README.md'        allow
 
 # ── false positives stay fixed ───────────────────────────────────────────────
@@ -141,7 +141,7 @@ case_ "commit msg with secret"           'git commit -m "fix secret handling"' a
 case_ "commit msg with gh api DELETE"    'git commit -m "block gh api -X DELETE in hook"' allow
 case_ "rg quoted secret"                 "rg 'secret' src/"                    allow
 case_ "echo quoted bash"                 "echo 'bash is fun'"                  allow
-case_ "fd -e sh"                         'fd -e sh'                            deny "fd cannot have a row in 0.10 (shguard#1111)"
+case_ "fd -e sh"                         'fd -e sh'                            allow "0.11 embeds an fd row (shguard#1111)"
 case_ "rg -t sh"                         'rg -t sh foo'                        allow
 case_ "double-quoted apostrophe"         'echo "don'\''t panic"'               allow
 case_ "force-with-lease"                 'git push --force-with-lease origin main' deny "embedded git-push-force-with-lease is an Ask"
@@ -188,7 +188,7 @@ case_ "git commit --no-verify"           'git commit --no-verify -m "x"'       d
 case_ "git commit -n"                    'git commit -n -m "x"'                deny
 case_ "git commit -anm (cluster)"        'git commit -anm "x"'                 deny
 case_ "git push -n (dry-run)"            'git push -n origin main'             allow
-case_ "git commit -uno"                  'git commit -uno -m "x"'              deny "the git commit row lists no -u"
+case_ "git commit -uno"                  'git commit -uno -m "x"'              allow "-u only filters untracked files in the editor template; the 0.11 embedded row lists it"
 case_ "commit msg mentioning --no-verify" 'git commit -m "use --no-verify for emergencies"' allow
 
 # ── interpreter script-file execution + issue #44 ───────────────────────────
@@ -311,7 +311,7 @@ case_ "diskutil apfs deleteVolume"       'diskutil apfs deleteVolume disk3s1'  d
 case_ "git remote add"                   'git remote add x https://example.com/r.git' deny
 case_ "git remote set-url"               'git remote set-url origin git@example.com:r.git' deny
 case_ "git remote rename"                'git remote rename origin o'          deny
-case_ "git remote -v"                    'git remote -v'                       deny "no row for git remote"
+case_ "git remote -v"                    'git remote -v'                       allow "0.11 embeds a listing-only git remote row"
 case_ "git config core.hooksPath"        'git config core.hooksPath /tmp/h'    deny
 case_ "git config core.sshCommand"       'git config --add core.sshCommand x'  deny
 case_ "git config remote url"            'git config remote.origin.url x'      deny
@@ -403,7 +403,7 @@ case_ "jq -f"                            'jq -f prog.jq x.json'                d
 case_ "jq --rawfile"                     'jq --rawfile a /etc/passwd -n .'     deny
 case_ "rm (any)"                         'rm foo'                              deny "dotfiles-file-rm"
 case_ "git log -n"                       'git log -n 5 --oneline'              allow
-case_ "git log -<number>"                'git log --oneline -5'                deny "the row lists no -<number> (shguard#1115)"
+case_ "git log -<number>"                'git log --oneline -5'                allow "0.11 accepts -<number> (shguard#1115)"
 case_ "cd then git"                      'cd /tmp && git status'               deny "cwd_sensitive after cd"
 
 # ── config-load fail-closed ────────────────────────────────────────────────

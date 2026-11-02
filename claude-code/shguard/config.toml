@@ -97,70 +97,6 @@ long = "exit-status"
 # same key is a load error), so branches are made with `git switch -c`.
 # ---------------------------------------------------------------------
 
-# Left out: -f/--force (stages ignored files; gitleaks is the backstop
-# only for what it recognizes), -p/-i/-e (interactive, would hang).
-[[row]]
-key = ["git", "add"]
-source = "https://git-scm.com/docs/git-add"
-cwd_sensitive = true
-order = "permute"
-dashdash = "ends"
-rest = "path"
-opt = [
-  { short = "A", long = "all" },
-  { short = "u", long = "update" },
-  { short = "N", long = "intent-to-add" },
-  { short = "v", long = "verbose" },
-  { short = "n", long = "dry-run" },
-]
-
-# Not -n: in git commit it is --no-verify, which skips the pre-commit
-# gitleaks hook, so both spellings stay unlisted (asked, hence denied).
-# Not -F/--file: it reads any file (`-F .env`) into a message that a push
-# then publishes; repeat -m for a multi-paragraph message.
-[[row]]
-key = ["git", "commit"]
-source = "https://git-scm.com/docs/git-commit"
-cwd_sensitive = true
-order = "permute"
-dashdash = "ends"
-rest = "path"
-opt = [
-  { short = "m", long = "message", value = { takes = "inert" } },
-  { short = "a", long = "all" },
-  { long = "amend" },
-  { long = "no-edit" },
-  { long = "fixup", value = { takes = "inert" } },
-  { long = "squash", value = { takes = "inert" } },
-  { short = "s", long = "signoff" },
-  { long = "allow-empty" },
-  { long = "author", value = { takes = "inert" } },
-  { long = "date", value = { takes = "inert" } },
-  { short = "q", long = "quiet" },
-  { short = "v", long = "verbose" },
-]
-
-# The branch operand is a path word only so rules can see it. Switching
-# still overwrites ignored files the target branch tracks (git's default
-# --overwrite-ignore); that is accepted.
-[[row]]
-key = ["git", "switch"]
-source = "https://git-scm.com/docs/git-switch"
-cwd_sensitive = true
-order = "permute"
-dashdash = "ends"
-rest = "path"
-opt = [
-  { short = "c", long = "create", value = { takes = "inert" } },
-  { short = "C", long = "force-create", value = { takes = "inert" } },
-  { short = "d", long = "detach" },
-  { short = "t", long = "track" },
-  { long = "no-track" },
-  { short = "q", long = "quiet" },
-  { short = "f", long = "force" },
-  { long = "discard-changes" },
-]
-
 [[row]]
 key = ["git", "reset"]
 source = "https://git-scm.com/docs/git-reset"
@@ -259,19 +195,6 @@ opt = [
 # state. A stash ref with braces must be quoted ('stash@{1}') or given as
 # its index (`git stash pop 1`).
 [[row]]
-key = ["git", "stash"]
-source = "https://git-scm.com/docs/git-stash"
-cwd_sensitive = true
-order = "permute"
-dashdash = "ends"
-opt = [
-  { short = "u", long = "include-untracked" },
-  { short = "m", long = "message", value = { takes = "inert" } },
-  { short = "k", long = "keep-index" },
-  { short = "q", long = "quiet" },
-]
-
-[[row]]
 key = ["git", "stash", "push"]
 source = "https://git-scm.com/docs/git-stash"
 cwd_sensitive = true
@@ -285,40 +208,6 @@ opt = [
   { short = "S", long = "staged" },
   { short = "q", long = "quiet" },
 ]
-
-[[row]]
-key = ["git", "stash", "pop"]
-source = "https://git-scm.com/docs/git-stash"
-cwd_sensitive = true
-order = "permute"
-dashdash = "ends"
-positionals = ["inert"]
-opt = [{ long = "index" }, { short = "q", long = "quiet" }]
-
-[[row]]
-key = ["git", "stash", "apply"]
-source = "https://git-scm.com/docs/git-stash"
-cwd_sensitive = true
-order = "permute"
-dashdash = "ends"
-positionals = ["inert"]
-opt = [{ long = "index" }, { short = "q", long = "quiet" }]
-
-[[row]]
-key = ["git", "stash", "list"]
-source = "https://git-scm.com/docs/git-stash"
-cwd_sensitive = true
-order = "permute"
-dashdash = "ends"
-
-[[row]]
-key = ["git", "stash", "show"]
-source = "https://git-scm.com/docs/git-stash"
-cwd_sensitive = true
-order = "permute"
-dashdash = "ends"
-positionals = ["inert"]
-opt = [{ short = "p", long = "patch" }, { long = "stat" }, { short = "u", long = "include-untracked" }]
 
 [[row]]
 key = ["git", "stash", "drop"]
@@ -335,23 +224,6 @@ source = "https://git-scm.com/docs/git-stash"
 cwd_sensitive = true
 order = "permute"
 dashdash = "ends"
-
-# The remote and refspecs are path words so the embedded URL and
-# absolute-path rules on `git` see them.
-[[row]]
-key = ["git", "fetch"]
-source = "https://git-scm.com/docs/git-fetch"
-cwd_sensitive = true
-order = "permute"
-dashdash = "ends"
-rest = "path"
-opt = [
-  { short = "p", long = "prune" },
-  { short = "t", long = "tags" },
-  { long = "all" },
-  { short = "q", long = "quiet" },
-  { short = "v", long = "verbose" },
-]
 
 # --rebase takes no value here: --rebase=interactive waits for an editor.
 [[row]]
@@ -691,25 +563,6 @@ opt = [
   { short = "i", long = "interval", value = { takes = "inert" } },
 ]
 
-# GET only: -X/--method, -f/-F/--field/--raw-field and --input are left
-# out because any of them sends a write (a field alone switches gh to
-# POST). Also left out: --hostname (another host), --verbose.
-[[row]]
-key = ["gh", "api"]
-source = "https://cli.github.com/manual/gh_api"
-cwd_sensitive = true
-order = "permute"
-dashdash = "ends"
-positionals = ["path"]
-opt = [
-  { long = "paginate" },
-  { long = "slurp" },
-  { short = "H", long = "header", value = { takes = "inert" } },
-  { short = "i", long = "include" },
-  { long = "cache", value = { takes = "inert" } },
-  { short = "t", long = "template", value = { takes = "inert" } },
-  { long = "silent" },
-]
 # =====================================================================
 # Rules: 0.9 denies on commands the embedded catalog covers.
 # =====================================================================
@@ -988,12 +841,6 @@ targets = [
 id = "dotfiles-git-reset-discard-worktree"
 key = ["git", "reset"]
 opts = [["--hard", "--merge", "--keep"]]
-outcome = "block"
-
-[[rule]]
-id = "dotfiles-git-switch-discard"
-key = ["git", "switch"]
-opts = [["-f", "--force", "--discard-changes"]]
 outcome = "block"
 
 [[rule]]

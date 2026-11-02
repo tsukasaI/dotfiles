@@ -29,27 +29,28 @@ narrow first, widen only on evidence.
 
 ## Procedure
 
-1. **Classify the change**: new rule / narrowing a false positive / target
-   matcher change / edit to the inline settings.json command itself. Each
+1. **Classify the change**: new rule / new catalog row / narrowing a false
+   positive / edit to the inline settings.json command itself. Each
    has a different blast radius, the inline command wraps every rule at
-   once (PATH-miss/crash handling, `SHGUARD_STRICT_CONFIG`).
+   once (`args: []`, `onFailure: "block"`).
 
 2. **Read before writing.** Open `config.toml` and its neighboring rules
-   first (`Read`). Each `[[deny]]`/`[[ask]]`/`[[allow]]` block has `id`,
-   `reason`, `command`, and `targets` (one of `exact`/`prefix`/`normalized`/
-   `normalized_prefix`/`normalized_basename` per entry, optionally
-   `except_targets` and `value_flags`/`attached_value_flags` for flags whose
-   value should or shouldn't count as a candidate target). Match existing
-   formatting and comments in the surrounding `# ─────` section.
+   first (`Read`). A `[[row]]` allows a command shape: every row widens
+   Allow, and the user owns it. A `[[rule]]` (outcome `block` or `ask`) can
+   only raise a decision and has no reason text, so its `id` is the reason.
+   Heads like `find`, `fd`, `sed`, `awk`, `bun`, `node`, `python*`, `sh`,
+   `env`, `xargs`, `sudo`, `ssh` can never get a row (upstream
+   tsukasaI/shguard#1111). Match existing formatting and comments in the
+   surrounding `# ─────` section.
 
-3. **Write the rule narrowly.** Prefer `exact`/`prefix` over a broad
-   substring match. `normalized_basename` widens by design (matches a
-   dotenv-style suffix family, e.g. `.env` also matches `.env.local`
-   anywhere in the path); only use it where that widening is the intent.
+3. **Write the rule narrowly.** Prefer a specific command shape over a broad
+   one. A new row widens what is allowed, and Allow is not a claim that the
+   command is safe. There are no basename targets in 0.10, so `cat sub/.env`
+   is allowed (tsukasaI/shguard#1113); don't assume a rule covers it.
 
 4. **Present the diff, don't try to apply it.** `config.toml` refuses
    Claude's own Edit/Write. Show the exact before/after and let the user
-   apply it (a small `sed`/manual edit, confirmed with them first).
+   apply it (a manual edit, confirmed with them first).
 
 5. **Run the test matrix** with the synthetic-payload one-liner (safe:
    stdin/stdout only, no real command executes):
@@ -58,17 +59,22 @@ narrow first, widen only on evidence.
    ```
    - (a) The command you intend to deny -> expect `permissionDecision: "deny"`.
    - (b) At least 2 nearby *legitimate* commands that share a substring or
-     prefix with the denied pattern -> expect `"allow"`.
+     prefix with the denied pattern -> expect `"allow"` only if a catalog or
+     user row covers them; any command with no row is denied ("no catalog
+     row matches the command ... (ask_outcome = deny)").
    - (c) A quoted variant of the denied string (e.g. inside a
      `git commit -m "..."`) -> expect `"allow"`, quoted text must not
      false-positive.
+   - Anything outside the parser's subset (`$(...)`, unquoted `$X`, globs,
+     `> file`, `<`, heredocs, subshells, `&`) is denied ("outside the
+     supported subset").
 
    Verified working examples (re-run these, don't take them on faith):
    ```
    echo '{"tool_input":{"command":"rm -rf foo"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard        # deny
    echo '{"tool_input":{"command":"rg foo"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard            # allow
    echo '{"tool_input":{"command":"git commit -m \"fix secret handling\""},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard  # allow (quoted "secret")
-   echo '{"tool_input":{"command":"cat foo/.env.local"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard  # deny (normalized_basename)
+   echo '{"tool_input":{"command":"cat foo/.env.local"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard  # allow (no basename targets in 0.10; tsukasaI/shguard#1113)
    ```
 
 6. **Run the full regression suite** before considering the change done:
@@ -76,9 +82,8 @@ narrow first, widen only on evidence.
    tests/shguard-parity-check.sh
    ```
    This pins the expected decision for every historically-tricky case
-   (quote/backslash bypass closures, curl localhost exemption, credential
-   reads, false-positive regressions, privilege escalation, `/dev/tcp`,
-   pre-commit bypass flags, and more). A new failure here means your change
+   (rule hits, credential reads, rows that must stay allowed,
+   unsupported syntax, and more). A new failure here means your change
    regressed a previously-fixed case, not just a new-rule sanity check.
 
 7. **`block-config-edit.sh` changes**: same discipline, but it gates
@@ -102,13 +107,14 @@ under `bypassPermissions`, it must resolve to `deny`, not `ask`. See
 `docs/shguard-migration-deltas.md`'s "Cutover caveat" section for the
 current list of `ask`-only rules that need re-auditing before that switch.
 
-As of shguard 0.7.0, `config.toml` sets the bare-string `ask_outcome =
-"deny"`, which floors every terminal `ask` this file's rules and structural
-fallbacks produce down to `deny`, in every `permission_mode`. New rules you
-add still don't need to hand-author around this (an `[[ask]]` block is
-still the right authoring choice when a human might actually see the
-prompt); `ask_outcome` is a global floor applied after rule evaluation, not
-something each rule opts into individually.
+`config.toml` sets `ask_outcome = "deny"`, which turns every Ask (no
+matching row, unsupported syntax, an `ask` rule) into `deny`, in every
+`permission_mode`. New rules you add still don't need to hand-author around
+this (a `[[rule]]` with outcome `ask` is still the right choice when a human
+might actually see the prompt); `ask_outcome` is a global floor applied after
+evaluation, not something each rule opts into individually. A config that
+fails to load (malformed TOML, unknown key, a 0.9-format file) denies every
+Bash call, so a broken edit locks the session out.
 
 ## History (why this is narrow-first, not a design opinion)
 

@@ -33,9 +33,10 @@ jobs:
 
   shguard-parity-check:
     # shguard is the PreToolUse Bash enforcer (claude-code/settings.json calls
-    # it directly, see docs/shguard-migration-deltas.md). Build it pinned to
-    # the committed flake.lock rev so this job tracks whatever `nix flake
-    # update` last pulled, with no separate version to bump by hand.
+    # it directly, see docs/shguard-migration-deltas.md). Build the same
+    # derivation nix-darwin installs (nix-darwin/shguard.nix over the locked
+    # `shguard` source input), so this job tracks whatever `nix flake update`
+    # last pulled, with no separate version to bump by hand.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,8 +45,7 @@ jobs:
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       - name: build shguard pinned to flake.lock
         run: |
-          rev=$(jq -r '.nodes.shguard.locked.rev' nix-darwin/flake.lock)
-          out=$(nix build "github:tsukasaI/shguard/$rev" --no-link --print-out-paths)
+          out=$(nix build ./nix-darwin#packages.x86_64-linux.shguard --no-link --print-out-paths)
           echo "$out/bin" >> "$GITHUB_PATH"
       - name: shguard parity check
         run: bash tests/shguard-parity-check.sh

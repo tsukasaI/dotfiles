@@ -104,13 +104,15 @@ claude-code/
 
 ### How the hook works
 
-`claude-code/settings.json`'s `PreToolUse`/`Bash` hook calls the `shguard` binary directly
-(`shguard || exit 2`, no wrapper script), with `SHGUARD_STRICT_CONFIG=1` set in the
-`env` block so a missing or malformed config denies instead of asking. `shguard` evaluates
-the command against `claude-code/shguard/config.toml` (resolved via the
-`~/.config/shguard/config.toml` symlink `setup.sh` creates) and its own built-in rules, and
-returns `allow`, `ask`, or `deny`. If `shguard` itself can't be found or crashes, `|| exit 2`
-blocks the call instead of letting empty output read as an implicit allow
+`claude-code/settings.json`'s `PreToolUse`/`Bash` hook runs the `shguard` binary directly
+(`/run/current-system/sw/bin/shguard`, `args: []` so no shell, no wrapper script) with
+`onFailure: "block"`, so a crash, timeout, or exit status other than 0/2 refuses the call.
+shguard 0.10.0 is built from source by `nix-darwin/shguard.nix`. It evaluates the command
+against `claude-code/shguard/config.toml` (resolved via the `~/.config/shguard/config.toml`
+symlink `setup.sh` creates) and its embedded catalog. A command is allowed only when the
+parser read all of it, every simple command matches a catalog row, and no rule hits;
+everything else is an Ask, which `ask_outcome = "deny"` turns into deny. A config that
+fails to load denies every Bash call
 (`docs/shguard-migration-deltas.md` gap #26).
 
 ### Managing the ruleset
@@ -120,9 +122,9 @@ need to be applied manually. See the `hooks-guardrails` skill for the safe-chang
 and `docs/shguard-migration-deltas.md` for the history of behavior differences found and
 resolved during the migration from the old hand-written hook.
 
-Each rule is a `[[deny]]`/`[[ask]]`/`[[allow]]` block with `id`, `reason`, `command`, and
-`targets` (matcher shapes: `exact`, `prefix`, `normalized`, `normalized_prefix`,
-`normalized_basename`). Test a change with:
+A `[[row]]` block allows a command shape (every row widens Allow); a `[[rule]]` block
+(outcome `block` or `ask`) can only raise a decision, and its `id` is its only reason text.
+Test a change with:
 
 ```
 echo '{"tool_input":{"command":"<CMD>"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard

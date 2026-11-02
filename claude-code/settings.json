@@ -3,7 +3,6 @@
   "cleanupPeriodDays": 14,
   "env": {
     "EDITOR": "nvim",
-    "SHGUARD_STRICT_CONFIG": "1",
     "CLAUDE_CODE_PLUGIN_DIRS": "~/dotfiles/claude-code/mod",
     "HOMEBREW_NO_ANALYTICS": "1",
     "npm_config_cache": "/Users/inouetsukasa/.cache/claude-sandbox/npm",
@@ -115,7 +114,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "shguard || exit 2"
+            "command": "/run/current-system/sw/bin/shguard",
+            "args": [],
+            "onFailure": "block"
           }
         ]
       },
@@ -294,7 +295,7 @@
       "git push -u origin:*",
       "git fetch",
       "git fetch origin:*",
-      "git fetch --prune origin:*",
+      "git remote prune origin:*",
       "git pull",
       "git pull origin:*",
       "git pull --rebase origin:*",

@@ -9,16 +9,17 @@ prompt directly, so don't repeat their content in this file. A repo's own `AGENT
 ## Safety (pi has no sandbox; tools are gated only by extensions)
 
 - Every tool call runs with my user's permissions and nothing asks for
-  approval. The shguard extension blocks the bash commands its config
-  denies (force push, deletions, `rm`, Keychain reads, ...). The
+  approval. The shguard extension blocks every bash command shguard does
+  not allow (no catalog row, unsupported syntax, or a rule hit such as `rm`
+  or a secret read). The
   file-guard extension blocks reads of secret paths and writes to
   linter/formatter configs, lockfiles, and guard files. Neither is a
   sandbox. Act as if each command is final.
 - When a guard blocks a call, never retry with an equivalent command
   (`unlink` for `rm`, a different tool, piping around it). Show me the
   command verbatim in a fenced block, or the intended edit as a diff, and
-  stop. Exception: `dotfiles-tool-policy-*` rules (e.g. `find`) are tool
-  preferences; retry at once with the named replacement (`fd`, `rg`).
+  stop. Exception: when shguard refuses `find`, use the built-in file
+  search (or `rg --files`) at once; fd is refused too.
 - Never run destructive commands without my explicit go-ahead in this
   session: `rm -rf`, `git reset --hard`, `git clean`, `git push --force`,
   branch/tag deletion, dropping databases, overwriting files outside the

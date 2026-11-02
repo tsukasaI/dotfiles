@@ -271,8 +271,8 @@ Rules:
   the session's scratchpad directory (overwriting it each time), then run
   `wc -m <absolute path to that file>`, with the path written literally.
   Never pass the statement through a heredoc, `echo`, or `printf`: shguard
-  counts `for`/`if`/`do`/`then`/`done` in a heredoc body as shell keywords
-  and denies the command once a multi-issue statement passes its cap.
+  refuses a heredoc or `> file` redirect (outside its supported subset), and
+  `printf` has no catalog row.
   The count includes `/goal ` and the trailing newline, so it is slightly conservative; it
   passes at 4,000 or less. Show the count next to the draft. Over 4,000:
   tighten wording (shorter per-issue clauses, titles abbreviated, not
