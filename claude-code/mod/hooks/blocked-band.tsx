@@ -11,7 +11,7 @@ const REVIEW_LABEL = {
   clear: 'no critical/high',
 } as const
 
-// shguard 0.10's deny wording: a Block rule hit, an Ask refused by
+// shguard's deny wording (0.10 and later): a Block rule hit, an Ask refused by
 // ask_outcome = "deny", a config that failed to load, a crash.
 const SHGUARD_DENY =
   /rule `[^`]+` hit \(item |\(ask_outcome = deny\)|shguard cannot load its config or catalog|shguard: internal error/

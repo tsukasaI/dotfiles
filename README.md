@@ -107,7 +107,7 @@ claude-code/
 `claude-code/settings.json`'s `PreToolUse`/`Bash` hook runs the `shguard` binary directly
 (`/run/current-system/sw/bin/shguard`, `args: []` so no shell, no wrapper script) with
 `onFailure: "block"`, so a crash, timeout, or exit status other than 0/2 refuses the call.
-shguard 0.10.0 is built from source by `nix-darwin/shguard.nix`. It evaluates the command
+shguard 0.11.1 is built from source by `nix-darwin/shguard.nix`. It evaluates the command
 against `claude-code/shguard/config.toml` (resolved via the `~/.config/shguard/config.toml`
 symlink `setup.sh` creates) and its embedded catalog. A command is allowed only when the
 parser read all of it, every simple command matches a catalog row, and no rule hits;

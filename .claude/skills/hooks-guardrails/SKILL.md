@@ -38,15 +38,17 @@ narrow first, widen only on evidence.
    first (`Read`). A `[[row]]` allows a command shape: every row widens
    Allow, and the user owns it. A `[[rule]]` (outcome `block` or `ask`) can
    only raise a decision and has no reason text, so its `id` is the reason.
-   Heads like `find`, `fd`, `sed`, `awk`, `bun`, `node`, `python*`, `sh`,
-   `env`, `xargs`, `sudo`, `ssh` can never get a row (upstream
-   tsukasaI/shguard#1111). Match existing formatting and comments in the
+   Heads like `find`, `sed`, `awk`, `bun`, `node`, `python*`, `sh`,
+   `env`, `xargs`, `sudo`, `ssh` have no row; 0.11 added one for `fd`, so
+   check upstream tsukasaI/shguard#1111 before assuming a head can never
+   get one. Match existing formatting and comments in the
    surrounding `# ─────` section.
 
 3. **Write the rule narrowly.** Prefer a specific command shape over a broad
    one. A new row widens what is allowed, and Allow is not a claim that the
-   command is safe. There are no basename targets in 0.10, so `cat sub/.env`
-   is allowed (tsukasaI/shguard#1113); don't assume a rule covers it.
+   command is safe. Since 0.11 a target matches a basename at any depth
+   (`cat sub/.env` is denied, tsukasaI/shguard#1113), so a bare name in a
+   rule also hits a search pattern that is a path word (`rg id_rsa`).
 
 4. **Present the diff, don't try to apply it.** `config.toml` refuses
    Claude's own Edit/Write. Show the exact before/after and let the user
@@ -74,7 +76,7 @@ narrow first, widen only on evidence.
    echo '{"tool_input":{"command":"rm -rf foo"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard        # deny
    echo '{"tool_input":{"command":"rg foo"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard            # allow
    echo '{"tool_input":{"command":"git commit -m \"fix secret handling\""},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard  # allow (quoted "secret")
-   echo '{"tool_input":{"command":"cat foo/.env.local"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard  # allow (no basename targets in 0.10; tsukasaI/shguard#1113)
+   echo '{"tool_input":{"command":"cat foo/.env.local"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard  # deny (basename targets since 0.11; tsukasaI/shguard#1113)
    ```
 
 6. **Run the full regression suite** before considering the change done:

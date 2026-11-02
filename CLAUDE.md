@@ -112,7 +112,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
   `onFailure: "block"`, so a crash, timeout, or exit status other than 0/2
   refuses the call (needs Claude Code 2.1.295+). It reads
   `claude-code/shguard/config.toml`, with no separate wrapper script. In
-  0.10 a config that fails to load (malformed TOML, unknown key, a 0.9-format
+  0.10 and later a config that fails to load (malformed TOML, unknown key, a 0.9-format
   file) denies every Bash call; that is built in, not an env setting.
   Allow needs the whole command parsed and every simple command covered by a
   catalog row, with no rule hit; everything else is Ask, and
