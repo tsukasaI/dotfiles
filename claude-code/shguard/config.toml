@@ -1,10 +1,10 @@
-# shguard 0.10 user policy for this machine.
+# shguard 0.11 user policy for this machine.
 #
 # Deployed to ~/.config/shguard/config.toml (shguard's default lookup path)
 # by a setup.sh symlink, so it stays versioned and CI-testable. Merged with
 # shguard's embedded catalog (catalog/*.toml in the shguard repository).
 #
-# How 0.10 decides: Allow needs every simple command covered by a catalog
+# How shguard decides: Allow needs every simple command covered by a catalog
 # row, with no rule hit. Anything without a row is Ask, and a [[rule]] can
 # only target a key some row covers. Allow is a claim about what shguard
 # read, not that a command is safe (shguard README, promises P1-P3).
