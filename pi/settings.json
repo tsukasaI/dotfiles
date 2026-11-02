@@ -2,15 +2,25 @@
   "defaultProvider": "anthropic",
   "defaultModel": "claude-opus-5-5",
   "enableInstallTelemetry": false,
-  "lastChangelogVersion": "1.3.0",
-  "extensions": ["~/dotfiles/pi/extensions", "-builtin:mcp", "-builtin:llama.cpp"],
+  "lastChangelogVersion": "1.4.0",
+  "extensions": [
+    "~/dotfiles/pi/extensions",
+    "-builtin:mcp",
+    "-builtin:llama.cpp"
+  ],
   "skills": [
     "~/.claude/skills/ja-lint",
     "~/.claude/skills/handover",
     "~/.claude/skills/grill",
-    "~/.claude/skills/review-gate"
+    "~/.claude/skills/review-gate",
+    "~/.claude/skills/explain-plan",
+    "~/.claude/skills/diagram-explain"
   ],
-  "prompts": ["~/dotfiles/pi/prompts"],
-  "themes": ["~/dotfiles/pi/themes"],
+  "prompts": [
+    "~/dotfiles/pi/prompts"
+  ],
+  "themes": [
+    "~/dotfiles/pi/themes"
+  ],
   "theme": "flat-dark"
 }

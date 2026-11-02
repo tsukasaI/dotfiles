@@ -15,7 +15,8 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   mounting only `$PWD`, and refuses if the tag is missing.
 - `settings.json` → `~/.pi/agent/settings.json`. It points pi at
   `extensions/` and `prompts/` here and at skills read directly from
-  `~/.claude/skills/` (`ja-lint`, `handover`, `grill`, `review-gate`;
+  `~/.claude/skills/` (`ja-lint`, `handover`, `grill`, `review-gate`,
+  `explain-plan`, `diagram-explain`;
   read-only reuse, no copies). Pi ignores `allowed-tools`/`argument-hint`
   and, for skills, does not substitute `$ARGUMENTS` (it appends args after
   the body; prompt templates do substitute), so shared skills must work
@@ -42,7 +43,9 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   (`bun test pi/tests`, offline). `git-checkpoint.ts` snapshots the repo to
   `refs/pi-checkpoints/<session>/<n>` once per prompt before the first
   edit/write/bash; `usage-log.ts` appends per-turn tokens/cost to
-  `~/.pi/agent/usage/YYYY-MM.jsonl` (`PI_USAGE_LOG_DIR` overrides);
+  `~/.pi/agent/usage/YYYY-MM.jsonl` (local month; `PI_USAGE_LOG_DIR`
+  overrides). "today" is the local day but "month" is the UTC month,
+  matching Anthropic's billing reset, so it can read two files;
   `/checkpoints` and `/usage` inspect them.
   `statusline.ts` replaces the TUI footer (theme colors; today's cost is
   read from usage-log's JSONL and the goal state from goal's entries, so it
@@ -52,8 +55,10 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   `paths:`, a read-on-demand list for the rest). `git-sandbox.md` is
   skipped: it describes Claude Code's Bash sandbox, which pi lacks.
   `shguard.ts` runs each model-issued bash command through
-  `shguard check --json` (same `~/.config/shguard/config.toml` as Claude
-  Code) and blocks anything but `Allow`, fail-closed; `!` commands are not
+  `shguard` on stdin as the same PreToolUse JSON the Claude Code hook gets
+  (same `~/.config/shguard/config.toml`), reads
+  `hookSpecificOutput.permissionDecision`, and blocks anything but `allow`
+  (including `ask`), fail-closed; `!` commands are not
   gated. It first rewrites `$HOME` with `claude-code/mod/hooks/shell-canon.ts`
   (imported, not copied) and runs the rewritten command.
   `file-guard.ts` gates read/grep/find/ls by the `Read(...)` rules in
