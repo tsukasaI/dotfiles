@@ -201,3 +201,19 @@ describe("redactTranscript structure", () => {
     expect(redactTranscript(s)).toBe(s);
   });
 });
+
+describe("redactTranscript: pathological nesting", () => {
+  test("a line nested far past the depth limit falls back to raw-line redaction", () => {
+    const line =
+      `{"type":"assistant","message":{"content":[{"type":"tool_use","input":` +
+      "[".repeat(50000) +
+      JSON.stringify(`sk-ant-${a(30)}`) +
+      "]".repeat(50000) +
+      "}]}}";
+    let out = "";
+    expect(() => {
+      out = redactTranscript(line);
+    }).not.toThrow();
+    expect(out).toContain("[REDACTED:anthropic-key]");
+  });
+});
