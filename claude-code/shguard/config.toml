@@ -63,6 +63,18 @@ source = "https://github.com/tsukasaI/shguard#readme"
 order = "strict"
 dashdash = "literal"
 
+[[row]]
+key = ["diagram-render"]
+source = "https://github.com/tsukasaI/dotfiles/blob/main/claude-code/skills/diagram-explain/render.ts"
+cwd_sensitive = true
+order = "permute"
+dashdash = "literal"
+positionals = ["path"]
+opt = [
+  { long = "root", value = { takes = "path" } },
+  { long = "out", value = { takes = "path" } },
+]
+
 # No rows on purpose: `git checkout` (a branch and `-- path`, which discards
 # edits, share one operand slot), `git restore` (a row cannot require
 # --staged; unstage with `git reset -- <path>`), `git clean`, `git rm`,

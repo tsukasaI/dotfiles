@@ -24,6 +24,7 @@
   outputs = { nixpkgs, nix-darwin, ewc, fini, herdr, shguard, ... }:
   let
     shguardFor = pkgs: pkgs.callPackage ./shguard.nix { src = shguard; };
+    diagramRenderFor = pkgs: pkgs.callPackage ./diagram-render.nix { };
     # One function per host (#14): adding a second machine is one more mkHost
     # call under darwinConfigurations, not a copy of the configuration block.
     mkHost = { primaryUser, system }:
@@ -90,6 +91,7 @@
           '';
         }))
         (shguardFor pkgs)
+        (diagramRenderFor pkgs)
       ] ++ (with pkgs; [
         # Modern CLI replacements
         bat
@@ -287,6 +289,7 @@
     # CI's parity job builds the same derivation on Linux from this lock.
     packages = nixpkgs.lib.genAttrs [ "aarch64-darwin" "x86_64-linux" ] (system: {
       shguard = shguardFor nixpkgs.legacyPackages.${system};
+      diagram-render = diagramRenderFor nixpkgs.legacyPackages.${system};
     });
 
     darwinConfigurations."Ino-macbook-air" = mkHost {

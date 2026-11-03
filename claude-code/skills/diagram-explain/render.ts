@@ -2,6 +2,10 @@
 import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { dirname, isAbsolute, join, relative, resolve } from "path";
+// Not read at run time next to import.meta.url: in the `bun build --compile` binary that is the
+// virtual /$bunfs root, so the files must be embedded.
+import quizCore from "./quiz-core.js" with { type: "text" };
+import template from "./template.html" with { type: "text" };
 
 const PERSPECTIVES = ["flow", "deepDive", "rejected", "evidence"] as const;
 const CHANGES = ["added", "changed", "removed"] as const;
@@ -405,11 +409,7 @@ export function main(argv: string[], log = console.log, fail = console.error, op
       return fail(`cannot read repo root ${rootDir}: ${String(err)}`), 1;
     }
   }
-  const here = dirname(new URL(import.meta.url).pathname);
-  const html = renderHtml(diagram, checks, readFileSync(join(here, "template.html"), "utf8"), [
-    readFileSync(join(here, "quiz-core.js"), "utf8"),
-    ...(opts.extraCores ?? []),
-  ]);
+  const html = renderHtml(diagram, checks, template, [quizCore, ...(opts.extraCores ?? [])]);
   const out = outFlag ?? outputPath(diagram.slug, process.env, opts.outDirName);
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, html);
