@@ -153,6 +153,9 @@ export function registerRuleGuards(on: On): void {
 
     // Which repo a `cd`/`-C` command, or a subagent (possibly in a worktree),
     // commits in can't be told from the session's cwd.
+    // Not resolving the `cd`/`-C` target instead: this guard catches slips, not evasion
+    // (`cd . && git commit` skips it), and parsing chained or non-literal paths here would
+    // run on every Bash call. Hard enforcement belongs in GitHub branch protection.
     const redirected = /(^|[;&|(\n]\s*)cd\s/.test(commit.prefix) || /(^|\s)-C(\s|$)/.test(commit.globalOptions)
     if (e.agentId === undefined && !redirected) {
       const badBranch = await mainCommitProblem($)
