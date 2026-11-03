@@ -1,6 +1,6 @@
 ---
 name: diagram-explain
-description: Explains a complex system or mechanism structurally as a self-contained HTML diagram (lanes of components, labeled data-flow edges, optional step-by-step frames that build the picture up, optional file:line excerpts verified against a repo), published as an Artifact when that tool exists and otherwise handed over as a local file. Use when the user asks to 図解して / 構造を説明して / "diagram this" / "explain how X fits together", including system design practice (designing a URL shortener, a chat service, a rate limiter) and walkthroughs of existing code. Not for a single chart of data (use dataviz), and not for gating a plan before implementation (that is /explain-plan, which builds on this skill).
+description: Explains a complex system or mechanism structurally as a self-contained HTML diagram (lanes of components, labeled data-flow edges, optional step-by-step frames that build the picture up, optional file:line excerpts verified against a repo), published as an Artifact when that tool exists and otherwise handed over as a local file. Use when the user asks to 図解して / 構造を説明して / "diagram this" / "explain how X fits together", including system design practice (designing a URL shortener, a chat service, a rate limiter) and walkthroughs of existing code. Not for a single chart of data (use dataviz), and not for walking through a plan before approving it (that is /explain-plan, which builds on this skill).
 argument-hint: [図解したい対象 (省略時は会話中の直近の話題)]
 allowed-tools: Read, Grep, Glob, Write, Bash, Artifact, Skill
 ---
