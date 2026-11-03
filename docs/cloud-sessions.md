@@ -88,8 +88,10 @@ The running session picked up the new skills without a restart: invoking
 `ja-lint` right after setup returned `Unknown skill`; shortly after, the
 session's skill list was refreshed with handover, ja-lint, mkgoal and
 review-gate (the model-invocable ones), and the same invocation loaded
-`/root/.claude/skills/ja-lint`. Rules and `CLAUDE.md` are read at session
-start, so they can't be checked from this session.
+`/root/.claude/skills/ja-lint`. Path-scoped rules load too: editing
+`CLAUDE.md` after setup attached `/root/.claude/rules/prompt-style.md`
+(`paths: **/CLAUDE.md`) to the session. Unconditional rules and `CLAUDE.md`
+are read at session start, so they can't be checked from this session.
 
 GitHub from the VM:
 
@@ -102,12 +104,25 @@ $ gh pr list -R tsukasaI/dotfiles
 HTTP 403: GitHub GraphQL is not available from Claude Code sessions; use the REST API (gh api repos/{owner}/{repo}/...). ...
 ```
 
+Opening a PR over REST works (it created tsukasaI/dotfiles#106):
+
+```
+$ gh api repos/tsukasaI/dotfiles/pulls -f title=... -f head=feat/cloud-session-config -f base=main -F body=@<file> --jq '.html_url,.number'
+https://github.com/tsukasaI/dotfiles/pull/106
+106
+```
+
 The session's GitHub credential acts as `tsukasaI` with admin rights, so a
 ruleset that lets repository admins bypass also lets cloud sessions push to
 main.
 
 Commits pushed after setup carry the new identity and no signature, and the
-proxy accepted the push.
+proxy accepted the push:
+
+```
+$ git log -1 --format='%H %an <%ae> sig=%G?'
+f974911ac917c739017107dbc62f8842e787dcab tsukasa inoue <inoue.tsukasa.4@gmail.com> sig=N
+```
 
 ## Not verified here
 
