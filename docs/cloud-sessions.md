@@ -164,7 +164,9 @@ seen. Converting the same 10 lines to CRLF reproduces the error
 is unconfirmed. `pin.sh` now prints one-line commands that each end in
 ` #`, which ran to completion here with LF, with CRLF, and with CRLF after
 nine extra lines; a wrong `SETUP_SHA256` under CRLF still exits 1 with
-nothing installed.
+nothing installed. With that output pasted into the box, a new session's
+`/context` listed `/root/.claude/CLAUDE.md` and the five unconditional rules
+as memory files and all 7 agents, so the box path works end to end.
 
 ## Not verified here
 
