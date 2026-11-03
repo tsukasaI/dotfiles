@@ -50,6 +50,24 @@ There is no staging or deploy step (hooks apply on the next tool call,
   backstop, not the only loop — re-run `lefthook install` after pulling
   changes to hooks or lefthook config.
 
+## Cloud sessions
+
+Claude Code on the web loads no `~/.claude` from this machine, so the
+environment's setup script installs the shared config instead (details and
+verification log: `docs/cloud-sessions.md`).
+
+- `claude-code/cloud/setup.sh` fetches `CLAUDE.md`, `rules/`, `skills/` and
+  `agents/` from raw.githubusercontent.com at a pinned commit, verifies each
+  file against `cloud/manifest.sha256`, appends `cloud/CLAUDE.cloud.md` (the
+  cloud-only deltas) to `~/.claude/CLAUDE.md`, and sets the git identity
+  without signing.
+- `cloud/exclude.txt` lists the Mac-only skills left out, with reasons.
+- After editing anything the manifest covers, run
+  `bash tests/cloud-manifest-sync.sh --write`; CI fails on drift.
+- Renew the pin: `bash claude-code/cloud/pin.sh <main commit>` and paste the
+  output into the environment's setup-script box. Until then cloud sessions
+  keep the old pinned config.
+
 ## Concepts
 
 - **ewc / fini / herdr**: personal tools installed as flake inputs. `fini` is

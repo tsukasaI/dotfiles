@@ -1,0 +1,6 @@
+# Paths under claude-code/ that the cloud setup doesn't install, because they
+# can't work in a cloud container. One path prefix per line; the rest of the
+# line is the reason. Read by tests/cloud-manifest-sync.sh.
+skills/browser-test/     needs the agent-browser MCP server, registered only on the Mac
+skills/diagram-explain/  runs diagram-render, a binary built by nix-darwin/diagram-render.nix
+skills/explain-plan/     runs explain-plan-render (nix-darwin) and reads diagram-explain's SKILL.md
