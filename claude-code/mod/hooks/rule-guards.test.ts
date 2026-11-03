@@ -209,3 +209,46 @@ test('cd/-C commits skip the branch check', async ($, on) => {
   stubGit(on, 'main', 'git@github.com:tsukasaI/app.git')
   expect((await $.tool.call({ tool: 'Bash', command: 'git -C ../other commit -m "feat: x"' })).deny).toBeUndefined()
 })
+
+test('repeated global options without a commit return quickly with no match', () => {
+  for (const command of [
+    'git' + ' --git-dir=x'.repeat(24) + ' status',
+    'git' + ' --git-dir'.repeat(24) + ' status',
+    'git' + ' -c'.repeat(24) + ' status',
+    'git' + ' -c "a"'.repeat(24) + ' status',
+    'git' + " -c 'a'".repeat(24) + ' status',
+    'git' + ' --x="a"'.repeat(24) + ' status',
+    'git' + ' --git-dir "a"'.repeat(24) + ' status',
+  ]) {
+    const start = performance.now()
+    expect(commitMessage(command)).toBeUndefined()
+    expect(performance.now() - start, command.slice(0, 30)).toBeLessThan(100)
+  }
+})
+
+test('global options of every shape still reach the commit', () => {
+  for (const command of [
+    'git -c user.name=x commit -m "feat: x"',
+    'git --git-dir=/a --work-tree /b commit -m "feat: x"',
+    "git -C 'my dir' --no-pager commit -m \"feat: x\"",
+    'git -c -x commit -m "feat: x"',
+    'git --git-dir "a b" commit -m "feat: x"',
+    'git -c "a" commit -m "feat: x"',
+    'git --x="a b" commit -m "feat: x"',
+  ]) {
+    expect(commitMessage(command), command).toBe('feat: x')
+  }
+})
+
+test('only a cd before the commit or -C among the git options skips the branch check', async ($, on) => {
+  stubGit(on, 'main', 'git@github.com:tsukasaI/app.git')
+  for (const command of [
+    'git commit -m "fix: honor -C paths"',
+    'git commit -C HEAD',
+    'git commit -m "feat: x" && cd ..',
+  ]) {
+    expect((await $.tool.call({ tool: 'Bash', command })).deny, command).toMatch(/branch \+ PR/)
+  }
+  const subshell = await $.tool.call({ tool: 'Bash', command: '(cd ../other && git commit -m "feat: x")' })
+  expect(subshell.deny).toBeUndefined()
+})

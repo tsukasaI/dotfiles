@@ -4,10 +4,13 @@ import type { EngineInterface, On } from 'claude-code'
 const DIRECT_TO_MAIN = /[:/]tsukasaI\/(dotfiles|ops)(\.git)?$/
 // Global options between `git` and the subcommand: `-c k=v`, `-C path`, `--no-pager`, `-P`,
 // `--git-dir <path>`. Values may be quoted or space-separated.
-const VALUE = String.raw`(?:"[^"]*"|'[^']*'|\S+)`
+const VALUE = String.raw`(?:"[^"]*"|'[^']*'|[^\s"']\S*)`
+// Not `\S+` alone, and no leading `-`: overlapping branches (a quoted value is also `\S+`, a value
+// can also be the next option) split a run of options exponentially many ways (backtracking).
+const NV = String.raw`(?:"[^"]*"|'[^']*'|(?![-"'])\S+)`
 const VALUE_LONG_OPTIONS = 'git-dir|work-tree|namespace|exec-path|config-env|attr-source'
-const GIT_GLOBAL_OPTIONS = String.raw`(?:\s+(?:-[cC]\s+${VALUE}|--(?:${VALUE_LONG_OPTIONS})(?:=${VALUE}|\s+${VALUE})|--[\w-]+(?:=${VALUE})?|-\w+))*`
-const GIT_COMMIT = new RegExp(String.raw`(^|[;&|(\n]\s*)git${GIT_GLOBAL_OPTIONS}\s+commit(?![\w-])`)
+const GIT_GLOBAL_OPTIONS = String.raw`(?:\s+(?:-[cC]\s+${NV}|--(?:${VALUE_LONG_OPTIONS})\s+${NV}|--[\w-]+(?:=${VALUE})?|-\w+))*`
+const GIT_COMMIT = new RegExp(String.raw`(^|[;&|(\n]\s*)git(${GIT_GLOBAL_OPTIONS})\s+commit(?![\w-])`)
 const SUBJECT = /^(feat|fix|refactor|chore|docs|test|perf|build|ci|style|revert)(\([^)]+\))?!?: \S/
 const JAPANESE = /[぀-ヿ㐀-鿿ｦ-ﾟ]/
 const HEREDOC_BODY = /(<<-?\s*['"]?(\w+)['"]?\n)([\s\S]*?)(\n\s*\2\b)/g
@@ -35,13 +38,22 @@ interface CommitCommand {
   stripped: string
   /** The original text from the `git commit` match onward. */
   tail: string
+  /** The command text before the `git` token. */
+  prefix: string
+  /** The global options between `git` and `commit`. */
+  globalOptions: string
 }
 
 function parseCommit(command: string): CommitCommand | undefined {
   const stripped = blankHeredocBodies(command)
   const match = GIT_COMMIT.exec(stripped)
   if (match === null) return undefined
-  return { stripped, tail: command.slice(match.index + match[1].length) }
+  return {
+    stripped,
+    tail: command.slice(match.index + match[1].length),
+    prefix: stripped.slice(0, match.index + match[1].length),
+    globalOptions: match[2],
+  }
 }
 
 function count(text: string, pattern: RegExp): number {
@@ -141,7 +153,11 @@ export function registerRuleGuards(on: On): void {
 
     // Which repo a `cd`/`-C` command, or a subagent (possibly in a worktree),
     // commits in can't be told from the session's cwd.
-    if (e.agentId === undefined && !/(^|[;&|\n]\s*)cd\s|\s-C\s/.test(commit.stripped)) {
+    // Not resolving the `cd`/`-C` target instead: this guard catches slips, not evasion
+    // (`cd . && git commit` skips it), and parsing chained or non-literal paths here would
+    // run on every Bash call. Hard enforcement belongs in GitHub branch protection.
+    const redirected = /(^|[;&|(\n]\s*)cd\s/.test(commit.prefix) || /(^|\s)-C(\s|$)/.test(commit.globalOptions)
+    if (e.agentId === undefined && !redirected) {
       const badBranch = await mainCommitProblem($)
       if (badBranch !== undefined) return { deny: `dotfiles-mod: ${badBranch}.` }
     }

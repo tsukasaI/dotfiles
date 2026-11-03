@@ -41,6 +41,7 @@ test('resolveRepoPath: maps links to dotfiles, never through `..`', async () => 
   expect(resolveRepoPath(`${HOME}/.claude/rules/x.md`, HOME)).toBe(`${HOME}/dotfiles/claude-code/rules/x.md`)
   expect(resolveRepoPath(`${HOME}/.claude/settings.json`, HOME)).toBe(`${HOME}/dotfiles/claude-code/settings.json`)
   expect(resolveRepoPath(`${HOME}/dotfiles/zsh/zshrc`, HOME)).toBe(`${HOME}/dotfiles/zsh/zshrc`)
+  expect(resolveRepoPath(`${HOME}/.pi/agent/settings.json`, HOME)).toBe(`${HOME}/dotfiles/pi/settings.json`)
   expect(resolveRepoPath(`${HOME}/.claude/rules/../projects/p`, HOME)).toBeUndefined()
   expect(resolveRepoPath(`${HOME}/src/a.go`, HOME)).toBeUndefined()
   expect(isLivePath(`${HOME}/.claude/rules/../projects/p`, HOME)).toBe(false)

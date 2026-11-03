@@ -91,21 +91,26 @@ export function redactSecrets(text: string): string {
   return out;
 }
 
+const MAX_DEPTH = 1000;
+class TooDeep extends Error {}
+
 // Redact string values (and keys) of a parsed JSON value. Returns the input
 // object itself when nothing changed so callers can keep the original line.
-function redactValue(v: unknown, hit: { changed: boolean }): unknown {
+// Throws TooDeep past MAX_DEPTH levels, well before the native stack limit.
+function redactValue(v: unknown, hit: { changed: boolean }, depth = 0): unknown {
+  if (depth > MAX_DEPTH) throw new TooDeep();
   if (typeof v === "string") {
     const r = redactSecrets(v);
     if (r !== v) hit.changed = true;
     return r;
   }
-  if (Array.isArray(v)) return v.map((x) => redactValue(x, hit));
+  if (Array.isArray(v)) return v.map((x) => redactValue(x, hit, depth + 1));
   if (v !== null && typeof v === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, x] of Object.entries(v)) {
       const rk = redactSecrets(k);
       if (rk !== k) hit.changed = true;
-      out[rk] = redactValue(x, hit);
+      out[rk] = redactValue(x, hit, depth + 1);
     }
     return out;
   }
@@ -116,7 +121,8 @@ function redactValue(v: unknown, hit: { changed: boolean }): unknown {
 // redacted before re-serialising, so a token that starts a line, tab or
 // string sees the text exactly as the user wrote it instead of behind a
 // `\n` / `\t` escape. Records with no hit are kept byte-for-byte; records
-// that fail to parse fall back to redacting the raw line.
+// that fail to parse, or nest deeper than redactValue allows, fall back to
+// redacting the raw line.
 export function redactTranscript(jsonl: string): string {
   return jsonl
     .split("\n")
@@ -129,8 +135,12 @@ export function redactTranscript(jsonl: string): string {
         return redactSecrets(line);
       }
       const hit = { changed: false };
-      const redacted = redactValue(parsed, hit);
-      return hit.changed ? JSON.stringify(redacted) : line;
+      try {
+        const redacted = redactValue(parsed, hit);
+        return hit.changed ? JSON.stringify(redacted) : line;
+      } catch {
+        return redactSecrets(line);
+      }
     })
     .join("\n");
 }

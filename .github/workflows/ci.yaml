@@ -64,6 +64,17 @@ jobs:
       - name: "rules paths: frontmatter sync check"
         run: bash tests/rules-paths-sync.sh
 
+  symlinked-sync:
+    # #101: the SYMLINKED table in session-edits.tsx must list every
+    # link_with_backup pair in setup.sh (a hooks module can't resolve links).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "SYMLINKED table sync check"
+        run: bash tests/symlinked-sync.sh
+
   cloud-manifest-sync:
     # claude-code/cloud/setup.sh installs exactly the files in
     # claude-code/cloud/manifest.sha256; catch a rule/skill/agent edit that

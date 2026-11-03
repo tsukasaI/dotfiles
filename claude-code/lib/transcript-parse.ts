@@ -63,6 +63,15 @@ export function sumTokens(usage: unknown): { input: number; output: number } {
   };
 }
 
+// A user line carrying only tool results is the tool's reply, not a prompt.
+function isToolResultOnly(content: unknown): boolean {
+  return (
+    Array.isArray(content) &&
+    content.length > 0 &&
+    content.every((b) => isPlainObject(b) && b.type === "tool_result")
+  );
+}
+
 export function parseTranscript(lines: string[]): SessionMeta {
   const meta: SessionMeta = {
     model: "",
@@ -76,6 +85,7 @@ export function parseTranscript(lines: string[]): SessionMeta {
     numAssistant: 0,
     dayCounts: new Map(),
   };
+  const seenIds = new Set<string>();
 
   for (const line of lines) {
     let parsed: unknown;
@@ -96,30 +106,40 @@ export function parseTranscript(lines: string[]): SessionMeta {
     if (!meta.startedAt && ts) meta.startedAt = ts;
     if (ts) meta.endedAt = ts;
 
-    const isMessage = entry.type === "user" || entry.type === "assistant";
-    if (day && isMessage) {
-      meta.dayCounts.set(day, (meta.dayCounts.get(day) ?? 0) + 1);
-    }
-
     const message = isPlainObject(entry.message) ? entry.message : undefined;
+
+    // A message is a user prompt or a distinct assistant response; the day
+    // bucket follows the same decision as numUser / numAssistant.
+    let counted = false;
 
     switch (entry.type) {
       case "user":
-        meta.numUser++;
+        if (!isToolResultOnly(message?.content)) {
+          meta.numUser++;
+          counted = true;
+        }
         meta.version ||= asString(entry.version);
         meta.gitBranch ||= asString(entry.gitBranch);
         break;
 
-      case "assistant":
-        meta.numAssistant++;
+      case "assistant": {
         meta.model ||= asString(message?.model);
+        // One JSONL line per content block, each repeating the message's id and usage.
+        const id = asString(message?.id) || asString(entry.requestId);
+        if (id && seenIds.has(id)) break;
+        if (id) seenIds.add(id);
+        meta.numAssistant++;
+        counted = true;
         if (message?.usage !== undefined) {
           const tokens = sumTokens(message.usage);
           meta.inputTokens += tokens.input;
           meta.outputTokens += tokens.output;
         }
         break;
+      }
     }
+
+    if (counted && day) meta.dayCounts.set(day, (meta.dayCounts.get(day) ?? 0) + 1);
   }
 
   return meta;

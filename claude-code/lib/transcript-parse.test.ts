@@ -173,3 +173,65 @@ describe("validateHookInput", () => {
     expect(r.ok && r.value.reason).toBeUndefined();
   });
 });
+
+describe("parseTranscript: one message split across lines", () => {
+  const block = (id: unknown, usage: unknown) =>
+    j({ type: "assistant", timestamp: T1, message: { id, model: "claude-x", usage } });
+  const usage = { input_tokens: 10, output_tokens: 5 };
+
+  test("lines sharing a message.id count once", () => {
+    const meta = parseTranscript([block("msg_1", usage), block("msg_1", usage), block("msg_1", usage)]);
+    expect(meta.inputTokens).toBe(10);
+    expect(meta.outputTokens).toBe(5);
+    expect(meta.numAssistant).toBe(1);
+  });
+  test("different ids are counted separately", () => {
+    const meta = parseTranscript([block("msg_1", usage), block("msg_2", usage)]);
+    expect(meta.inputTokens).toBe(20);
+    expect(meta.outputTokens).toBe(10);
+    expect(meta.numAssistant).toBe(2);
+  });
+  test("requestId stands in when there is no message.id; lines with neither are all counted", () => {
+    const withRequest = j({ type: "assistant", timestamp: T1, requestId: "req_1", message: { usage } });
+    expect(parseTranscript([withRequest, withRequest]).numAssistant).toBe(1);
+    expect(parseTranscript([block(undefined, usage), block(undefined, usage)]).numAssistant).toBe(2);
+  });
+});
+
+describe("parseTranscript: what counts as a message", () => {
+  const userWith = (content: unknown) => j({ type: "user", timestamp: T1, message: { content } });
+  const toolResult = { type: "tool_result", tool_use_id: "t1", content: "ok" };
+
+  test("a tool_result-only user line is not a prompt: no numUser, no day bucket", () => {
+    const meta = parseTranscript([userWith([toolResult]), userWith([toolResult, toolResult])]);
+    expect(meta.numUser).toBe(0);
+    expect(total(meta.dayCounts)).toBe(0);
+  });
+  test("string content, text+tool_result, and an empty array are prompts", () => {
+    const meta = parseTranscript([
+      userWith("hello"),
+      userWith([toolResult, { type: "text", text: "and more" }]),
+      userWith([]),
+    ]);
+    expect(meta.numUser).toBe(3);
+    expect(total(meta.dayCounts)).toBe(3);
+  });
+  test("a tool_result-only user line still supplies version and gitBranch", () => {
+    const line = j({
+      type: "user",
+      timestamp: T1,
+      version: "2.0.1",
+      gitBranch: "feat/x",
+      message: { content: [toolResult] },
+    });
+    const meta = parseTranscript([line]);
+    expect(meta.version).toBe("2.0.1");
+    expect(meta.gitBranch).toBe("feat/x");
+  });
+  test("repeated assistant ids add one day bucket entry", () => {
+    const line = j({ type: "assistant", timestamp: T1, message: { id: "msg_1", usage: {} } });
+    const meta = parseTranscript([line, line, line]);
+    expect(total(meta.dayCounts)).toBe(1);
+    expect(meta.dayCounts.get(localDay(T1))).toBe(1);
+  });
+});
