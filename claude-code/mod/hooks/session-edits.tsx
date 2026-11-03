@@ -34,6 +34,9 @@ const SYMLINKED: ReadonlyArray<readonly [link: string, target: string]> = [
   ['.claude/themes', 'claude-code/themes'],
   ['.claude/settings.json', 'claude-code/settings.json'],
   ['.claude/CLAUDE.md', 'claude-code/CLAUDE.md'],
+  ['.local/bin/pi-factory', 'pi/pi-factory'],
+  ['.pi/agent/settings.json', 'pi/settings.json'],
+  ['.pi/agent/AGENTS.md', 'pi/AGENTS.md'],
 ]
 
 // The path inside ~/dotfiles that `path` is, or is symlinked to; undefined
