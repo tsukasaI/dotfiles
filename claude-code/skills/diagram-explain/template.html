@@ -57,11 +57,6 @@
   .c-removed { opacity: 0.85; }
   .selected rect, .selected path.line { filter: drop-shadow(0 0 3px var(--focus)); }
   .badge { fill: var(--removed); } .badge-text { fill: var(--on-badge); font-weight: 700; }
-  fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 12px; min-width: 0; }
-  fieldset label { display: block; padding: 2px 0; }
-  .other-text { width: 80%; }
-  .right { color: var(--added); } .wrong { color: var(--removed); }
-  #result { width: 100%; height: 160px; font: 12px ui-monospace, monospace; color: var(--ink); background: var(--code-bg); }
   @media (max-width: 719px) {
     header, main, section { padding-left: 16px; padding-right: 16px; }
     #banner { margin: 8px 16px; }
@@ -103,23 +98,12 @@
   <h2>深掘り対象外と判断した境界</h2>
   <ul id="boundaries"></ul>
 </section>
-<section id="quiz-sec" hidden>
-  <h2>理解確認</h2>
-  <form id="quiz"></form>
-  <div id="difficulty" hidden><strong>難易度（任意）:</strong></div>
-  <p><button id="score" type="button" disabled>採点する</button></p>
-  <div id="score-out"></div>
-</section>
 <script type="application/json" id="data">__DATA__</script>
-<script>
-/*__CORE__*/
-</script>
 <script>
 "use strict";
 const { diagram: D, checks } = JSON.parse(document.getElementById("data").textContent);
 const SVG = "http://www.w3.org/2000/svg";
 const COL = 250, ROW = 100, W = 200, H = 60, PAD = 30, TOP = 40;
-const PERSPECTIVE = { flow: "フロー・IF", deepDive: "深掘り", rejected: "却下案", evidence: "根拠コード" };
 const CATEGORY = {
   "input-validation": "外部入力の検証", auth: "認証・権限", secrets: "秘密情報", "process-exec": "シェル・プロセス実行",
   "guard-sandbox": "ガード・サンドボックス", crypto: "暗号", destructive: "破壊的操作",
@@ -129,12 +113,10 @@ const STATUS = {
   missing: "ファイルがない、または読めない", outside: "repo 外のパス（照合を拒否）",
 };
 const IS_PLAN = D.mode === "plan";
-const GATED = typeof gateQuiz === "function" && typeof resultBlock === "function";
 const checkById = new Map(checks.map(c => [c.id, c]));
 const nodeById = new Map(D.nodes.map(n => [n.id, n]));
 const edges = D.edges || [];
 const steps = D.steps || [];
-const quiz = D.quiz || [];
 const el = (tag, attrs = {}, text) => {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
@@ -334,7 +316,6 @@ async function copyText(text, button) {
 document.getElementById("prev").addEventListener("click", () => show(current - 1));
 document.getElementById("next").addEventListener("click", () => show(current + 1));
 document.addEventListener("keydown", ev => {
-  if (ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement) return;
   if (ev.key === "ArrowLeft") show(current - 1);
   if (ev.key === "ArrowRight") show(current + 1);
 });
@@ -344,89 +325,6 @@ if (IS_PLAN) {
   for (const b of D.boundaries || []) document.getElementById("boundaries").append(el("li", {}, `${b.label} — ${b.reason}`));
   if ((D.boundaries || []).length === 0) document.getElementById("boundaries").append(el("li", { class: "muted" }, "なし"));
 }
-
-const form = document.getElementById("quiz");
-const scoreButton = document.getElementById("score");
-const difficulty = document.getElementById("difficulty");
-if (quiz.length > 0) document.getElementById("quiz-sec").hidden = false;
-quiz.forEach((q, i) => {
-  const fs = el("fieldset");
-  const tag = q.perspective ? ` [${PERSPECTIVE[q.perspective]}]` : "";
-  fs.append(el("legend", {}, `Q${i + 1}${tag} ${q.question}`));
-  if (q.about) {
-    const look = el("button", { type: "button" }, "図で見る");
-    look.addEventListener("click", () => select(q.about));
-    fs.append(look);
-  }
-  // Shuffled because a model writing the quiz tends to put the answer first.
-  const order = q.options.map((_, k) => k);
-  for (let k = order.length - 1; k > 0; k--) {
-    const j = Math.floor(Math.random() * (k + 1));
-    [order[k], order[j]] = [order[j], order[k]];
-  }
-  for (const k of order) {
-    const label = el("label");
-    label.append(el("input", { type: "radio", name: `q${i}`, value: String(k) }), ` ${q.options[k]}`);
-    fs.append(label);
-  }
-  const other = el("label");
-  other.append(el("input", { type: "radio", name: `q${i}`, value: "other" }), " Other（妥当な選択肢がない: 考慮不足を書く） ");
-  other.append(el("input", { type: "text", class: "other-text", "data-q": String(i), maxlength: "300" }));
-  fs.append(other);
-  form.append(fs);
-});
-if (GATED) {
-  difficulty.hidden = false;
-  for (const v of ["易", "適", "難"]) {
-    const label = el("label");
-    label.append(el("input", { type: "radio", name: "difficulty", value: v }), ` ${v} `);
-    difficulty.append(label);
-  }
-}
-
-function collect() {
-  return quiz.map((_, i) => {
-    const picked = form.querySelector(`input[name="q${i}"]:checked`);
-    if (!picked) return null;
-    if (picked.value !== "other") return { choice: Number(picked.value) };
-    const text = form.querySelector(`input[data-q="${i}"]`).value.trim();
-    return text ? { other: text } : null;
-  });
-}
-form.addEventListener("input", () => { scoreButton.disabled = collect().some(a => a === null); });
-
-scoreButton.addEventListener("click", () => {
-  const answers = collect();
-  if (answers.some(a => a === null)) return;
-  const score = scoreQuiz(quiz, answers);
-  const gate = GATED ? gateQuiz(quiz, answers) : null;
-  for (const input of document.querySelectorAll("#quiz input, #difficulty input")) input.disabled = true;
-  scoreButton.disabled = true;
-  const out = document.getElementById("score-out");
-  out.replaceChildren();
-  if (gate) out.append(el("h2", { class: gate.passed ? "right" : "wrong" }, gate.passed ? "合格" : "不合格"));
-  out.append(el("h2", {}, `${score.correct} / ${score.scored} 正解`));
-  quiz.forEach((q, i) => {
-    const a = answers[i];
-    if (typeof a.other === "string") {
-      out.append(el("div", {}, `Q${i + 1} - 考慮不足を指摘: ${a.other}`));
-    } else {
-      const ok = a.choice === q.answer;
-      out.append(el("div", { class: ok ? "right" : "wrong" }, `Q${i + 1} ${ok ? "✓" : "✗"} ${q.question}`));
-    }
-    out.append(el("div", { class: "muted" }, `正解: ${q.options[q.answer]} / 解説: ${q.explanation}`));
-  });
-  if (gate) {
-    const picked = document.querySelector('input[name="difficulty"]:checked');
-    const text = resultBlock(D.slug, quiz, answers, gate, picked ? picked.value : "");
-    out.append(el("h2", {}, "この結果をチャットに貼ってください"));
-    const area = el("textarea", { id: "result", readonly: "" });
-    area.value = text;
-    const copy = el("button", { type: "button" }, "結果をコピー");
-    copy.addEventListener("click", () => { area.select(); copyText(text, copy); });
-    out.append(area, copy);
-  }
-});
 
 show(0);
 </script>

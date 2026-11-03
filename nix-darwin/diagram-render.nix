@@ -7,9 +7,7 @@ stdenvNoCC.mkDerivation {
     fileset = lib.fileset.unions [
       ../claude-code/skills/diagram-explain/render.ts
       ../claude-code/skills/diagram-explain/template.html
-      ../claude-code/skills/diagram-explain/quiz-core.js
       ../claude-code/skills/explain-plan/plan.ts
-      ../claude-code/skills/explain-plan/plan-core.js
     ];
   };
   nativeBuildInputs = [ bun ];

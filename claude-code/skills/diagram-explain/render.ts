@@ -4,10 +4,8 @@ import { tmpdir } from "os";
 import { dirname, isAbsolute, join, relative, resolve } from "path";
 // Not read at run time next to import.meta.url: in the `bun build --compile` binary that is the
 // virtual /$bunfs root, so the files must be embedded.
-import quizCore from "./quiz-core.js" with { type: "text" };
 import template from "./template.html" with { type: "text" };
 
-const PERSPECTIVES = ["flow", "deepDive", "rejected", "evidence"] as const;
 const CHANGES = ["added", "changed", "removed"] as const;
 
 const MAX_JSON_BYTES = 1_000_000;
@@ -31,14 +29,6 @@ export type DiagramNode = {
 };
 export type DiagramEdge = { id: string; from: string; to: string; data: string; kind: Kind; ref?: Ref };
 export type Step = { title: string; description: string; changes: Record<string, (typeof CHANGES)[number]> };
-export type QuizItem = {
-  perspective?: (typeof PERSPECTIVES)[number];
-  question: string;
-  options: string[];
-  answer: number;
-  explanation: string;
-  about?: string;
-};
 export type Diagram = {
   version: 1;
   mode: Mode;
@@ -50,7 +40,6 @@ export type Diagram = {
   edges: DiagramEdge[];
   steps: Step[];
   boundaries: { label: string; reason: string }[];
-  quiz: QuizItem[];
 };
 
 export type RefStatus = "ok" | "moved" | "mismatch" | "missing" | "outside";
@@ -128,26 +117,6 @@ function checkSteps(
   for (const [id, kind] of kinds) {
     if (kind === "proposed" && !added.has(id)) errors.push(`proposed ${id} is never added in a step`);
   }
-}
-
-function checkQuiz(quiz: unknown[], ids: Set<string>, errors: string[]): void {
-  quiz.forEach((q, i) => {
-    const where = `quiz[${i}]`;
-    if (!isObj(q)) return void errors.push(`${where}: must be an object`);
-    if (q.perspective !== undefined && !PERSPECTIVES.includes(q.perspective as never)) {
-      errors.push(`${where}: unknown perspective`);
-    }
-    if (!isText(q.question, 500)) errors.push(`${where}: question required (<=500 chars)`);
-    const opts = q.options;
-    if (!Array.isArray(opts) || opts.length !== 4 || !opts.every(o => isText(o, 300)) || new Set(opts).size !== 4) {
-      errors.push(`${where}: options must be 4 distinct non-empty strings`);
-    }
-    if (!isInt(q.answer, 0, 3)) errors.push(`${where}: answer must be 0-3`);
-    if (!isText(q.explanation, 1000)) errors.push(`${where}: explanation required (<=1000 chars)`);
-    if (q.about !== undefined && !(typeof q.about === "string" && ids.has(q.about))) {
-      errors.push(`${where}: about must be a node or edge id`);
-    }
-  });
 }
 
 export function validate(raw: unknown): { diagram: Diagram } | { errors: string[] } {
@@ -245,9 +214,6 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
   if (raw.steps !== undefined && (!Array.isArray(raw.steps) || raw.steps.length > 30)) errors.push("steps: at most 30 steps");
   else checkSteps((raw.steps as unknown[]) ?? [], kinds, endpoints, errors);
 
-  if (raw.quiz !== undefined && (!Array.isArray(raw.quiz) || raw.quiz.length > 15)) errors.push("quiz: at most 15 questions");
-  else checkQuiz((raw.quiz as unknown[]) ?? [], new Set(kinds.keys()), errors);
-
   if (errors.length > 0) return { errors };
   const withKind = (x: unknown) => ({ ...(x as Obj), kind: (x as Obj).kind ?? "existing" });
   return {
@@ -259,7 +225,6 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
       edges: ((raw.edges as unknown[]) ?? []).map(withKind),
       steps: raw.steps ?? [],
       boundaries: raw.boundaries ?? [],
-      quiz: raw.quiz ?? [],
     } as unknown as Diagram,
   };
 }
@@ -334,20 +299,18 @@ export function embedJson(value: unknown): string {
 const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
-export function renderHtml(diagram: Diagram, checks: RefCheck[], template: string, cores: string[]): string {
-  for (const core of cores) if (/<\/script/i.test(core)) throw new Error("a core script must not contain </script");
-  for (const marker of ["__DATA__", "/*__CORE__*/", "__TITLE__"]) {
+export function renderHtml(diagram: Diagram, checks: RefCheck[], template: string): string {
+  for (const marker of ["__DATA__", "__TITLE__"]) {
     if (template.split(marker).length !== 2) throw new Error(`template must contain ${marker} exactly once`);
   }
   const fill: Record<string, string> = {
-    "/*__CORE__*/": cores.join("\n"),
     __DATA__: embedJson({ diagram, checks }),
     __TITLE__: escapeHtml(diagram.title),
   };
   // One pass with a function replacer: a string replacement would expand $& and $' found in the
   // payload, and sequential split/join would rescan inserted text for the next marker (a title
   // of "__DATA__" would receive the payload).
-  return template.replace(/\/\*__CORE__\*\/|__DATA__|__TITLE__/g, m => fill[m]);
+  return template.replace(/__DATA__|__TITLE__/g, m => fill[m]);
 }
 
 export function outputPath(
@@ -360,7 +323,6 @@ export function outputPath(
 
 export type MainOptions = {
   extraValidate?: (raw: unknown, errors: string[]) => void;
-  extraCores?: string[];
   defaultMode?: Mode;
   outDirName?: string;
 };
@@ -409,7 +371,7 @@ export function main(argv: string[], log = console.log, fail = console.error, op
       return fail(`cannot read repo root ${rootDir}: ${String(err)}`), 1;
     }
   }
-  const html = renderHtml(diagram, checks, template, [quizCore, ...(opts.extraCores ?? [])]);
+  const html = renderHtml(diagram, checks, template);
   const out = outFlag ?? outputPath(diagram.slug, process.env, opts.outDirName);
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, html);

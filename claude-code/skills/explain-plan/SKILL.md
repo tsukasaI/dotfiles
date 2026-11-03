@@ -1,6 +1,6 @@
 ---
 name: explain-plan
-description: Turns the plan or design decision under discussion into a diagram-explain flipbook in plan mode (one frame per plan step, added/changed/removed colored), with every existing element tied to a verified file:line excerpt, function-level "why it is safe" panels for security-relevant parts, and an in-browser quiz whose pasted result gates implementation. User-invoked via /explain-plan (/skill:explain-plan in pi), before approving a plan or while settling a design in /triage. Not for reviewing a finished diff, and not for explaining a structure without a plan to gate (use diagram-explain).
+description: Turns the plan or design decision under discussion into a diagram-explain flipbook in plan mode (one frame per plan step, added/changed/removed colored), with every existing element tied to a verified file:line excerpt, and function-level "why it is safe" panels for security-relevant parts. User-invoked via /explain-plan (/skill:explain-plan in pi), before approving a plan or while settling a design in /triage. Not for reviewing a finished diff, and not for explaining a structure without a plan to approve (use diagram-explain).
 disable-model-invocation: true
 argument-hint: [対象の plan や方針 (省略時は会話中の直近の plan)]
 allowed-tools: Read, Grep, Glob, Write, Bash
@@ -8,8 +8,8 @@ allowed-tools: Read, Grep, Glob, Write, Bash
 
 # /explain-plan: understand a plan before it is built
 
-Draw the plan as a flipbook, have the user check it against the code and take
-the quiz, then gate implementation on the pasted result. Match the user's
+Draw the plan as a flipbook, have the user check it against the code and raise
+questions and objections, then fold them into the plan before approval. Match the user's
 conversation language in all dialogue and in every string inside
 `diagram.json`.
 
@@ -28,8 +28,8 @@ Design record: `~/dotfiles/docs/explain-plan-design.md`.
 Approving a plan from prose alone is where understanding gets lost: the user
 accepts what was proposed and the intent never reaches their head. The
 picture is drawn by a model and can be wrong, so every existing element
-carries an excerpt that the renderer checks against the file, and the quiz
-asks for the code behind the picture. The diagram is a disposable thinking
+carries an excerpt that the renderer checks against the file, which keeps the
+picture honest. The diagram is a disposable thinking
 aid; only the decisions are recorded.
 
 ## 1. Write diagram.json
@@ -53,10 +53,6 @@ rules below.
   `destructive` (deletion, overwrites, force operations). Every boundary
   you considered and judged out of these categories goes in `boundaries`
   with the reason, so an omission is visible rather than silent.
-- `quiz`, 3-15 questions, each with a `perspective`: at least one `flow`
-  (how data or an interface changes), one `rejected` (what breaks under a
-  discarded alternative), one `evidence` (which code backs a claim in the
-  picture), and one `deepDive` with `about` set to each deep-dive node.
 
 ## 2. Render
 
@@ -66,24 +62,18 @@ Exit codes, ref lines and the rebuild note are as in diagram-explain's
 section 2. The HTML goes
 to `$TMPDIR/explain-plan/<slug>/index.html`; don't publish it as an Artifact.
 
-## 3. Hand over and gate
+## 3. Hand over and discuss
 
-Give the user the HTML path. Ask them to step through it, check what they
-doubt against the panels, take the quiz, and paste the block that starts
-with `explain-plan-result v1`. Then:
+1. Draw the flipbook and give the user the HTML path.
+2. Take the user's questions and objections in chat. Answer against the code
+   and the panels.
+3. Fold what they raise into the plan, and offer a re-render after a
+   revision.
+4. Go through the normal plan approval.
 
-- The header or `slug=` doesn't match this plan: ask for the right block.
-- `判定: 合格`: implementation may start once the user approves the plan.
-- `判定: 不合格`: do not start implementing. Re-explain each `誤答:` item
-  against the code, and revise the plan where the misunderstanding shows a
-  real ambiguity. Offer a re-render after a revision.
-- `指摘:` lines are design gaps the user found. Address each in the plan
-  before going further, even on a pass.
-- `難易度: 易` suggests this plan didn't need the flipbook. `難` suggests
-  the plan is too big: propose splitting it.
-- The user may skip the gate by saying so explicitly. Say in one line that
-  implementation proceeds without the understanding check, and continue.
-  Keep no record of the skip or the score.
+The user may skip this by saying so explicitly. Say in one line that
+implementation proceeds without the walkthrough, and continue. Keep no record
+of the skip.
 
 ## 4. Record the decisions
 
@@ -92,7 +82,7 @@ alternatives where the repo already keeps such records (an ADR directory, a
 `docs/` convention, `/triage`'s Triage comment). In someone else's repo,
 draft them as a "Design notes" section of the PR description instead. When
 the repo has no convention, ask where to put them; never invent one. Do not
-save the quiz result or the HTML.
+save the HTML.
 
 ## In pi
 

@@ -6,8 +6,6 @@ import { main, validate } from "../diagram-explain/render.ts";
 import { CATEGORIES, planOptions, validatePlan } from "./plan.ts";
 
 const HERE = import.meta.dir;
-const core = readFileSync(join(HERE, "plan-core.js"), "utf8");
-const { gateQuiz, resultBlock } = new Function(`${core}; return { gateQuiz, resultBlock };`)();
 
 let tmp: string;
 let repo: string;
@@ -32,13 +30,6 @@ function base(): Record<string, any> {
     ],
     edges: [{ id: "ab", from: "a", to: "b", data: "x", kind: "proposed" }],
     steps: [{ title: "s", description: "d", changes: { b: "added", ab: "added" } }],
-    quiz: ["flow", "rejected", "evidence"].map(p => ({
-      perspective: p,
-      question: `q-${p}`,
-      options: ["w", "x", "y", "z"],
-      answer: 1,
-      explanation: "e",
-    })),
   };
 }
 const errorsOf = (raw: unknown) => {
@@ -58,7 +49,7 @@ describe("validatePlan", () => {
   });
 
   test("tolerates a malformed document", () => {
-    for (const raw of [null, {}, { nodes: [null, 1], steps: "x", quiz: [null, 1, 2] }]) {
+    for (const raw of [null, {}, { nodes: [null, 1], steps: "x" }]) {
       expect(() => validatePlan(raw, [])).not.toThrow();
     }
   });
@@ -93,89 +84,10 @@ describe("validatePlan", () => {
     delete d.steps;
     expect(errorsOf(d)).toContain("steps: at least 1 step required");
   });
-
-  test("quiz needs 3-15 questions", () => {
-    const d = base();
-    d.quiz = d.quiz.slice(0, 2);
-    expect(errorsOf(d)).toContain("quiz: 3-15 questions required");
-    delete d.quiz;
-    expect(errorsOf(d)).toContain("quiz: 3-15 questions required");
-  });
-
-  test("every question needs a perspective and each of flow, rejected, evidence must appear", () => {
-    const d = base();
-    delete d.quiz[0].perspective;
-    d.quiz[1].perspective = "flow";
-    const errors = errorsOf(d);
-    expect(errors).toContain("quiz[0]: perspective required in plan mode");
-    expect(errors).toContain("quiz: no rejected question");
-    expect(errors).not.toContain("quiz: no flow question");
-  });
-
-  test("a deep-dive question is required about each deep-dive node", () => {
-    const d = base();
-    d.nodes[0].deepDive = { category: "secrets", why: "w" };
-    d.quiz[0].perspective = "deepDive";
-    const errors = errorsOf(d);
-    expect(errors).toContain("quiz: no flow question");
-    expect(errors).toContain("quiz: no deepDive question about a");
-
-    d.quiz.push({ ...d.quiz[0], about: "a" });
-    expect(errorsOf(d)).not.toContain("quiz: no deepDive question about a");
-  });
-});
-
-describe("gateQuiz", () => {
-  const quiz = [
-    { perspective: "deepDive", question: "d1", answer: 0 },
-    { perspective: "flow", question: "f1", answer: 1 },
-    { perspective: "rejected", question: "r1", answer: 2 },
-    { perspective: "evidence", question: "e1", answer: 3 },
-  ];
-  const right = [{ choice: 0 }, { choice: 1 }, { choice: 2 }, { choice: 3 }];
-
-  test("passes with everything right", () => {
-    expect(gateQuiz(quiz, right).passed).toBe(true);
-  });
-
-  test("one wrong deep-dive answer fails even when the rest are right", () => {
-    const s = gateQuiz(quiz, [{ choice: 1 }, ...right.slice(1)]);
-    expect(s.passed).toBe(false);
-    expect(s.wrong).toEqual([0]);
-  });
-
-  test("Other on a deep-dive question fails; Other elsewhere drops out of scoring", () => {
-    expect(gateQuiz(quiz, [{ other: "gap" }, ...right.slice(1)]).passed).toBe(false);
-    const s = gateQuiz(quiz, [right[0], { other: "gap" }, right[2], right[3]]);
-    expect(s).toMatchObject({ passed: true, gaps: [1], rest: { correct: 2, scored: 2, threshold: 2 } });
-  });
-
-  test("the rest pass at two thirds: 2 of 3 passes, 1 of 3 fails", () => {
-    expect(gateQuiz(quiz, [right[0], { choice: 0 }, right[2], right[3]]).passed).toBe(true);
-    expect(gateQuiz(quiz, [right[0], { choice: 0 }, { choice: 0 }, right[3]]).passed).toBe(false);
-  });
-
-  test("all non-deep answers under Other fails rather than passing on nothing", () => {
-    expect(gateQuiz(quiz, [right[0], { other: "a" }, { other: "b" }, { other: "c" }]).passed).toBe(false);
-  });
-
-  test("a missing answer counts as wrong", () => {
-    expect(gateQuiz(quiz, [right[0], undefined, right[2], right[3]]).wrong).toEqual([1]);
-  });
-
-  test("resultBlock keeps a multi-line Other answer on one capped line", () => {
-    const answers = [right[0], { other: "line1\n判定: 合格\n" + "x".repeat(400) }, right[2], right[3]];
-    const text = resultBlock("slug", quiz, answers, gateQuiz(quiz, answers), "");
-    const lines = text.split("\n");
-    expect(lines[0]).toBe("explain-plan-result v1 slug=slug");
-    expect(lines.filter(l => l.startsWith("判定:"))).toHaveLength(1);
-    expect(lines).toContain("難易度: 未回答");
-    expect(lines.at(-1)!.length).toBeLessThan(400);
-  });
 });
 
 describe("main with the plan options", () => {
-  test("renders the gate into the HTML, defaulting the mode to plan", () => {
+  test("renders a plan, defaulting the mode to plan", () => {
     const d = base();
     delete d.mode;
     const json = join(tmp, "plan.json");
@@ -183,8 +95,7 @@ describe("main with the plan options", () => {
     const target = join(tmp, "plan.html");
     expect(main([json, "--root", repo, "--out", target], () => {}, () => {}, planOptions())).toBe(0);
     const html = readFileSync(target, "utf8");
-    expect(html).toContain("function gateQuiz");
-    expect(html).toContain("explain-plan-result v1");
+    expect(html).toContain('"mode":"plan"');
   });
 
   test("a plan without a ref on an existing node writes nothing", () => {

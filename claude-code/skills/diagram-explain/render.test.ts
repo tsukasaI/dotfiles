@@ -5,8 +5,6 @@ import { join } from "path";
 import { checkRefs, embedJson, main, outputPath, renderHtml, validate, type Diagram } from "./render.ts";
 
 const HERE = import.meta.dir;
-const core = readFileSync(join(HERE, "quiz-core.js"), "utf8");
-const { scoreQuiz } = new Function(`${core}; return { scoreQuiz };`)();
 const LINE_SEPARATORS = String.fromCharCode(0x2028, 0x2029);
 
 let tmp: string;
@@ -33,7 +31,6 @@ function base(): Record<string, any> {
     ],
     edges: [{ id: "ab", from: "a", to: "b", data: "x", kind: "proposed" }],
     steps: [{ title: "s", description: "d", changes: { b: "added", ab: "added" } }],
-    quiz: [{ question: "q", options: ["w", "x", "y", "z"], answer: 1, explanation: "e" }],
   };
 }
 const errorsOf = (raw: unknown) => {
@@ -56,11 +53,11 @@ const bare = (): Record<string, any> => ({
 describe("validate", () => {
   test("a bare diagram is accepted and normalized", () => {
     const d = diagramOf(bare());
-    expect(d).toMatchObject({ mode: "explain", summary: "", edges: [], steps: [], boundaries: [], quiz: [] });
+    expect(d).toMatchObject({ mode: "explain", summary: "", edges: [], steps: [], boundaries: [] });
     expect(d.nodes[0].kind).toBe("existing");
   });
 
-  test("accepts no steps, no quiz and no refs", () => {
+  test("accepts no steps and no refs", () => {
     const d = bare();
     d.nodes.push({ id: "b", lane: "l", order: 1, kind: "existing", label: "B" });
     d.edges = [{ id: "ab", from: "a", to: "b", data: "x" }];
@@ -166,32 +163,10 @@ describe("validate", () => {
     expect(errors.some(e => e.includes("a change must be"))).toBe(true);
   });
 
-  test("more than 30 steps or 15 questions are rejected", () => {
+  test("more than 30 steps are rejected", () => {
     const d = base();
     d.steps = Array(31).fill({ title: "s", description: "d", changes: { b: "added" } });
     expect(errorsOf(d)).toContain("steps: at most 30 steps");
-    const e = base();
-    e.quiz = Array(16).fill(e.quiz[0]);
-    expect(errorsOf(e)).toContain("quiz: at most 15 questions");
-  });
-
-  test("a quiz perspective is optional but must be known when present; options must be 4 distinct", () => {
-    const d = base();
-    d.quiz[0].perspective = "vibes";
-    d.quiz[0].options = ["a", "a", "b", "c"];
-    const errors = errorsOf(d);
-    expect(errors).toContain("quiz[0]: unknown perspective");
-    expect(errors.some(e => e.startsWith("quiz[0]: options"))).toBe(true);
-
-    const ok = base();
-    ok.quiz[0].perspective = "flow";
-    expect(errorsOf(ok)).toEqual([]);
-  });
-
-  test("a quiz about must name a node or edge", () => {
-    const d = base();
-    d.quiz[0].about = "nope";
-    expect(errorsOf(d)).toContain("quiz[0]: about must be a node or edge id");
   });
 
   test("deepDive and boundaries need mode plan", () => {
@@ -261,7 +236,7 @@ describe("renderHtml", () => {
     d.title = "</script><img src=x onerror=alert(1)>";
     d.nodes[0].ref.excerpt = "</SCRIPT><script>alert(1)</script> $& $' " + LINE_SEPARATORS;
     const diagram = diagramOf(d);
-    const html = renderHtml(diagram, [], template, [core]);
+    const html = renderHtml(diagram, [], template);
     const payload = html.split('<script type="application/json" id="data">')[1].split("</script>")[0];
     expect(payload).not.toMatch(/[<>]/);
     expect(JSON.parse(payload).diagram).toEqual(diagram);
@@ -269,12 +244,12 @@ describe("renderHtml", () => {
   });
 
   test("the title is HTML-escaped into <title>", () => {
-    const html = renderHtml(diagramOf({ ...base(), title: `a & <b> "c" 'd'` }), [], template, [core]);
+    const html = renderHtml(diagramOf({ ...base(), title: `a & <b> "c" 'd'` }), [], template);
     expect(html).toContain("<title>a &amp; &lt;b&gt; &quot;c&quot; &#39;d&#39;</title>");
   });
 
   test("text that looks like a marker is never expanded", () => {
-    const html = renderHtml(diagramOf({ ...base(), title: "__DATA__ $&" }), [], template, [core]);
+    const html = renderHtml(diagramOf({ ...base(), title: "__DATA__ $&" }), [], template);
     expect(html).toContain("<title>__DATA__ $&amp;</title>");
   });
 
@@ -282,50 +257,12 @@ describe("renderHtml", () => {
     expect(embedJson("<>&" + LINE_SEPARATORS)).toBe('"\\u003c\\u003e\\u0026\\u2028\\u2029"');
   });
 
-  test("inlines every core", () => {
-    const html = renderHtml(diagramOf(base()), [], template, ["/*A*/", "/*B*/"]);
-    expect(html).toContain("/*A*/\n/*B*/");
-  });
-
-  test("refuses a core script containing </script and a template with a missing or duplicated marker", () => {
+  test("refuses a template with a missing or duplicated marker", () => {
     const d = diagramOf(base());
-    expect(() => renderHtml(d, [], template, ["x = '</script>'"])).toThrow();
-    expect(() => renderHtml(d, [], template, [core, "y = '</SCRIPT>'"])).toThrow();
     for (const marker of ["__DATA__", "__TITLE__"]) {
-      expect(() => renderHtml(d, [], `${template}${marker}`, [core])).toThrow();
-      expect(() => renderHtml(d, [], template.replace(marker, ""), [core])).toThrow();
+      expect(() => renderHtml(d, [], `${template}${marker}`)).toThrow();
+      expect(() => renderHtml(d, [], template.replace(marker, ""))).toThrow();
     }
-    expect(() => renderHtml(d, [], `${template}/*__CORE__*/`, [core])).toThrow();
-  });
-});
-
-describe("quiz-core", () => {
-  const quiz = [
-    { question: "q1", answer: 0 },
-    { question: "q2", answer: 1 },
-    { question: "q3", answer: 2 },
-  ];
-
-  test("counts correct answers and lists the wrong ones", () => {
-    expect(scoreQuiz(quiz, [{ choice: 0 }, { choice: 0 }, { choice: 2 }])).toEqual({
-      correct: 2,
-      scored: 3,
-      wrong: [1],
-      gaps: [],
-    });
-  });
-
-  test("Other drops out of scoring into gaps", () => {
-    expect(scoreQuiz(quiz, [{ choice: 0 }, { other: "gap" }, { choice: 2 }])).toEqual({
-      correct: 2,
-      scored: 2,
-      wrong: [],
-      gaps: [1],
-    });
-  });
-
-  test("a missing answer counts as wrong", () => {
-    expect(scoreQuiz(quiz, [{ choice: 0 }, undefined, { choice: 2 }]).wrong).toEqual([1]);
   });
 });
 
@@ -373,7 +310,7 @@ describe("main", () => {
     expect(logs).toEqual([target]);
   });
 
-  test("options: extra validation, extra cores, default mode and output dir name", () => {
+  test("options: extra validation, default mode and output dir name", () => {
     const target = join(tmp, "opts.html");
     const d = base();
     d.nodes[0].deepDive = { category: "secrets", why: "w" };
@@ -382,9 +319,9 @@ describe("main", () => {
     expect(main([json, "--root", repo, "--out", target], () => {}, () => {})).toBe(1);
     expect(existsSync(target)).toBe(false);
 
-    const opts = { defaultMode: "plan" as const, extraCores: ["/*EXTRA-CORE*/"] };
+    const opts = { defaultMode: "plan" as const };
     expect(main([json, "--root", repo, "--out", target], () => {}, () => {}, opts)).toBe(0);
-    expect(readFileSync(target, "utf8")).toContain("/*EXTRA-CORE*/");
+    expect(readFileSync(target, "utf8")).toContain('"mode":"plan"');
 
     const failures: string[] = [];
     const veto = { extraValidate: (_: unknown, errors: string[]) => void errors.push("vetoed") };
