@@ -4,10 +4,10 @@ import type { EngineInterface, On } from 'claude-code'
 const DIRECT_TO_MAIN = /[:/]tsukasaI\/(dotfiles|ops)(\.git)?$/
 // Global options between `git` and the subcommand: `-c k=v`, `-C path`, `--no-pager`, `-P`,
 // `--git-dir <path>`. Values may be quoted or space-separated.
-const VALUE = String.raw`(?:"[^"]*"|'[^']*'|\S+)`
-// A separate-argument value never starts with `-`: otherwise `--git-dir --git-dir ...` can be split
-// between the value and the next option in exponentially many ways (catastrophic backtracking).
-const NV = String.raw`(?:"[^"]*"|'[^']*'|(?!-)\S+)`
+const VALUE = String.raw`(?:"[^"]*"|'[^']*'|[^\s"']\S*)`
+// Not `\S+` alone, and no leading `-`: overlapping branches (a quoted value is also `\S+`, a value
+// can also be the next option) split a run of options exponentially many ways (backtracking).
+const NV = String.raw`(?:"[^"]*"|'[^']*'|(?![-"'])\S+)`
 const VALUE_LONG_OPTIONS = 'git-dir|work-tree|namespace|exec-path|config-env|attr-source'
 const GIT_GLOBAL_OPTIONS = String.raw`(?:\s+(?:-[cC]\s+${NV}|--(?:${VALUE_LONG_OPTIONS})\s+${NV}|--[\w-]+(?:=${VALUE})?|-\w+))*`
 const GIT_COMMIT = new RegExp(String.raw`(^|[;&|(\n]\s*)git(${GIT_GLOBAL_OPTIONS})\s+commit(?![\w-])`)

@@ -212,9 +212,13 @@ test('cd/-C commits skip the branch check', async ($, on) => {
 
 test('repeated global options without a commit return quickly with no match', () => {
   for (const command of [
-    'git' + ' --git-dir=x'.repeat(40) + ' status',
-    'git' + ' --git-dir'.repeat(40) + ' status',
-    'git' + ' -c'.repeat(40) + ' status',
+    'git' + ' --git-dir=x'.repeat(24) + ' status',
+    'git' + ' --git-dir'.repeat(24) + ' status',
+    'git' + ' -c'.repeat(24) + ' status',
+    'git' + ' -c "a"'.repeat(24) + ' status',
+    'git' + " -c 'a'".repeat(24) + ' status',
+    'git' + ' --x="a"'.repeat(24) + ' status',
+    'git' + ' --git-dir "a"'.repeat(24) + ' status',
   ]) {
     const start = performance.now()
     expect(commitMessage(command)).toBeUndefined()
@@ -229,6 +233,8 @@ test('global options of every shape still reach the commit', () => {
     "git -C 'my dir' --no-pager commit -m \"feat: x\"",
     'git -c -x commit -m "feat: x"',
     'git --git-dir "a b" commit -m "feat: x"',
+    'git -c "a" commit -m "feat: x"',
+    'git --x="a b" commit -m "feat: x"',
   ]) {
     expect(commitMessage(command), command).toBe('feat: x')
   }
