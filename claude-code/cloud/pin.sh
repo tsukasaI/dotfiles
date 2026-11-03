@@ -32,15 +32,15 @@ while read -r digest path; do
   fi
 done < <(git show "$sha:claude-code/cloud/manifest.sha256")
 
+# Each code line ends in " #" and the pipeline is one line, not a multi-line
+# && chain with a { } group: if the box stores CRLF line endings, the \r
+# lands in a comment instead of in a value or after the closing brace.
 cat <<EOF
 #!/bin/bash
 # dotfiles cloud setup, pinned to tsukasaI/dotfiles@$sha
 # Renew: bash claude-code/cloud/pin.sh <newer main commit>, paste the output here.
-REF=$sha
-SETUP_SHA256=$setup_sha256
-MANIFEST_SHA256=$manifest_sha256
-f=\$(mktemp) &&
-  curl -fsSL --proto '=https' --retry 3 --max-time 60 -o "\$f" "https://raw.githubusercontent.com/tsukasaI/dotfiles/\$REF/claude-code/cloud/setup.sh" &&
-  echo "\$SETUP_SHA256  \$f" | sha256sum -c --quiet - &&
-  bash "\$f" "\$REF" "\$MANIFEST_SHA256" || { echo "dotfiles-cloud: FAILED (see above)" >&2; exit 1; }
+REF=$sha #
+SETUP_SHA256=$setup_sha256 #
+MANIFEST_SHA256=$manifest_sha256 #
+f=\$(mktemp) && curl -fsSL --proto '=https' --retry 3 --max-time 60 -o "\$f" "https://raw.githubusercontent.com/tsukasaI/dotfiles/\$REF/claude-code/cloud/setup.sh" && echo "\$SETUP_SHA256  \$f" | sha256sum -c --quiet - && bash "\$f" "\$REF" "\$MANIFEST_SHA256" || { echo "dotfiles-cloud: FAILED (see above)" >&2; exit 1; } #
 EOF

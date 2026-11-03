@@ -152,6 +152,20 @@ f974911ac917c739017107dbc62f8842e787dcab tsukasa inoue <inoue.tsukasa.4@gmail.co
   variables set gave `author=tsukasa inoue <inoue.tsukasa.4@gmail.com>
   committer=tsukasa inoue <inoue.tsukasa.4@gmail.com> sig=N`.
 
+## Setup-script box, `syntax error: unexpected end of file`
+
+After pasting the `dd14f27` bootstrap (10 lines, byte-identical to
+`pin.sh`'s output, `bash -n` clean), new sessions failed with
+`/tmp/init-script-<n>.sh: line 20: syntax error: unexpected end of file`
+(exit 2); the platform's SessionStart hook reported it and the session
+still started. The temp script is deleted afterwards, so its bytes were not
+seen. Converting the same 10 lines to CRLF reproduces the error
+(`line 11`); line 20 would fit CRLF plus a prefix the platform adds, which
+is unconfirmed. `pin.sh` now prints one-line commands that each end in
+` #`, which ran to completion here with LF, with CRLF, and with CRLF after
+nine extra lines; a wrong `SETUP_SHA256` under CRLF still exits 1 with
+nothing installed.
+
 ## Not verified here
 
 - That the environment's variables reach the session's git commands (check
