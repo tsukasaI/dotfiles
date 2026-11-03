@@ -173,3 +173,27 @@ describe("validateHookInput", () => {
     expect(r.ok && r.value.reason).toBeUndefined();
   });
 });
+
+describe("parseTranscript: one message split across lines", () => {
+  const block = (id: unknown, usage: unknown) =>
+    j({ type: "assistant", timestamp: T1, message: { id, model: "claude-x", usage } });
+  const usage = { input_tokens: 10, output_tokens: 5 };
+
+  test("lines sharing a message.id count once", () => {
+    const meta = parseTranscript([block("msg_1", usage), block("msg_1", usage), block("msg_1", usage)]);
+    expect(meta.inputTokens).toBe(10);
+    expect(meta.outputTokens).toBe(5);
+    expect(meta.numAssistant).toBe(1);
+  });
+  test("different ids are counted separately", () => {
+    const meta = parseTranscript([block("msg_1", usage), block("msg_2", usage)]);
+    expect(meta.inputTokens).toBe(20);
+    expect(meta.outputTokens).toBe(10);
+    expect(meta.numAssistant).toBe(2);
+  });
+  test("requestId stands in when there is no message.id; lines with neither are all counted", () => {
+    const withRequest = j({ type: "assistant", timestamp: T1, requestId: "req_1", message: { usage } });
+    expect(parseTranscript([withRequest, withRequest]).numAssistant).toBe(1);
+    expect(parseTranscript([block(undefined, usage), block(undefined, usage)]).numAssistant).toBe(2);
+  });
+});

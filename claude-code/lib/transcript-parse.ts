@@ -76,6 +76,7 @@ export function parseTranscript(lines: string[]): SessionMeta {
     numAssistant: 0,
     dayCounts: new Map(),
   };
+  const seenIds = new Set<string>();
 
   for (const line of lines) {
     let parsed: unknown;
@@ -110,15 +111,20 @@ export function parseTranscript(lines: string[]): SessionMeta {
         meta.gitBranch ||= asString(entry.gitBranch);
         break;
 
-      case "assistant":
-        meta.numAssistant++;
+      case "assistant": {
         meta.model ||= asString(message?.model);
+        // One JSONL line per content block, each repeating the message's id and usage.
+        const id = asString(message?.id) || asString(entry.requestId);
+        if (id && seenIds.has(id)) break;
+        if (id) seenIds.add(id);
+        meta.numAssistant++;
         if (message?.usage !== undefined) {
           const tokens = sumTokens(message.usage);
           meta.inputTokens += tokens.input;
           meta.outputTokens += tokens.output;
         }
         break;
+      }
     }
   }
 
