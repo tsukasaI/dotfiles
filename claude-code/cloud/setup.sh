@@ -1,7 +1,7 @@
 #!/bin/bash
 # Installs the shared Claude Code config (CLAUDE.md + the cloud overlay,
 # rules/, skills/, agents/) into ~/.claude of a Claude Code cloud container,
-# whatever repo the session is for, and sets the git identity.
+# whatever repo the session is for, and turns git commit/tag signing off.
 #
 #   setup.sh <commit-sha> <manifest-sha256>
 #
@@ -19,15 +19,18 @@
 #      session without its config should not be cached as "set up"; the
 #      platform's SessionStart hook tells the model the setup script failed,
 #      and the session still starts.
-#   0  Everything installed, or only the git identity step failed (logged as
-#      WARN): a session with the config but the default git identity is
-#      still usable, and the commit author is visible in every diff.
+#   0  Everything installed, or only the signing step failed (logged as
+#      WARN): a session with the config but signed commits is still usable.
+#
+# Not user.name/user.email here: the platform rewrites both in ~/.gitconfig
+# after this script runs. The identity comes from GIT_AUTHOR_*/GIT_COMMITTER_*
+# in the environment's variables, which git ranks above any config file.
+# Signing stays off because the platform's key isn't mine, so it would sign
+# commits made under my identity.
 
 set -uo pipefail
 
 REPO=tsukasaI/dotfiles
-GIT_NAME='tsukasa inoue'
-GIT_EMAIL=inoue.tsukasa.4@gmail.com
 
 REF=${1-}
 MANIFEST_SHA256=${2-}
@@ -43,14 +46,8 @@ die() {
 }
 
 warnings=0
-git_identity() {
-  git config --global user.name "$GIT_NAME" &&
-    git config --global user.email "$GIT_EMAIL" &&
-    git config --global commit.gpgsign false &&
-    git config --global tag.gpgsign false
-}
-if ! git_identity; then
-  log "WARN: setting the git identity failed; commits will use the image default"
+if ! { git config --global commit.gpgsign false && git config --global tag.gpgsign false; }; then
+  log "WARN: turning git signing off failed; commits will be signed with the platform's key"
   warnings=1
 fi
 

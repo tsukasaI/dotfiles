@@ -59,8 +59,11 @@ verification log: `docs/cloud-sessions.md`).
 - `claude-code/cloud/setup.sh` fetches `CLAUDE.md`, `rules/`, `skills/` and
   `agents/` from raw.githubusercontent.com at a pinned commit, verifies each
   file against `cloud/manifest.sha256`, appends `cloud/CLAUDE.cloud.md` (the
-  cloud-only deltas) to `~/.claude/CLAUDE.md`, and sets the git identity
-  without signing.
+  cloud-only deltas) to `~/.claude/CLAUDE.md`, and turns git signing off.
+- The git identity is not in the script: the platform rewrites
+  `user.name`/`user.email` in `~/.gitconfig` after it runs. Set
+  `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and
+  `GIT_COMMITTER_EMAIL` in the environment's variables instead.
 - `cloud/exclude.txt` lists the Mac-only skills left out, with reasons.
 - After editing anything the manifest covers, run
   `bash tests/cloud-manifest-sync.sh --write`; CI fails on drift.

@@ -13,9 +13,11 @@ Verified on 2026-11-03 in a Claude Code on the web session attached only to
   `raw.githubusercontent.com/tsukasaI/dotfiles/<sha>/claude-code/...`,
   verifies all digests, then installs into `~/.claude/`: `rules/`, `skills/`,
   `agents/`, and `CLAUDE.md` = `claude-code/CLAUDE.md` + `cloud/CLAUDE.cloud.md`.
-  It also sets the git identity and turns commit/tag signing off.
-- Any fetch or digest failure installs nothing and exits 1; only a git
-  identity failure is a warning with exit 0 (reasons in `setup.sh`'s header).
+  It also turns commit/tag signing off. The git identity comes from
+  `GIT_AUTHOR_*`/`GIT_COMMITTER_*` in the environment's variables (see
+  "Setup-script box, first real run" below for why not `~/.gitconfig`).
+- Any fetch or digest failure installs nothing and exits 1; only a failure
+  to turn signing off is a warning with exit 0 (reasons in `setup.sh`'s header).
 - `tests/cloud-manifest-sync.sh` (CI job `cloud-manifest-sync`) fails when
   the manifest drifts from the tracked files; `--write` regenerates it.
 
@@ -124,16 +126,39 @@ $ git log -1 --format='%H %an <%ae> sig=%G?'
 f974911ac917c739017107dbc62f8842e787dcab tsukasa inoue <inoue.tsukasa.4@gmail.com> sig=N
 ```
 
+## Setup-script box, first real run (2026-11-03, environment `dotfiles-cloud`)
+
+- Loading: after the manual run above, `/context` in the resumed session
+  listed `/root/.claude/CLAUDE.md` and the five unconditional rules
+  (`security`, `surgical-changes`, `user-handoff`, `git-sandbox`,
+  `shell-tools`) as User memory files, the 7 agents as User agents, and
+  handover/ja-lint/mkgoal/review-gate as User skills.
+- With the box still empty, a new session's `~/.claude` had none of it and
+  no `setup-script-failed` note. `~/.claude/skills/session-start-hook` kept
+  the 00:28 mtime of the environment's first build while the other entries
+  were 01:21, so the container came from that build's snapshot.
+- With the bootstrap pasted into the box, a new session showed "Ran setup
+  script" and `dotfiles-cloud: installed 31 files + CLAUDE.md from
+  tsukasaI/dotfiles@78e4c21...`; `~/.claude/.dotfiles-cloud-files` had 31
+  lines and `CLAUDE.md` ended with the cloud overlay.
+- In that session `~/.gitconfig` (mtime 01:29) had `user.name Claude`,
+  `user.email noreply@anthropic.com`, `user.signingkey` for the platform
+  key, but `commit.gpgsign false` and `tag.gpgsign false`. setup.sh then set
+  `user.name` first in one `&&` chain ahead of the gpgsign lines, so the
+  platform rewrote `user.*` after the script and left `gpgsign` alone.
+  Hence the identity moved to `GIT_AUTHOR_*`/`GIT_COMMITTER_*` environment
+  variables, which git ranks above `~/.gitconfig`. Checked with a throwaway
+  `HOME` whose `.gitconfig` says `Claude`: a commit made with those four
+  variables set gave `author=tsukasa inoue <inoue.tsukasa.4@gmail.com>
+  committer=tsukasa inoue <inoue.tsukasa.4@gmail.com> sig=N`.
+
 ## Not verified here
 
-- The setup-script box itself: this environment has no setup script, so the
-  snapshot/caching behavior and the ordering against the platform's own
-  `~/.gitconfig` / `~/.claude` writes at session start are unobserved.
-- That `~/.claude/rules/*.md` and the appended `CLAUDE.md` load in a fresh
-  session. Check: start a new session, run `/context`, and confirm Memory
-  files lists `~/.claude/CLAUDE.md` and the unconditional rules (e.g.
-  `security.md`, `surgical-changes.md`); then ask for the skill list and
-  confirm `/grill`, `/triage`, `/maintain-sweep` appear (user-invoked only).
+- That the environment's variables reach the session's git commands (check
+  in a new session: `git var GIT_AUTHOR_IDENT`).
+- `/context` in a session built from the box (as opposed to the manual run);
+  `/grill`, `/triage`, `/maintain-sweep` being callable (user-invoked only,
+  so they don't appear in `/context`).
 - raw.githubusercontent.com from a session whose repo is not dotfiles.
 - triage/mkgoal/maintain-sweep running end to end with REST in place of
   `gh issue`.
