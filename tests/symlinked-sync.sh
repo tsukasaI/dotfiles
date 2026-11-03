@@ -6,39 +6,52 @@
 # to that file look "not live" in the session-edits pane.
 #
 # This extracts both lists as "<link> <target>" pairs and fails if they differ.
+# A link_with_backup line it cannot parse also fails, so it is never skipped.
 # Run locally: bash tests/symlinked-sync.sh
 # Exit: 0 the lists match, 1 a mismatch was found.
 
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
-SETUP=setup.sh
-TABLE=claude-code/mod/hooks/session-edits.tsx
+SETUP=${SETUP:-setup.sh}
+TABLE=${TABLE:-claude-code/mod/hooks/session-edits.tsx}
 
-# setup.sh lines: link_with_backup "$DOTFILES/<target>" ~/<link>
+# setup.sh lines: link_with_backup "$DOTFILES/<target>" ~/<link> [# comment]
+# Prints "<link> <target>" pairs; returns 1 on a line it cannot parse.
 from_setup() {
   local line
+  local re='^link_with_backup[[:space:]]+"\$DOTFILES/([^"]+)"[[:space:]]+~/([^[:space:]]+)[[:space:]]*(#.*)?$'
   while IFS= read -r line; do
-    if [[ "$line" =~ ^link_with_backup[[:space:]]+\"\$DOTFILES/([^\"]+)\"[[:space:]]+~/([^[:space:]]+)[[:space:]]*$ ]]; then
+    if [[ "$line" =~ $re ]]; then
       echo "${BASH_REMATCH[2]} ${BASH_REMATCH[1]}"
+    else
+      echo "FAIL cannot parse $SETUP line: $line" >&2
+      return 1
     fi
-  done < <(grep -E '^link_with_backup ' "$SETUP")
+  done < <(grep -E '^link_with_backup ' "$SETUP" | grep -v '^link_with_backup()')
 }
 
-# SYMLINKED rows: ['<link>', '<target>'],
+# Rows of the SYMLINKED array only: ['<link>', '<target>'],
 from_table() {
-  local line
+  local line in_table=0
+  local re="^[[:space:]]*\['([^']+)',[[:space:]]*'([^']+)'\],?[[:space:]]*\$"
   while IFS= read -r line; do
-    if [[ "$line" =~ ^[[:space:]]*\[\'([^\']+)\',[[:space:]]*\'([^\']+)\'\],?[[:space:]]*$ ]]; then
+    if ((in_table == 0)); then
+      [[ "$line" =~ ^(export[[:space:]]+)?const[[:space:]]+SYMLINKED[:[:space:]=] ]] && in_table=1
+      continue
+    fi
+    [[ "$line" =~ ^[[:space:]]*\] ]] && break
+    if [[ "$line" =~ $re ]]; then
       echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
     fi
-  done < <(grep -E "^[[:space:]]*\['[^']+',[[:space:]]*'[^']+'\]," "$TABLE")
+  done <"$TABLE"
 }
 
-setup_pairs=$(from_setup | sort)
+setup_out=$(from_setup) || exit 1
+setup_pairs=$(echo "$setup_out" | sort)
 table_pairs=$(from_table | sort)
 
-if [[ -z "$setup_pairs" ]]; then
+if [[ -z "$setup_out" ]]; then
   echo "FAIL no link_with_backup pairs found in $SETUP - the sync check would pass vacuously" >&2
   exit 1
 fi

@@ -216,4 +216,24 @@ describe("redactTranscript: pathological nesting", () => {
     }).not.toThrow();
     expect(out).toContain("[REDACTED:anthropic-key]");
   });
+
+  const nested = (depth: number) =>
+    `{"type": "assistant", "input": ` +
+    "[".repeat(depth) +
+    JSON.stringify(`sk-ant-${a(30)}`) +
+    "]".repeat(depth) +
+    "}";
+
+  test("nesting past the depth limit but under the native stack limit gets the raw-line fallback", () => {
+    // The spaces make re-serialising differ from the raw line, so the two paths are distinguishable.
+    const line = nested(1500);
+    expect(redactTranscript(line)).toBe(redactSecrets(line));
+  });
+
+  test("nesting under the depth limit is still re-serialised structurally", () => {
+    const out = redactTranscript(nested(900));
+    expect(() => JSON.parse(out)).not.toThrow();
+    expect(out).toContain("[REDACTED:anthropic-key]");
+    expect(out).not.toContain("sk-ant-");
+  });
 });
