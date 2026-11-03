@@ -152,13 +152,28 @@ f974911ac917c739017107dbc62f8842e787dcab tsukasa inoue <inoue.tsukasa.4@gmail.co
   variables set gave `author=tsukasa inoue <inoue.tsukasa.4@gmail.com>
   committer=tsukasa inoue <inoue.tsukasa.4@gmail.com> sig=N`.
 
+## Setup-script box, `syntax error: unexpected end of file`
+
+After pasting the `dd14f27` bootstrap (10 lines, byte-identical to
+`pin.sh`'s output, `bash -n` clean), new sessions failed with
+`/tmp/init-script-<n>.sh: line 20: syntax error: unexpected end of file`
+(exit 2); the platform's SessionStart hook reported it and the session
+still started. The temp script is deleted afterwards, so its bytes were not
+seen. Converting the same 10 lines to CRLF reproduces the error
+(`line 11`); line 20 would fit CRLF plus a prefix the platform adds, which
+is unconfirmed. `pin.sh` now prints one-line commands that each end in
+` #`, which ran to completion here with LF, with CRLF, and with CRLF after
+nine extra lines; a wrong `SETUP_SHA256` under CRLF still exits 1 with
+nothing installed. With that output pasted into the box, a new session's
+`/context` listed `/root/.claude/CLAUDE.md` and the five unconditional rules
+as memory files and all 7 agents, so the box path works end to end.
+`/grill` (user-invoked only, so absent from `/context`) ran there too, and
+an earlier box-built session's `git var GIT_AUTHOR_IDENT` and
+`GIT_COMMITTER_IDENT` both started with
+`tsukasa inoue <inoue.tsukasa.4@gmail.com>`.
+
 ## Not verified here
 
-- That the environment's variables reach the session's git commands (check
-  in a new session: `git var GIT_AUTHOR_IDENT`).
-- `/context` in a session built from the box (as opposed to the manual run);
-  `/grill`, `/triage`, `/maintain-sweep` being callable (user-invoked only,
-  so they don't appear in `/context`).
 - raw.githubusercontent.com from a session whose repo is not dotfiles.
 - triage/mkgoal/maintain-sweep running end to end with REST in place of
   `gh issue`.
