@@ -60,9 +60,10 @@ rules below.
 
 ## 2. Render
 
-    bun --config=/dev/null $HOME/dotfiles/claude-code/skills/explain-plan/plan.ts <diagram.json> --root <repo root>
+    explain-plan-render <diagram.json> --root <repo root>
 
-Exit codes and ref lines are as in diagram-explain's section 2. The HTML goes
+Exit codes, ref lines and the rebuild note are as in diagram-explain's
+section 2. The HTML goes
 to `$TMPDIR/explain-plan/<slug>/index.html`; don't publish it as an Artifact.
 
 ## 3. Hand over and gate

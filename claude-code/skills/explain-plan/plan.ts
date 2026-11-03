@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
-import { readFileSync } from "fs";
-import { dirname, join } from "path";
 import { main, type MainOptions } from "../diagram-explain/render.ts";
+// Imported, not read next to import.meta.url: see render.ts.
+import planCore from "./plan-core.js" with { type: "text" };
 
 export const CATEGORIES = [
   "input-validation",
@@ -58,10 +58,9 @@ export function validatePlan(raw: unknown, errors: string[]): void {
 }
 
 export function planOptions(): MainOptions {
-  const here = dirname(new URL(import.meta.url).pathname);
   return {
     extraValidate: validatePlan,
-    extraCores: [readFileSync(join(here, "plan-core.js"), "utf8")],
+    extraCores: [planCore],
     defaultMode: "plan",
     outDirName: "explain-plan",
   };

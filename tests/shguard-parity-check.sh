@@ -402,6 +402,8 @@ case_ "shguard init"                     'shguard init'                        d
 case_ "shguard check"                    'shguard check x.toml'                deny "the shguard row takes no operand"
 case_ "diagram-render"                   'diagram-render d.json --root . --out /private/tmp/claude-501/x/index.html' allow
 case_ "diagram-render unknown option"    'diagram-render d.json --watch'       deny
+case_ "explain-plan-render"              'explain-plan-render d.json --root .' allow
+case_ "explain-plan-render unknown opt"  'explain-plan-render d.json --watch'  deny
 case_ "jq filter on a file"              "jq -r '.name' package.json"          allow
 case_ "jq in a pipeline"                 'cat package.json | jq .name'         allow
 case_ "jq -f"                            'jq -f prog.jq x.json'                deny

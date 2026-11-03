@@ -54,9 +54,9 @@ are in `render.ts`.
 
     diagram-render <diagram.json> [--root <repo root>] [--out <html path>]
 
-- `diagram-render` is `render.ts` compiled by `nix-darwin/diagram-render.nix`:
-  an edit to `render.ts`, `template.html` or `quiz-core.js` takes effect only
-  after `darwin-rebuild switch`.
+- `diagram-render` (and explain-plan's `explain-plan-render`) are compiled
+  by `nix-darwin/diagram-render.nix`: an edit to their sources takes effect
+  only after `darwin-rebuild switch`.
 - `--root` matters only when the diagram has refs.
 - `--out`: when publishing as an Artifact, write into the scratchpad
   directory (publish sources must be under the working directory or the
