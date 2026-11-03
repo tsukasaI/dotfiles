@@ -167,14 +167,13 @@ nine extra lines; a wrong `SETUP_SHA256` under CRLF still exits 1 with
 nothing installed. With that output pasted into the box, a new session's
 `/context` listed `/root/.claude/CLAUDE.md` and the five unconditional rules
 as memory files and all 7 agents, so the box path works end to end.
+`/grill` (user-invoked only, so absent from `/context`) ran there too, and
+an earlier box-built session's `git var GIT_AUTHOR_IDENT` and
+`GIT_COMMITTER_IDENT` both started with
+`tsukasa inoue <inoue.tsukasa.4@gmail.com>`.
 
 ## Not verified here
 
-- That the environment's variables reach the session's git commands (check
-  in a new session: `git var GIT_AUTHOR_IDENT`).
-- `/context` in a session built from the box (as opposed to the manual run);
-  `/grill`, `/triage`, `/maintain-sweep` being callable (user-invoked only,
-  so they don't appear in `/context`).
 - raw.githubusercontent.com from a session whose repo is not dotfiles.
 - triage/mkgoal/maintain-sweep running end to end with REST in place of
   `gh issue`.
