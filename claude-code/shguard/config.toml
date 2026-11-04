@@ -553,6 +553,37 @@ opt = [
   { short = "i", long = "interval", value = { takes = "inert" } },
 ]
 
+# Only the listing: the other `gh repo` subcommands create, edit, delete or
+# clone. The owner takes "path" so gh-url-operand sees a URL operand; -q/--jq
+# is listed only so that gh-jq blocks it with its reason.
+[[row]]
+key = ["gh", "repo"]
+source = "https://cli.github.com/manual/gh_repo"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+
+[[row]]
+key = ["gh", "repo", "list"]
+source = "https://cli.github.com/manual/gh_repo_list"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { long = "archived" },
+  { long = "fork" },
+  { short = "q", long = "jq", value = { takes = "inert" } },
+  { long = "json", value = { takes = "inert" } },
+  { short = "l", long = "language", value = { takes = "inert" } },
+  { short = "L", long = "limit", value = { takes = "inert" } },
+  { long = "no-archived" },
+  { long = "source" },
+  { short = "t", long = "template", value = { takes = "inert" } },
+  { long = "topic", value = { takes = "inert" } },
+  { long = "visibility", value = { takes = "inert" } },
+]
+
 [[rule]]
 id = "dotfiles-file-rm"
 key = ["rm"]

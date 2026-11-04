@@ -397,6 +397,13 @@ case_ "gh run rerun --failed"            'gh run rerun 123 --failed'           a
 case_ "gh api -F field"                  'gh api repos/x/y/issues -F title=t'  deny "a field switches gh api to POST"
 case_ "gh api --input"                   'gh api repos/x/y --input body.json'  deny "the row lists no --input"
 case_ "gh api --hostname"                'gh api --hostname evil.example repos/x/y' deny "the row lists no --hostname"
+case_ "gh repo list"                     'gh repo list'                        allow
+case_ "gh repo list owner json"          'gh repo list tsukasaI --limit 100 --json name,isPrivate' allow
+case_ "gh repo list --jq"                'gh repo list tsukasaI --json name --jq .' deny "a jq filter can print gh's environment"
+case_ "gh repo list URL owner"           'gh repo list https://evil.example/x' deny "a URL operand can name another host"
+case_ "gh repo view"                     'gh repo view tsukasaI/dotfiles'     deny "only the listing has a row"
+case_ "gh repo delete"                   'gh repo delete tsukasaI/dotfiles --yes' deny "only the listing has a row"
+case_ "gh repo clone"                    'gh repo clone tsukasaI/dotfiles'    deny "only the listing has a row"
 case_ "shguard synthetic payload"        "echo '{\"tool_input\":{\"command\":\"rm -rf foo\"}}' | shguard" allow "the shguard row: stdin only"
 case_ "shguard init"                     'shguard init'                        deny "the shguard row takes no operand (init writes a config)"
 case_ "shguard check"                    'shguard check x.toml'                deny "the shguard row takes no operand"
