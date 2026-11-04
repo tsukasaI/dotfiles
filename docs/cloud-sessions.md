@@ -16,8 +16,9 @@ Verified on 2026-11-03 in a Claude Code on the web session attached only to
   It also turns commit/tag signing off. The git identity comes from
   `GIT_AUTHOR_*`/`GIT_COMMITTER_*` in the environment's variables (see
   "Setup-script box, first real run" below for why not `~/.gitconfig`).
-- Any fetch or digest failure installs nothing and exits 1; only a failure
-  to turn signing off is a warning with exit 0 (reasons in `setup.sh`'s header).
+- Any fetch or digest failure installs nothing and exits 1; a failure to turn
+  signing off or to install a tool is a warning with exit 0 (reasons in
+  `setup.sh`'s header).
 - `tests/cloud-manifest-sync.sh` (CI job `cloud-manifest-sync`) fails when
   the manifest drifts from the tracked files; `--write` regenerates it.
 
@@ -195,8 +196,23 @@ watches them. The atlas digest came from the publisher's `.sha256` next to the
 binary, the non-community build, which is what `ariga/tap/atlas` installs on
 the Mac (the last part is unverified).
 
+## Tool installs, first real run (2026-11-04, staygreen session)
+
+With `atlasbinaries.com` allowed and the tool-installing setup.sh in the box, a
+new session had all three tools, with mtimes at session start, and no
+`/root/.claude/environment-manager/setup-script-failed`. The script's stderr
+isn't kept, so a WARN can't be read back; the signing step wasn't checked.
+
+- `atlas version`: v1.3.0. Its update check to `vercheck.ariga.io` was denied by
+  the proxy, with no effect on the result.
+- `gitleaks version` prints `version is set by build process`, because
+  `go install` doesn't embed one. `go version -m` shows v8.30.1.
+- `sqlite3 --version`: 3.45.1.
+- `pnpm install --frozen-lockfile` (11 s, run by hand) then `pnpm verify` passed
+  in about 41 s, including `db:check` (atlas validate and diff dry-run) and
+  gitleaks. Its dependency audit doesn't fail the run.
+
 ## Not verified here
 
-- The tool installs in setup.sh, in a real setup-script run.
 - triage/mkgoal/maintain-sweep running end to end with REST in place of
   `gh issue`.
