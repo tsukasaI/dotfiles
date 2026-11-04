@@ -59,7 +59,13 @@ verification log: `docs/cloud-sessions.md`).
 - `claude-code/cloud/setup.sh` fetches `CLAUDE.md`, `rules/`, `skills/` and
   `agents/` from raw.githubusercontent.com at a pinned commit, verifies each
   file against `cloud/manifest.sha256`, appends `cloud/CLAUDE.cloud.md` (the
-  cloud-only deltas) to `~/.claude/CLAUDE.md`, and turns git signing off.
+  cloud-only deltas) to `~/.claude/CLAUDE.md`, turns git signing off, and
+  installs sqlite3, gitleaks and atlas at the versions pinned in the script.
+- Two environments, split by network and secret boundary rather than by repo:
+  `personal-dev` (Custom: the default list plus `atlasbinaries.com`, this
+  script) and `macromenu-ingest` (Custom: the default list plus
+  `www.matsuyafoods.co.jp`, macromenu's own setup script). Repo-specific setup
+  belongs in that repo's SessionStart hook.
 - The git identity is not in the script: the platform rewrites
   `user.name`/`user.email` in `~/.gitconfig` after it runs. Set
   `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and

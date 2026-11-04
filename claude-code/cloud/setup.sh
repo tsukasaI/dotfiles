@@ -19,8 +19,9 @@
 #      session without its config should not be cached as "set up"; the
 #      platform's SessionStart hook tells the model the setup script failed,
 #      and the session still starts.
-#   0  Everything installed, or only the signing step failed (logged as
-#      WARN): a session with the config but signed commits is still usable.
+#   0  Everything installed, or only the signing step or a tool install failed
+#      (logged as WARN): a session with the config is still usable, and a
+#      missing tool makes the hooks that need it fail closed.
 #
 # Not user.name/user.email here: the platform rewrites both in ~/.gitconfig
 # after this script runs. The identity comes from GIT_AUTHOR_*/GIT_COMMITTER_*
@@ -31,6 +32,10 @@
 set -uo pipefail
 
 REPO=tsukasaI/dotfiles
+GITLEAKS_VERSION=8.30.1
+ATLAS_VERSION=1.3.0
+ATLAS_SHA256=cfc773e5b4e845bc01d680390c174648938a7f88bf30e5a2c83ae85217c21587
+TOOL_DIR=/usr/local/bin
 
 REF=${1-}
 MANIFEST_SHA256=${2-}
@@ -112,6 +117,28 @@ if [[ -f $STATE ]]; then
   done <"$STATE"
 fi
 printf '%s\n' "${installed[@]}" >"$STATE" || die "write $STATE"
+
+warn() {
+  log "WARN: $*"
+  warnings=1
+}
+
+{ apt-get update -qq && apt-get install -y -qq sqlite3; } || warn "sqlite3 was not installed"
+
+# Not a release tarball: go verifies the module against its checksum database,
+# so there is no digest to maintain here.
+GOBIN=$TOOL_DIR go install "github.com/zricethezav/gitleaks/v8@v$GITLEAKS_VERSION" ||
+  warn "gitleaks was not installed"
+
+# Not go install: atlas's command module has replace directives (unverified
+# here, from memory of its go.mod). Needs atlasbinaries.com in the environment's
+# allowed domains.
+{
+  curl -fsSL --proto '=https' --retry 3 --max-time 120 -o "$stage/atlas" \
+    "https://atlasbinaries.com/atlas/atlas-linux-amd64-v$ATLAS_VERSION" &&
+    echo "$ATLAS_SHA256  $stage/atlas" | sha256sum -c --quiet - &&
+    install -m 755 "$stage/atlas" "$TOOL_DIR/atlas"
+} || warn "atlas was not installed"
 
 log "installed ${#installed[@]} files + CLAUDE.md from $REPO@$REF into $CLAUDE_DIR"
 ((warnings == 0)) || log "finished with warnings (see WARN above)"

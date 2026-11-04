@@ -172,8 +172,31 @@ an earlier box-built session's `git var GIT_AUTHOR_IDENT` and
 `GIT_COMMITTER_IDENT` both started with
 `tsukasa inoue <inoue.tsukasa.4@gmail.com>`.
 
+## Other repositories (2026-11-04, shguard and staygreen sessions)
+
+Both ran the bootstrap and reached raw.githubusercontent.com (200):
+`~/.claude/.dotfiles-cloud-files` had 31 lines and `git var GIT_AUTHOR_IDENT`
+gave the owner's identity. Other results:
+
+- shguard: `cargo test --workspace` passed in 29 s with the pinned Rust 1.96.1.
+  The submodule was uninitialised at start; `git submodule update --init
+  --depth 1` cloned it, though `gh api` for that repository returned 403
+  because it wasn't attached to the session.
+- staygreen: corepack resolved `pnpm@11.9.0`; `pnpm install --frozen-lockfile`
+  took 9 s, and typecheck and 588 tests passed. `prepare` installed lefthook's
+  git hooks, whose pre-commit needs gitleaks and pre-push needs gitleaks and
+  atlas, none of them in the image. Hence setup.sh installs them.
+- `github.com/NixOS/nixpkgs/archive/...` returned 403 and `cache.nixos.org` 200.
+  The nix CLI is present, but flake inputs are not expected to resolve
+  (`nix develop` itself was not run), so proofs stay in CI.
+
+Pins in setup.sh are renewed by hand when the bootstrap is renewed; nothing
+watches them. The atlas digest came from the publisher's `.sha256` next to the
+binary, the non-community build, which is what `ariga/tap/atlas` installs on
+the Mac (the last part is unverified).
+
 ## Not verified here
 
-- raw.githubusercontent.com from a session whose repo is not dotfiles.
+- The tool installs in setup.sh, in a real setup-script run.
 - triage/mkgoal/maintain-sweep running end to end with REST in place of
   `gh issue`.
