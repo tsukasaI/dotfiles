@@ -9,6 +9,8 @@ Patterns that the sandbox or shguard denies by mechanism, not by policy:
   `git worktree add --no-track -b <b> <path> origin/main`): the sandbox
   write-protects `.git/config`, so recording the upstream fails. Set the
   upstream with the unsandboxed `git push -u origin <b>` instead.
+- shguard refuses `git commit -F`, which its row doesn't list. Pass a multi-part
+  message with repeated `-m`, one per paragraph.
 - shguard refuses a `gh` body file outside `/private/tmp` and the repository
   (`dotfiles-gh-upload-path`: gh runs unsandboxed and uploads it), and
   `gh api` with `-X`/`-f`/`-F`/`--input`, which turn it into a write.

@@ -42,9 +42,15 @@ if [[ ${1-} == --write ]]; then
   exit 0
 fi
 
-if diff -u "$MANIFEST" <(expected); then
+want=$(expected)
+
+# Not diff or mktemp for the verdict: in a commit hook inside the Claude Code
+# Bash sandbox, mktemp and diff on a pipe both fail with "Operation not
+# permitted", which would read as a drifted manifest.
+if [[ $(<"$MANIFEST") == "$want" ]]; then
   echo "cloud manifest matches the tracked files"
 else
+  diff -u "$MANIFEST" <(printf '%s\n' "$want") || true
   echo "FAIL claude-code/$MANIFEST drifted; run: bash tests/cloud-manifest-sync.sh --write" >&2
   exit 1
 fi
