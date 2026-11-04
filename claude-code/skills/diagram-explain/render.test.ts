@@ -193,6 +193,51 @@ describe("validate", () => {
   });
 });
 
+describe("recall", () => {
+  const item = { question: "なぜ?", answer: "理由だから" };
+
+  test("is optional, normalized to [] and allowed in both modes", () => {
+    expect(diagramOf(bare()).recall).toEqual([]);
+    const d = { ...bare(), recall: [item] };
+    expect(errorsOf(d)).toEqual([]);
+    expect(diagramOf(d).recall).toEqual([item]);
+    expect(errorsOf({ ...d, mode: "plan" })).toEqual([]);
+  });
+
+  test("rejects more than 8 items, bad items and non-arrays", () => {
+    expect(errorsOf({ ...bare(), recall: Array(9).fill(item) })).toContain("recall: must be an array of 1-8 items");
+    expect(errorsOf({ ...bare(), recall: [] })).toContain("recall: must be an array of 1-8 items");
+    expect(errorsOf({ ...bare(), recall: "x" })).toContain("recall: must be an array of 1-8 items");
+    expect(errorsOf({ ...bare(), recall: {} })).toContain("recall: must be an array of 1-8 items");
+    const msg = "recall[1]: question (<=200) and answer (<=1500) required";
+    expect(errorsOf({ ...bare(), recall: [item, { question: " ", answer: "a" }] })).toContain(msg);
+    expect(errorsOf({ ...bare(), recall: [item, { question: "q", answer: "a".repeat(1501) }] })).toContain(msg);
+    expect(errorsOf({ ...bare(), recall: [item, { question: "q".repeat(201), answer: "a" }] })).toContain(msg);
+    expect(errorsOf({ ...bare(), recall: [item, "x"] })).toContain(msg);
+  });
+});
+
+describe("step predict", () => {
+  const withPredict = (predict: unknown) => {
+    const d = base();
+    d.steps[0].predict = predict;
+    return d;
+  };
+  const msg = "steps[0]: predict needs a question (<=200 chars) and an optional hint (<=300 chars)";
+
+  test("a question with or without a hint is accepted", () => {
+    expect(errorsOf(withPredict({ question: "q" }))).toEqual([]);
+    expect(errorsOf(withPredict({ question: "q", hint: "h" }))).toEqual([]);
+  });
+
+  test("a missing or oversize question, or an oversize hint, is rejected", () => {
+    expect(errorsOf(withPredict({ hint: "h" }))).toContain(msg);
+    expect(errorsOf(withPredict({ question: "q".repeat(201) }))).toContain(msg);
+    expect(errorsOf(withPredict({ question: "q", hint: "h".repeat(301) }))).toContain(msg);
+    expect(errorsOf(withPredict("q"))).toContain(msg);
+  });
+});
+
 describe("checkRefs", () => {
   const withRef = (file: string, line: number, excerpt: string): Diagram => {
     const d = base();
@@ -230,6 +275,14 @@ describe("checkRefs", () => {
 
 describe("renderHtml", () => {
   const template = readFileSync(join(HERE, "template.html"), "utf8");
+
+  test("the template carries the recall section and the predict toggle", () => {
+    const html = renderHtml(diagramOf(base()), [], template);
+    expect(html).toContain('id="recall-sec"');
+    expect(html).toContain('id="predict"');
+    expect(html).toContain('id="hint"');
+    expect(html).toContain('id="predict-hint"');
+  });
 
   test("an excerpt cannot close the data script or inject markup", () => {
     const d = base();

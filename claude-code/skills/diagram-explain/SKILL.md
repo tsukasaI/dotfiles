@@ -39,6 +39,17 @@ are in `render.ts`.
   appear in a step are `kind: "proposed"` and listed as `added`; `changed`
   and `removed` mark later revisions. Omit `steps` for a single static
   picture.
+- `recall` (optional, 1-8): 2-3 questions on why a step's decision was made
+  or what happens in the picture, each with one answer of 1-3 sentences.
+  Avoid yes/no and "which is best" questions. State the reason in `answer`,
+  not just the name. The page shows each answer only after the reader picks
+  a confidence, and nothing is scored or stored.
+- With `steps`, the page has an opt-in 予測モード: the reader says what the
+  next step adds before it is revealed. Optional `steps[].predict`:
+  `question` names the requirement or number under pressure at that point and
+  asks for the bottleneck and the fix, without naming the component the step
+  adds; `hint` narrows where to look (a scenario or a calculation to try),
+  never the fix.
 - `ref` (optional): for code, tie an element to `file` (relative to the repo
   root), `line`, and an `excerpt` of 1-40 lines copied verbatim from what Read
   showed. `render.ts` checks it. A system design without code has no refs.

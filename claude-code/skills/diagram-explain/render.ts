@@ -28,7 +28,12 @@ export type DiagramNode = {
   deepDive?: { category: string; why: string };
 };
 export type DiagramEdge = { id: string; from: string; to: string; data: string; kind: Kind; ref?: Ref };
-export type Step = { title: string; description: string; changes: Record<string, (typeof CHANGES)[number]> };
+export type Step = {
+  title: string;
+  description: string;
+  changes: Record<string, (typeof CHANGES)[number]>;
+  predict?: { question: string; hint?: string };
+};
 export type Diagram = {
   version: 1;
   mode: Mode;
@@ -40,6 +45,7 @@ export type Diagram = {
   edges: DiagramEdge[];
   steps: Step[];
   boundaries: { label: string; reason: string }[];
+  recall: { question: string; answer: string }[];
 };
 
 export type RefStatus = "ok" | "moved" | "mismatch" | "missing" | "outside";
@@ -86,6 +92,12 @@ function checkSteps(
     if (!isObj(s)) return void errors.push(`${where}: must be an object`);
     if (!isText(s.title, 120)) errors.push(`${where}: title required (<=120 chars)`);
     if (!isText(s.description, 1000)) errors.push(`${where}: description required (<=1000 chars)`);
+    if (s.predict !== undefined) {
+      const p = s.predict;
+      if (!isObj(p) || !isText(p.question, 200) || (p.hint !== undefined && !isText(p.hint, 300))) {
+        errors.push(`${where}: predict needs a question (<=200 chars) and an optional hint (<=300 chars)`);
+      }
+    }
     if (!isObj(s.changes) || Object.keys(s.changes).length === 0) return void errors.push(`${where}: changes required`);
     for (const [id, change] of Object.entries(s.changes)) {
       if (!kinds.has(id)) {
@@ -210,6 +222,16 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
       });
   }
 
+  if (raw.recall !== undefined) {
+    if (!Array.isArray(raw.recall) || raw.recall.length < 1 || raw.recall.length > 8) errors.push("recall: must be an array of 1-8 items");
+    else
+      raw.recall.forEach((r, i) => {
+        if (!isObj(r) || !isText(r.question, 200) || !isText(r.answer, 1500)) {
+          errors.push(`recall[${i}]: question (<=200) and answer (<=1500) required`);
+        }
+      });
+  }
+
   // An invalid steps value skips the replay: its "never added" noise would only bury the real error.
   if (raw.steps !== undefined && (!Array.isArray(raw.steps) || raw.steps.length > 30)) errors.push("steps: at most 30 steps");
   else checkSteps((raw.steps as unknown[]) ?? [], kinds, endpoints, errors);
@@ -225,6 +247,7 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
       edges: ((raw.edges as unknown[]) ?? []).map(withKind),
       steps: raw.steps ?? [],
       boundaries: raw.boundaries ?? [],
+      recall: raw.recall ?? [],
     } as unknown as Diagram,
   };
 }
