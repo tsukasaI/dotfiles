@@ -28,6 +28,10 @@
   "steps": [
     {
       "title": "読み取りをキャッシュで受ける",
+      "predict": {
+        "question": "1日1億回のリダイレクトに対し、書き込みは100万回。今の構成で最初に限界が来るのはどこで、どう減らすか。",
+        "hint": "1秒あたりの読み取り回数を計算し、DB 1台の処理量と比べてみてください。"
+      },
       "description": "リダイレクトは書き込みよりずっと多く、人気のコードにアクセスが偏る。API はまずキャッシュを引き、外れたときだけ DB を読む。",
       "changes": { "cache": "added", "e-api-cache": "added", "e-api-db": "changed" }
     },
@@ -38,6 +42,9 @@
     },
     {
       "title": "クリック集計を非同期にする",
+      "predict": {
+        "question": "リダイレクトのたびにクリック数を DB へ書くと、応答時間と DB の負荷はどうなるか。どこへ逃がすか。"
+      },
       "description": "リダイレクトの応答内で集計を書くと遅くなる。イベントをキューに積み、別の処理が集計ストアへ書く。",
       "changes": { "queue": "added", "stats": "added", "e-api-queue": "added", "e-queue-stats": "added" }
     }

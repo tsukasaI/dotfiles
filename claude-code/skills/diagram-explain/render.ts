@@ -28,7 +28,12 @@ export type DiagramNode = {
   deepDive?: { category: string; why: string };
 };
 export type DiagramEdge = { id: string; from: string; to: string; data: string; kind: Kind; ref?: Ref };
-export type Step = { title: string; description: string; changes: Record<string, (typeof CHANGES)[number]> };
+export type Step = {
+  title: string;
+  description: string;
+  changes: Record<string, (typeof CHANGES)[number]>;
+  predict?: { question: string; hint?: string };
+};
 export type Diagram = {
   version: 1;
   mode: Mode;
@@ -87,6 +92,12 @@ function checkSteps(
     if (!isObj(s)) return void errors.push(`${where}: must be an object`);
     if (!isText(s.title, 120)) errors.push(`${where}: title required (<=120 chars)`);
     if (!isText(s.description, 1000)) errors.push(`${where}: description required (<=1000 chars)`);
+    if (s.predict !== undefined) {
+      const p = s.predict;
+      if (!isObj(p) || !isText(p.question, 200) || (p.hint !== undefined && !isText(p.hint, 300))) {
+        errors.push(`${where}: predict needs a question (<=200 chars) and an optional hint (<=300 chars)`);
+      }
+    }
     if (!isObj(s.changes) || Object.keys(s.changes).length === 0) return void errors.push(`${where}: changes required`);
     for (const [id, change] of Object.entries(s.changes)) {
       if (!kinds.has(id)) {

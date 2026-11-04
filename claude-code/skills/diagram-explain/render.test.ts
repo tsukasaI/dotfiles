@@ -217,6 +217,27 @@ describe("recall", () => {
   });
 });
 
+describe("step predict", () => {
+  const withPredict = (predict: unknown) => {
+    const d = base();
+    d.steps[0].predict = predict;
+    return d;
+  };
+  const msg = "steps[0]: predict needs a question (<=200 chars) and an optional hint (<=300 chars)";
+
+  test("a question with or without a hint is accepted", () => {
+    expect(errorsOf(withPredict({ question: "q" }))).toEqual([]);
+    expect(errorsOf(withPredict({ question: "q", hint: "h" }))).toEqual([]);
+  });
+
+  test("a missing or oversize question, or an oversize hint, is rejected", () => {
+    expect(errorsOf(withPredict({ hint: "h" }))).toContain(msg);
+    expect(errorsOf(withPredict({ question: "q".repeat(201) }))).toContain(msg);
+    expect(errorsOf(withPredict({ question: "q", hint: "h".repeat(301) }))).toContain(msg);
+    expect(errorsOf(withPredict("q"))).toContain(msg);
+  });
+});
+
 describe("checkRefs", () => {
   const withRef = (file: string, line: number, excerpt: string): Diagram => {
     const d = base();
@@ -259,6 +280,8 @@ describe("renderHtml", () => {
     const html = renderHtml(diagramOf(base()), [], template);
     expect(html).toContain('id="recall-sec"');
     expect(html).toContain('id="predict"');
+    expect(html).toContain('id="hint"');
+    expect(html).toContain('id="predict-hint"');
   });
 
   test("an excerpt cannot close the data script or inject markup", () => {

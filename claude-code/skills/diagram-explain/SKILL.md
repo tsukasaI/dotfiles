@@ -45,7 +45,11 @@ are in `render.ts`.
   not just the name. The page shows each answer only after the reader picks
   a confidence, and nothing is scored or stored.
 - With `steps`, the page has an opt-in 予測モード: the reader says what the
-  next step adds before it is revealed. Nothing to author for it.
+  next step adds before it is revealed. Optional `steps[].predict`:
+  `question` names the requirement or number under pressure at that point and
+  asks for the bottleneck and the fix, without naming the component the step
+  adds; `hint` narrows where to look (a scenario or a calculation to try),
+  never the fix.
 - `ref` (optional): for code, tie an element to `file` (relative to the repo
   root), `line`, and an `excerpt` of 1-40 lines copied verbatim from what Read
   showed. `render.ts` checks it. A system design without code has no refs.
