@@ -130,9 +130,8 @@ warn() {
 GOBIN=$TOOL_DIR go install "github.com/zricethezav/gitleaks/v8@v$GITLEAKS_VERSION" ||
   warn "gitleaks was not installed"
 
-# Not go install: atlas's command module has replace directives (unverified
-# here, from memory of its go.mod). Needs atlasbinaries.com in the environment's
-# allowed domains.
+# Not go install: atlas's command module has a replace directive, which go
+# install refuses. Needs atlasbinaries.com in the environment's allowed domains.
 {
   curl -fsSL --proto '=https' --retry 3 --max-time 120 -o "$stage/atlas" \
     "https://atlasbinaries.com/atlas/atlas-linux-amd64-v$ATLAS_VERSION" &&
