@@ -57,6 +57,16 @@
   .c-removed { opacity: 0.85; }
   .selected rect, .selected path.line { filter: drop-shadow(0 0 3px var(--focus)); }
   .badge { fill: var(--removed); } .badge-text { fill: var(--on-badge); font-weight: 700; }
+  #controls label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
+  #recall-sec button, #reveal, #controls button { cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .recall-card { border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 12px; margin: 8px 0; }
+  .recall-q { font-weight: 600; margin-bottom: 8px; overflow-wrap: anywhere; }
+  .recall-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 0; }
+  .recall-row button { padding: 4px 12px; }
+  .recall-row button[aria-pressed="true"] { border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); font-weight: 600; }
+  .recall-a { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin-top: 8px; }
+  #recall-summary { margin-top: 8px; font-weight: 600; color: var(--changed); }
   @media (max-width: 719px) {
     header, main, section { padding-left: 16px; padding-right: 16px; }
     #banner { margin: 8px 16px; }
@@ -77,6 +87,8 @@
     <button id="next" type="button">次へ →</button>
     <span id="counter" class="muted"></span>
     <span id="frame-title"></span>
+    <button id="reveal" type="button" hidden>表示</button>
+    <label><input type="checkbox" id="predict"> 予測モード</label>
   </div>
   <div id="frame-desc"></div>
   <div id="legend" class="muted">
@@ -94,6 +106,12 @@
     <aside id="panel"><span class="muted">図の要素をクリックすると、詳細を表示します。</span></aside>
   </div>
 </main>
+<section id="recall-sec" hidden>
+  <h2>思い出す問い</h2>
+  <div class="muted">答えを見る前に、自分の言葉で一言答えてください。採点や記録はしません。</div>
+  <div id="recall-list"></div>
+  <div id="recall-summary" role="status"></div>
+</section>
 <section id="boundaries-sec" hidden>
   <h2>深掘り対象外と判断した境界</h2>
   <ul id="boundaries"></ul>
@@ -254,7 +272,11 @@ document.getElementById("canvas").append(svg);
 
 let current = 0;
 let selected = null;
+// pending: index of a frame the user is predicting but has not revealed yet (current stays at the previous frame).
+let pending = null;
 function show(i) {
+  pending = null;
+  document.getElementById("reveal").hidden = true;
   current = Math.max(0, Math.min(frames.length - 1, i));
   const snap = frameStates[current];
   for (const [id, { g, line }] of shapes) {
@@ -269,6 +291,28 @@ function show(i) {
   document.getElementById("frame-desc").textContent = frames[current].description;
   document.getElementById("prev").disabled = current === 0;
   document.getElementById("next").disabled = current === frames.length - 1;
+}
+
+const predictBox = document.getElementById("predict");
+try { predictBox.checked = localStorage.getItem("diagram-explain:predict") === "1"; } catch {}
+
+function predict(k) {
+  pending = k;
+  document.getElementById("counter").textContent = `${k + 1} / ${frames.length} (予測中)`;
+  document.getElementById("frame-title").textContent = `ステップ ${k}: ？`;
+  document.getElementById("frame-desc").textContent = "次に何を足す・変えるか、なぜかを頭の中で言ってから「表示」を押してください。";
+  document.getElementById("reveal").hidden = false;
+  document.getElementById("prev").disabled = false;
+  document.getElementById("next").disabled = false;
+}
+function forward() {
+  if (pending !== null) return show(pending);
+  if (predictBox.checked && current < frames.length - 1) return predict(current + 1);
+  show(current + 1);
+}
+function back() {
+  // While pending, current is still the previous frame, so one press never skips a frame.
+  show(pending !== null ? current : current - 1);
 }
 
 function select(id) {
@@ -313,12 +357,62 @@ async function copyText(text, button) {
   }
 }
 
-document.getElementById("prev").addEventListener("click", () => show(current - 1));
-document.getElementById("next").addEventListener("click", () => show(current + 1));
-document.addEventListener("keydown", ev => {
-  if (ev.key === "ArrowLeft") show(current - 1);
-  if (ev.key === "ArrowRight") show(current + 1);
+document.getElementById("prev").addEventListener("click", back);
+document.getElementById("next").addEventListener("click", forward);
+document.getElementById("reveal").addEventListener("click", () => show(pending));
+predictBox.addEventListener("change", () => {
+  try { localStorage.setItem("diagram-explain:predict", predictBox.checked ? "1" : "0"); } catch {}
+  if (!predictBox.checked && pending !== null) show(pending);
 });
+document.addEventListener("keydown", ev => {
+  if (ev.key === "ArrowLeft") back();
+  if (ev.key === "ArrowRight") forward();
+});
+
+const recall = D.recall || [];
+if (recall.length > 0) {
+  document.getElementById("recall-sec").hidden = false;
+  const state = recall.map(() => ({ confident: null, grade: null }));
+  const summary = document.getElementById("recall-summary");
+  const refresh = () => {
+    const missed = state.map((s, i) => (s.confident && (s.grade === "△" || s.grade === "×") ? `Q${i + 1}` : null)).filter(Boolean);
+    summary.textContent = missed.length > 0 ? `自信ありで外した問い: ${missed.join(", ")} — 思い込みで外したところなので、見直す候補です。` : "";
+  };
+  const list = document.getElementById("recall-list");
+  recall.forEach((r, i) => {
+    const card = el("div", { class: "recall-card" });
+    card.append(el("div", { class: "recall-q" }, `Q${i + 1}. ${r.question}`));
+    const conf = el("div", { class: "recall-row" });
+    const answer = el("div", { class: "recall-a" }, r.answer);
+    answer.hidden = true;
+    const grades = el("div", { class: "recall-row" });
+    grades.hidden = true;
+    const gradeBtns = ["○ 言えた", "△ 一部", "× 言えなかった"].map(label => {
+      const b = el("button", { type: "button", "aria-pressed": "false" }, label);
+      b.addEventListener("click", () => {
+        state[i].grade = label[0];
+        for (const o of gradeBtns) o.setAttribute("aria-pressed", String(o === b));
+        refresh();
+      });
+      return b;
+    });
+    grades.append(...gradeBtns);
+    const confBtns = [["自信あり", true], ["自信なし", false]].map(([label, value]) => {
+      const b = el("button", { type: "button", "aria-pressed": "false" }, label);
+      b.addEventListener("click", () => {
+        state[i].confident = value;
+        for (const o of confBtns) o.disabled = true;
+        b.setAttribute("aria-pressed", "true");
+        answer.hidden = false;
+        grades.hidden = false;
+      });
+      return b;
+    });
+    conf.append(...confBtns);
+    card.append(conf, answer, grades);
+    list.append(card);
+  });
+}
 
 if (IS_PLAN) {
   document.getElementById("boundaries-sec").hidden = false;

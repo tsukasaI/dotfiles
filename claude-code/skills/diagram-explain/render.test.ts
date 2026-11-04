@@ -193,6 +193,30 @@ describe("validate", () => {
   });
 });
 
+describe("recall", () => {
+  const item = { question: "なぜ?", answer: "理由だから" };
+
+  test("is optional, normalized to [] and allowed in both modes", () => {
+    expect(diagramOf(bare()).recall).toEqual([]);
+    const d = { ...bare(), recall: [item] };
+    expect(errorsOf(d)).toEqual([]);
+    expect(diagramOf(d).recall).toEqual([item]);
+    expect(errorsOf({ ...d, mode: "plan" })).toEqual([]);
+  });
+
+  test("rejects more than 8 items, bad items and non-arrays", () => {
+    expect(errorsOf({ ...bare(), recall: Array(9).fill(item) })).toContain("recall: must be an array of 1-8 items");
+    expect(errorsOf({ ...bare(), recall: [] })).toContain("recall: must be an array of 1-8 items");
+    expect(errorsOf({ ...bare(), recall: "x" })).toContain("recall: must be an array of 1-8 items");
+    expect(errorsOf({ ...bare(), recall: {} })).toContain("recall: must be an array of 1-8 items");
+    const msg = "recall[1]: question (<=200) and answer (<=1500) required";
+    expect(errorsOf({ ...bare(), recall: [item, { question: " ", answer: "a" }] })).toContain(msg);
+    expect(errorsOf({ ...bare(), recall: [item, { question: "q", answer: "a".repeat(1501) }] })).toContain(msg);
+    expect(errorsOf({ ...bare(), recall: [item, { question: "q".repeat(201), answer: "a" }] })).toContain(msg);
+    expect(errorsOf({ ...bare(), recall: [item, "x"] })).toContain(msg);
+  });
+});
+
 describe("checkRefs", () => {
   const withRef = (file: string, line: number, excerpt: string): Diagram => {
     const d = base();
@@ -230,6 +254,12 @@ describe("checkRefs", () => {
 
 describe("renderHtml", () => {
   const template = readFileSync(join(HERE, "template.html"), "utf8");
+
+  test("the template carries the recall section and the predict toggle", () => {
+    const html = renderHtml(diagramOf(base()), [], template);
+    expect(html).toContain('id="recall-sec"');
+    expect(html).toContain('id="predict"');
+  });
 
   test("an excerpt cannot close the data script or inject markup", () => {
     const d = base();

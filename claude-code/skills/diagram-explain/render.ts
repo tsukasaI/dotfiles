@@ -40,6 +40,7 @@ export type Diagram = {
   edges: DiagramEdge[];
   steps: Step[];
   boundaries: { label: string; reason: string }[];
+  recall: { question: string; answer: string }[];
 };
 
 export type RefStatus = "ok" | "moved" | "mismatch" | "missing" | "outside";
@@ -210,6 +211,16 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
       });
   }
 
+  if (raw.recall !== undefined) {
+    if (!Array.isArray(raw.recall) || raw.recall.length < 1 || raw.recall.length > 8) errors.push("recall: must be an array of 1-8 items");
+    else
+      raw.recall.forEach((r, i) => {
+        if (!isObj(r) || !isText(r.question, 200) || !isText(r.answer, 1500)) {
+          errors.push(`recall[${i}]: question (<=200) and answer (<=1500) required`);
+        }
+      });
+  }
+
   // An invalid steps value skips the replay: its "never added" noise would only bury the real error.
   if (raw.steps !== undefined && (!Array.isArray(raw.steps) || raw.steps.length > 30)) errors.push("steps: at most 30 steps");
   else checkSteps((raw.steps as unknown[]) ?? [], kinds, endpoints, errors);
@@ -225,6 +236,7 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
       edges: ((raw.edges as unknown[]) ?? []).map(withKind),
       steps: raw.steps ?? [],
       boundaries: raw.boundaries ?? [],
+      recall: raw.recall ?? [],
     } as unknown as Diagram,
   };
 }
