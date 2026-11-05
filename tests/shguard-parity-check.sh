@@ -320,8 +320,21 @@ case_ "git config credential"            'git config credential.helper x'      d
 case_ "git config includeIf"             'git config includeIf.gitdir:/x.path y' deny
 case_ "git config --global"              'git config --global user.name x'     deny
 case_ "git config -e"                    'git config -e'                       deny
-case_ "git config read email"            'git config user.email'               deny "no row for git config"
-case_ "git config --get email"           'git config --get user.email'         deny "no row for git config"
+case_ "git config read email"            'git config user.email'               allow "one operand reads"
+case_ "git config --get email"           'git config --get user.email'         allow
+case_ "git config --list"                'git config --list'                   deny "the row lists no --list"
+case_ "git config --unset"               'git config --unset user.name'        deny "the row lists no --unset"
+case_ "git config --file"                'git config --file x a.b'             deny "the row lists no --file"
+case_ "git config edit"                  'git config edit'                     deny "dotfiles-git-config-subcommand"
+case_ "git config list"                  'git config list'                     deny "dotfiles-git-config-subcommand"
+case_ "git check-ignore -v"              'git check-ignore -v a.ics'           allow
+case_ "git check-ignore --stdin"         'git check-ignore --stdin'            deny "the row lists no --stdin"
+case_ "date +format"                     'date +%Y'                            deny "no row for date"
+case_ "date -u +format"                  'date -u +%Y'                         deny "no row for date"
+case_ "date -s"                          'date -s 12:00'                       deny "no row for date"
+case_ "date -r"                          'date -r 0'                           deny "no row for date"
+case_ "gh auth status"                   'gh auth status'                      deny "gh auth stays out on purpose"
+case_ "gh auth status --show-token"      'gh auth status --show-token'         deny
 case_ "gh ssh-key add"                   'gh ssh-key add k.pub'                deny
 case_ "gh gpg-key add"                   'gh gpg-key add k.asc'                deny
 case_ "gh repo archive"                  'gh repo archive a/b'                 deny
@@ -401,9 +414,14 @@ case_ "gh repo list"                     'gh repo list'                        a
 case_ "gh repo list owner json"          'gh repo list tsukasaI --limit 100 --json name,isPrivate' allow
 case_ "gh repo list --jq"                'gh repo list tsukasaI --json name --jq .' deny "a jq filter can print gh's environment"
 case_ "gh repo list URL owner"           'gh repo list https://evil.example/x' deny "a URL operand can name another host"
-case_ "gh repo view"                     'gh repo view tsukasaI/dotfiles'     deny "only the listing has a row"
-case_ "gh repo delete"                   'gh repo delete tsukasaI/dotfiles --yes' deny "only the listing has a row"
-case_ "gh repo clone"                    'gh repo clone tsukasaI/dotfiles'    deny "only the listing has a row"
+case_ "gh repo view current"             'gh repo view --json name,visibility' allow "the current repository only"
+case_ "gh repo view operand"             'gh repo view tsukasaI/dotfiles'     deny "the view row takes no operand"
+case_ "gh repo view host form"           'gh repo view evil.example/o/r'      deny "a HOST/OWNER/REPO operand reaches another host"
+case_ "gh repo view URL"                 'gh repo view https://evil.example/o/r' deny "a URL operand can name another host"
+case_ "gh repo view --web"               'gh repo view --web'                  deny "the row lists no --web"
+case_ "gh repo view --jq"                'gh repo view --json name --jq .'     deny "a jq filter can print gh's environment"
+case_ "gh repo delete"                   'gh repo delete tsukasaI/dotfiles --yes' deny "only list and view have rows"
+case_ "gh repo clone"                    'gh repo clone tsukasaI/dotfiles'    deny "only list and view have rows"
 case_ "shguard synthetic payload"        "echo '{\"tool_input\":{\"command\":\"rm -rf foo\"}}' | shguard" allow "the shguard row: stdin only"
 case_ "shguard init"                     'shguard init'                        deny "the shguard row takes no operand (init writes a config)"
 case_ "shguard check"                    'shguard check x.toml'                deny "the shguard row takes no operand"

@@ -1102,6 +1102,7 @@ How the 0.9 config was carried over (`claude-code/shguard/config.toml`):
 | `dotfiles-secret-read-*` | `[[rule]]` block for cat/head/tail/wc/sort/jq on absolute `/Users/inouetsukasa/...` credential paths and the bare names; grep gets the absolute paths only (its pattern is a path word); rg gets none (`rg-ask-broad` already asks every `/Users` path). The embedded rules only know `~`, and the kernel has no HOME (tsukasaI/shguard#1113). |
 | `dotfiles-git-push-url-target` | `[[rule]]` block on `git@` and `.` remotes (the catalog asks URL and absolute remotes, allows these two). |
 | `dotfiles-rename-protected-ancestor-cp` | `[[rule]]` block on `claude-code` (the catalog blocks `.git`/`.claude`). |
+| `dotfiles-git-config-subcommand` | `[[rule]]` block on `git config edit` and `git config list`: each takes one operand, so the read-only `git config` row alone would allow them. |
 | `[[allow]]` secretlint/detect-secrets/gitleaks/trufflehog | Dropped by decision; lefthook's `gitleaks git --staged` runs as a git hook child, not through shguard. |
 | (new) | `[[row]]`s for `git add`, `git commit -m` and `jq`, so an agent can commit and read JSON under `ask_outcome = "deny"`. |
 

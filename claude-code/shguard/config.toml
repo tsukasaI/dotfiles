@@ -948,3 +948,54 @@ targets = [
   { pat = ".env", kind = "prefix" },
 ]
 outcome = "block"
+# One operand and only --get, so this row reads a value: a second operand,
+# --add, --unset, --file, --global, -e and --list all fall outside it. The
+# operand takes "path" so dotfiles-git-config-subcommand can see it.
+[[row]]
+key = ["git", "config"]
+source = "https://git-scm.com/docs/git-config"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [{ long = "get" }]
+
+# Not --stdin: it reads its paths from a stream the rules cannot see.
+[[row]]
+key = ["git", "check-ignore"]
+source = "https://git-scm.com/docs/git-check-ignore"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "v", long = "verbose" },
+  { short = "n", long = "non-matching" },
+  { short = "q", long = "quiet" },
+]
+
+# No operand: a repository operand can name another host, including the
+# HOST/OWNER/REPO form that gh-url-operand does not see as a URL. -q/--jq is
+# listed only so that gh-jq blocks it with its reason.
+[[row]]
+key = ["gh", "repo", "view"]
+source = "https://cli.github.com/manual/gh_repo_view"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+opt = [
+  { short = "q", long = "jq", value = { takes = "inert" } },
+  { long = "json", value = { takes = "inert" } },
+  { short = "t", long = "template", value = { takes = "inert" } },
+]
+
+# Modern git reads these two words as subcommands, so the one-operand row alone
+# would open an editor or dump the whole config.
+[[rule]]
+id = "dotfiles-git-config-subcommand"
+key = ["git", "config"]
+targets = [
+  { pat = "edit", kind = "exact" },
+  { pat = "list", kind = "exact" },
+]
+outcome = "block"
