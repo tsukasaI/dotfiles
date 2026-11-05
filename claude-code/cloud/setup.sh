@@ -32,6 +32,7 @@
 set -uo pipefail
 
 REPO=tsukasaI/dotfiles
+CG_REPO=tsukasaI/coding-guidelines
 GITLEAKS_VERSION=8.30.1
 ATLAS_VERSION=1.3.0
 ATLAS_SHA256=cfc773e5b4e845bc01d680390c174648938a7f88bf30e5a2c83ae85217c21587
@@ -82,7 +83,8 @@ while read -r digest path; do
   [[ $path =~ ^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$ && /$path/ != */../* ]] ||
     die "unsafe path in manifest: $path"
   case $path in
-    CLAUDE.md | cloud/CLAUDE.cloud.md | rules/* | skills/* | agents/*) ;;
+    CLAUDE.md | cloud/CLAUDE.cloud.md | cloud/coding-guidelines.ref) ;;
+    cloud/coding-guidelines.sha256 | rules/* | skills/* | agents/*) ;;
     *) die "path outside the installed set: $path" ;;
   esac
   paths+=("$path")
@@ -95,16 +97,46 @@ done
 (cd "$stage/files" && sha256sum -c --quiet --strict -) <"$stage/manifest" ||
   die "file digest mismatch at $REF"
 
+# coding-guidelines, a separate repo, installed as user-level rules. Its
+# commit and per-file digests come from the two cloud/coding-guidelines.*
+# files just verified above, so the chain of trust stays this pin.
+cg_paths=()
+if [[ -f $stage/files/cloud/coding-guidelines.ref ]]; then
+  cg_ref=$(<"$stage/files/cloud/coding-guidelines.ref")
+  [[ $cg_ref =~ ^[0-9a-f]{40}$ ]] || die "malformed cloud/coding-guidelines.ref"
+  [[ -f $stage/files/cloud/coding-guidelines.sha256 ]] ||
+    die "cloud/coding-guidelines.ref without cloud/coding-guidelines.sha256"
+  while read -r digest path; do
+    [[ $digest =~ ^[0-9a-f]{64}$ ]] || die "malformed coding-guidelines line: $digest $path"
+    [[ $path =~ ^(principles|languages/[a-z]+|frontend/[a-z]+)\.md$ ]] ||
+      die "coding-guidelines path outside the installed set: $path"
+    cg_paths+=("$path")
+  done <"$stage/files/cloud/coding-guidelines.sha256"
+  ((${#cg_paths[@]} > 0)) || die "empty coding-guidelines manifest"
+  for path in "${cg_paths[@]}"; do
+    curl -fsSL --proto '=https' --retry 3 --max-time 60 --create-dirs \
+      -o "$stage/cg/$path" "https://raw.githubusercontent.com/$CG_REPO/$cg_ref/$path" ||
+      die "could not fetch coding-guidelines $path at $cg_ref"
+  done
+  (cd "$stage/cg" && sha256sum -c --quiet --strict -) <"$stage/files/cloud/coding-guidelines.sha256" ||
+    die "coding-guidelines digest mismatch at $cg_ref"
+fi
+
 mkdir -p "$CLAUDE_DIR" || die "cannot create $CLAUDE_DIR"
 installed=()
 for path in "${paths[@]}"; do
   case $path in
-    CLAUDE.md | cloud/CLAUDE.cloud.md) ;;
+    CLAUDE.md | cloud/*) ;;
     *)
       install -D -m 644 "$stage/files/$path" "$CLAUDE_DIR/$path" || die "install $path"
       installed+=("$path")
       ;;
   esac
+done
+for path in "${cg_paths[@]}"; do
+  dest=rules/coding-guidelines/${path//\//-}
+  install -D -m 644 "$stage/cg/$path" "$CLAUDE_DIR/$dest" || die "install $dest"
+  installed+=("$dest")
 done
 { cat "$stage/files/CLAUDE.md" "$stage/files/cloud/CLAUDE.cloud.md"; } >"$CLAUDE_DIR/CLAUDE.md.tmp" &&
   mv "$CLAUDE_DIR/CLAUDE.md.tmp" "$CLAUDE_DIR/CLAUDE.md" || die "install CLAUDE.md"

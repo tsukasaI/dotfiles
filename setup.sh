@@ -69,18 +69,19 @@ chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
 # load only for matching files. Linked into a gitignored subdirectory of
 # claude-code/rules, which ~/.claude/rules points at. react.md and solid.md
 # are left out: both use .tsx, so a project imports the one it uses.
+# Mac links track the checkout's HEAD; only the cloud copy is pinned.
 CODING_GUIDELINES=${CODING_GUIDELINES:-$HOME/engineer/coding-guidelines}
 if [[ -d $CODING_GUIDELINES ]]; then
   mkdir -p "$DOTFILES/claude-code/rules/coding-guidelines"
-  for f in principles.md languages/go.md languages/rust.md \
-    languages/typescript.md frontend/common.md frontend/svelte.md; do
+  # The file list is the one the cloud setup pins; the digests are unused here.
+  while read -r _ f; do
     if [[ ! -f $CODING_GUIDELINES/$f ]]; then
       echo "Error: $CODING_GUIDELINES/$f does not exist" >&2
       exit 1
     fi
     ln -sfn "$CODING_GUIDELINES/$f" \
       "$DOTFILES/claude-code/rules/coding-guidelines/${f//\//-}"
-  done
+  done <"$DOTFILES/claude-code/cloud/coding-guidelines.sha256"
 else
   echo "WARNING: $CODING_GUIDELINES not found; coding-guidelines rules NOT linked." >&2
   echo "Clone tsukasaI/coding-guidelines there (or set CODING_GUIDELINES) and re-run setup.sh." >&2

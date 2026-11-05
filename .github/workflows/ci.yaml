@@ -110,6 +110,17 @@ jobs:
       - name: pi AGENTS.md sync check
         run: bash tests/pi-agents-sync.sh
 
+  coding-guidelines-pin:
+    # cloud/setup.sh installs the coding-guidelines files at the commit in
+    # cloud/coding-guidelines.ref and refuses any that miss their digest.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: coding-guidelines pin check
+        run: bash tests/coding-guidelines-pin.sh
+
   gitleaks:
     runs-on: ubuntu-latest
     steps:
