@@ -87,6 +87,29 @@ jobs:
       - name: cloud manifest sync check
         run: bash tests/cloud-manifest-sync.sh
 
+  contract-markers-sync:
+    # /mkgoal parses the triage:v1 comment and /triage parses the
+    # decision-note:v1 body; each marker's owner file and its readers must
+    # agree on version and field names.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: contract markers sync check
+        run: bash tests/contract-markers-sync.sh
+
+  pi-agents-sync:
+    # pi/AGENTS.md is a hand distillation of claude-code/CLAUDE.md; it
+    # records the hash it was last checked against.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: pi AGENTS.md sync check
+        run: bash tests/pi-agents-sync.sh
+
   gitleaks:
     runs-on: ubuntu-latest
     steps:
