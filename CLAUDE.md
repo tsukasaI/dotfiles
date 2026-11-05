@@ -43,9 +43,9 @@ There is no staging or deploy step (hooks apply on the next tool call,
   channel around the sandbox proxy allowlist.
 - Update flake inputs: `nix flake update` (in `nix-darwin/`), then
   `darwin-rebuild switch` to activate.
-- Test a hook change with a synthetic payload:
-  `echo '{"tool_input":{"command":"find ."},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard`
-  and check `.hookSpecificOutput.permissionDecision` (`allow`/`ask`/`deny`).
+- Test a hook change with a synthetic payload piped into `shguard`; the
+  one-liner and test matrix are in the `hooks-guardrails` skill. Check
+  `.hookSpecificOutput.permissionDecision` (`allow`/`ask`/`deny`).
 - CI: see `.github/workflows/ci.yaml` and `flake-check.yaml`. CI is a
   backstop, not the only loop — re-run `lefthook install` after pulling
   changes to hooks or lefthook config.
@@ -89,14 +89,12 @@ verification log: `docs/cloud-sessions.md`).
   **intentionally manual** — never run or automate it; its credentials are
   deliberately kept out of Claude's process tree.
 - **Personal knowledge store**: cc-memory (MCP) is the sole store for
-  memory about the owner: personal facts, the owner's own learnings,
-  and article-idea candidates (`blog_candidate: true`). Pitfalls Claude
-  Code finds while working go to rules instead (see global CLAUDE.md;
-  decision record: `ops/memory/cc-memory-curation-decisions.md`).
-  A repo's own `docs/` holds investigations specific to that repo's own subject
-  matter (e.g. `docs/turso-investigation.md` here), separate from
-  cc-memory's personal-knowledge scope. One store per finding — don't
-  duplicate across them.
+  memory about the owner, including article-idea candidates
+  (`blog_candidate: true`); what it holds and where Claude Code's own
+  pitfalls go is owned by the global CLAUDE.md (Context & Session
+  Management). A repo's own `docs/` holds investigations specific to that
+  repo's own subject matter (e.g. `docs/turso-investigation.md` here). One
+  store per finding — don't duplicate across them.
 
 ## Pitfalls
 
@@ -164,6 +162,6 @@ verification log: `docs/cloud-sessions.md`).
   and at least quarterly regardless (originally issue #25).
 - **Known debt is catalogued.** Closed GitHub issues (security /
   architecture / quality / claude-config) document past structural
-  problems, in Japanese, with a 問題の所在 → 推奨される対応方針 structure. Run
-  `gh issue list --state all` before filing a "new" finding, and follow that
-  format.
+  problems, in Japanese. Run `gh issue list --state all` before filing a
+  "new" finding, and follow the issue body structure `/maintain-sweep` sets
+  for its triage agent (問題の所在 → 推奨される対応方針).
