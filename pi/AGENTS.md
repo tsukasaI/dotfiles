@@ -1,5 +1,7 @@
 # Global instructions (pi)
 
+<!-- distilled-from: claude-code/CLAUDE.md sha256:b3c99da5e5ced6da4db074eada2c75096374b4bd3d7205334a5eb050dec271f6 -->
+
 Source: `~/dotfiles/pi/AGENTS.md`, symlinked to `~/.pi/agent/AGENTS.md`.
 Distilled from `~/dotfiles/claude-code/CLAUDE.md`, keeping only the parts
 that do not depend on Claude Code tools. The rules in `~/.claude/rules/`

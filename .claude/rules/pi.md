@@ -36,7 +36,10 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   When pi updates, diff against the new built-in `dark.json` for added tokens.
 - `AGENTS.md` → `~/.pi/agent/AGENTS.md` (symlink: context files have no
   settings path option). Pi does not read `~/.claude/CLAUDE.md`, so this is
-  the pi-side distillation of it; keep the two in step by hand. Rules are
+  the pi-side distillation of it; keep the two in step by hand.
+  `tests/pi-agents-sync.sh` (lefthook, CI) compares the `distilled-from`
+  hash at the top of AGENTS.md with `claude-code/CLAUDE.md` and fails when
+  it changed: re-check the distillation, then run it with `--write`. Rules are
   not distilled: `claude-rules.ts` loads `~/.claude/rules` itself, so
   AGENTS.md must not repeat their content.
 - `extensions/`: every `.ts` file here is loaded, so tests live in `tests/`
