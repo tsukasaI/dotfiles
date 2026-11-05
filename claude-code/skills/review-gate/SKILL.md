@@ -5,9 +5,6 @@ description: The code-reviewer gate between `gh pr create` and `gh pr merge` in 
 
 # Review gate
 
-Moved out of the global CLAUDE.md so it loads only when a PR is actually
-being reviewed. The global CLAUDE.md keeps only the trigger.
-
 - When: run `code-reviewer` once, automatically, right after `gh pr create`.
 - Model: `opus`; `fable` only for a security boundary or an architectural
   decision, since Fable's weekly quota is the scarce one.

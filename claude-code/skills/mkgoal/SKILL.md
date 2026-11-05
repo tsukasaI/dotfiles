@@ -184,8 +184,8 @@ included:
   boundary or makes an architectural decision (`review-gate` skill).
 - On the reviewer's approval, the PR is pre-authorized to squash-merge via
   `gh pr merge --squash --delete-branch` without asking again. This is the
-  standing exception to the usual "merge only when I say so" rule, scoped
-  strictly to goals launched through this skill.
+  merge rule the global CLAUDE.md already sets (Workflow, Git workflow by
+  repo), restated here so the goal statement carries it.
 - Settle medium/low findings by the tiers in the `review-gate` skill
   (`auto-fix` in the same PR, listed under `## Auto-fixed`;
   `needs-decision` as an issue with a decision note); the criteria live
