@@ -225,10 +225,12 @@ Hence setup.sh installs cargo-deny and cargo-audit. Their digests are the ones t
 GitHub release API reports for the x86_64 musl archives. CI gets its own versions
 from its actions, which may differ from these pins.
 
+In the next real setup-script run, both tools were at their pinned versions in
+`/usr/local/bin`. In shguard, `cargo deny check` passed in about 2 s, fetching the
+advisory database through the proxy. In fini, `cargo audit` found nothing in 81
+crates.
+
 ## Not verified here
 
-- The cargo-deny and cargo-audit installs in a real setup-script run: the
-  archive layout, whether the release downloads are reachable, and whether
-  both tools can fetch the advisory database.
 - triage/mkgoal/maintain-sweep running end to end with REST in place of
   `gh issue`.
