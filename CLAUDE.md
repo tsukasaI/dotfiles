@@ -161,7 +161,7 @@ verification log: `docs/cloud-sessions.md`).
   `extraFlags` is needed.
 - **Homebrew taps can't be content-pinned** — the exception to
   `rules/security.md`'s pin rule. The taps in `nix-darwin/flake.nix`
-  (`homebrew.taps`, the single list; `abue-ammar/tinycast` is non-notarized)
+  (`homebrew.taps`, the single list)
   have no content-hash mechanism, and `trusted = true`
   on each is not optional: Homebrew 5.1+ refuses to install third-party-tap
   formulae without it (confirmed live in commit `ad07cb8`). Renewal
