@@ -104,8 +104,8 @@ narrow first, widen only on evidence.
    path, both entries must stay in sync if either file moves.
 
 8. **Record rationale as Contextual Commit body lines** when committing
-   (`intent`/`decision`/`rejected`/`constraint`/`learned`, see repo
-   CLAUDE.md). `learned` is usually the most valuable line for the next
+   (`intent`/`decision`/`rejected`/`constraint`/`learned`, see global
+   CLAUDE.md, Workflow). `learned` is usually the most valuable line for the next
    person hitting the same false positive.
 
 ## bypassPermissions caveat
