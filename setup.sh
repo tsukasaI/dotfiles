@@ -64,6 +64,29 @@ link_with_backup "$DOTFILES/claude-code/settings.json" ~/.claude/settings.json
 link_with_backup "$DOTFILES/claude-code/CLAUDE.md" ~/.claude/CLAUDE.md
 chmod +x "$DOTFILES/claude-code/hooks/"*.sh 2>/dev/null || true
 
+# coding-guidelines (a separate repo) as user-level rules: principles.md loads
+# in every session, the language/frontend files carry paths: frontmatter and
+# load only for matching files. Linked into a gitignored subdirectory of
+# claude-code/rules, which ~/.claude/rules points at. react.md and solid.md
+# are left out: both use .tsx, so a project imports the one it uses.
+# Mac links track the checkout's HEAD; only the cloud copy is pinned.
+CODING_GUIDELINES=${CODING_GUIDELINES:-$HOME/engineer/coding-guidelines}
+if [[ -d $CODING_GUIDELINES ]]; then
+  mkdir -p "$DOTFILES/claude-code/rules/coding-guidelines"
+  # The file list is the one the cloud setup pins; the digests are unused here.
+  while read -r _ f; do
+    if [[ ! -f $CODING_GUIDELINES/$f ]]; then
+      echo "Error: $CODING_GUIDELINES/$f does not exist" >&2
+      exit 1
+    fi
+    ln -sfn "$CODING_GUIDELINES/$f" \
+      "$DOTFILES/claude-code/rules/coding-guidelines/${f//\//-}"
+  done <"$DOTFILES/claude-code/cloud/coding-guidelines.sha256"
+else
+  echo "WARNING: $CODING_GUIDELINES not found; coding-guidelines rules NOT linked." >&2
+  echo "Clone tsukasaI/coding-guidelines there (or set CODING_GUIDELINES) and re-run setup.sh." >&2
+fi
+
 # Pi coding agent (API-key billing, separate from Claude Code)
 mkdir -p ~/.local/bin ~/.pi/agent
 link_with_backup "$DOTFILES/pi/pi-factory" ~/.local/bin/pi-factory

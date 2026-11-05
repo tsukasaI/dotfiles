@@ -19,6 +19,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 |---|---|
 | `nix-darwin/flake.nix` | Source of truth for packages, Homebrew, and macOS defaults. Single host config; `system.primaryUser` must equal `whoami`. |
 | `claude-code/` | The user's **global** Claude Code config. Symlinked by `setup.sh`: `CLAUDE.md`, `settings.json`, `rules/`, `skills/`, `agents/`, `themes/` into `~/.claude/`, and `shguard/config.toml` into `~/.config/shguard/` (the path shguard reads). Referenced from `settings.json` by `$HOME/dotfiles/...` (`~/dotfiles/...` for `mod/`) path instead: `hooks/`, `statusline.ts` (`~/.claude/hooks` is herdr's own directory), and `mod/` (the `dotfiles-mod` plugin, via `env.CLAUDE_CODE_PLUGIN_DIRS`; see `hooks/README.md`). |
+| `claude-code/rules/coding-guidelines/` | Gitignored. `setup.sh` links files from `~/engineer/coding-guidelines` (separate repo `tsukasaI/coding-guidelines`, the owner of code conventions) here, so they load as user-level rules. |
 | `.claude/` | Project-scoped Claude state for *this repo only* (plans, memory, local settings, skills, rules, worktrees). Not the same thing as `claude-code/`. |
 | `nvim/` | lazy.nvim: a plugin's keymaps live inside its own spec in `lua/plugins/`, not in `init.lua`. |
 | `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks (see Pitfalls). |
@@ -43,9 +44,9 @@ There is no staging or deploy step (hooks apply on the next tool call,
   channel around the sandbox proxy allowlist.
 - Update flake inputs: `nix flake update` (in `nix-darwin/`), then
   `darwin-rebuild switch` to activate.
-- Test a hook change with a synthetic payload:
-  `echo '{"tool_input":{"command":"find ."},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard`
-  and check `.hookSpecificOutput.permissionDecision` (`allow`/`ask`/`deny`).
+- Test a hook change with a synthetic payload piped into `shguard`; the
+  one-liner and test matrix are in the `hooks-guardrails` skill. Check
+  `.hookSpecificOutput.permissionDecision` (`allow`/`ask`/`deny`).
 - CI: see `.github/workflows/ci.yaml` and `flake-check.yaml`. CI is a
   backstop, not the only loop — re-run `lefthook install` after pulling
   changes to hooks or lefthook config.
@@ -71,6 +72,12 @@ verification log: `docs/cloud-sessions.md`).
   `user.name`/`user.email` in `~/.gitconfig` after it runs. Set
   `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and
   `GIT_COMMITTER_EMAIL` in the environment's variables instead.
+- `cloud/setup.sh` also installs the `tsukasaI/coding-guidelines` files listed in
+  `cloud/coding-guidelines.sha256`, at the commit in
+  `cloud/coding-guidelines.ref`, into `~/.claude/rules/coding-guidelines/`
+  (the same list `setup.sh` links on the Mac). Re-pin with
+  `bash tests/coding-guidelines-pin.sh --write <coding-guidelines main commit>`,
+  then regenerate the manifest.
 - `cloud/exclude.txt` lists the Mac-only skills left out, with reasons.
 - After editing anything the manifest covers, run
   `bash tests/cloud-manifest-sync.sh --write`; CI fails on drift.
@@ -89,14 +96,12 @@ verification log: `docs/cloud-sessions.md`).
   **intentionally manual** — never run or automate it; its credentials are
   deliberately kept out of Claude's process tree.
 - **Personal knowledge store**: cc-memory (MCP) is the sole store for
-  memory about the owner: personal facts, the owner's own learnings,
-  and article-idea candidates (`blog_candidate: true`). Pitfalls Claude
-  Code finds while working go to rules instead (see global CLAUDE.md;
-  decision record: `ops/memory/cc-memory-curation-decisions.md`).
-  A repo's own `docs/` holds investigations specific to that repo's own subject
-  matter (e.g. `docs/turso-investigation.md` here), separate from
-  cc-memory's personal-knowledge scope. One store per finding — don't
-  duplicate across them.
+  memory about the owner, including article-idea candidates
+  (`blog_candidate: true`); what it holds and where Claude Code's own
+  pitfalls go is owned by the global CLAUDE.md (Context & Session
+  Management). A repo's own `docs/` holds investigations specific to that
+  repo's own subject matter (e.g. `docs/turso-investigation.md` here). One
+  store per finding — don't duplicate across them.
 
 ## Pitfalls
 
@@ -164,6 +169,6 @@ verification log: `docs/cloud-sessions.md`).
   and at least quarterly regardless (originally issue #25).
 - **Known debt is catalogued.** Closed GitHub issues (security /
   architecture / quality / claude-config) document past structural
-  problems, in Japanese, with a 問題の所在 → 推奨される対応方針 structure. Run
-  `gh issue list --state all` before filing a "new" finding, and follow that
-  format.
+  problems, in Japanese. Run `gh issue list --state all` before filing a
+  "new" finding, and follow the issue body structure `/maintain-sweep` sets
+  for its triage agent (問題の所在 → 推奨される対応方針).

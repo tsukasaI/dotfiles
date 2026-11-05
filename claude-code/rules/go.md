@@ -8,6 +8,4 @@ paths:
 # Go
 
 - Run `go vet ./...`, `golangci-lint run`, and `go test ./...` before considering changes complete.
-- Wrap errors with `fmt.Errorf("context: %w", err)`.
-- Never discard an error without a comment justifying why it's safe, including errors from `defer`red `Close`/`Flush` on writes.
-- Use table-driven tests.
+- Conventions (error wrapping, discarded errors, tests, layout) live in coding-guidelines `languages/go.md`, which loads alongside this rule from `~/.claude/rules/coding-guidelines/`.

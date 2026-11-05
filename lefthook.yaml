@@ -19,6 +19,16 @@ pre-commit:
       run: bash tests/symlinked-sync.sh
     cloud-manifest-sync:
       run: bash tests/cloud-manifest-sync.sh
+    contract-markers-sync:
+      run: bash tests/contract-markers-sync.sh
+    pi-agents-sync:
+      run: bash tests/pi-agents-sync.sh
+    coding-guidelines-pin:
+      # Reads the pinned files over the network when no local checkout has
+      # the commit, so it runs only when the pin itself changes; CI runs it
+      # on every push.
+      glob: "claude-code/cloud/coding-guidelines.*"
+      run: bash tests/coding-guidelines-pin.sh
 
 pre-push:
   commands:

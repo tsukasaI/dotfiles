@@ -8,7 +8,8 @@
 #   bash tests/cloud-manifest-sync.sh           check (exit 1 on drift)
 #   bash tests/cloud-manifest-sync.sh --write   regenerate the manifest
 #
-# Scope: claude-code/CLAUDE.md, the cloud overlay, rules/, skills/, agents/,
+# Scope: claude-code/CLAUDE.md, the cloud overlay, the coding-guidelines pin
+# (cloud/coding-guidelines.{ref,sha256}), rules/, skills/, agents/,
 # minus the path prefixes in claude-code/cloud/exclude.txt.
 
 set -euo pipefail
@@ -29,7 +30,8 @@ excluded() {
 
 expected() {
   local path
-  git ls-files -- CLAUDE.md cloud/CLAUDE.cloud.md rules skills agents |
+  git ls-files -- CLAUDE.md cloud/CLAUDE.cloud.md cloud/coding-guidelines.ref \
+    cloud/coding-guidelines.sha256 rules skills agents |
     LC_ALL=C sort |
     while IFS= read -r path; do
       excluded "$path" || sha256sum -- "$path"
@@ -43,6 +45,15 @@ if [[ ${1-} == --write ]]; then
 fi
 
 want=$(expected)
+
+# setup.sh refuses a manifest without the coding-guidelines pin; catch an
+# untracked or deleted pin file here instead of in a cloud session.
+for f in cloud/coding-guidelines.ref cloud/coding-guidelines.sha256; do
+  grep -q "  $f\$" <<<"$want" || {
+    echo "FAIL claude-code/$f is not tracked; git add it, then run --write" >&2
+    exit 1
+  }
+done
 
 # Not diff or mktemp for the verdict: in a commit hook inside the Claude Code
 # Bash sandbox, mktemp and diff on a pipe both fail with "Operation not

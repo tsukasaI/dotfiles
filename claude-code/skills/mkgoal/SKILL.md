@@ -45,8 +45,9 @@ If the launch argument consists solely of one or more `#<digits>` tokens
 mode: draft ONE combined `/goal` statement covering every listed issue, in
 the order given.
 
-**Batch size**: one `/goal` loop takes up to 10 issues, as long as the
-assembled statement passes the 4,000-character check in Assemble; the
+**Batch size**: group sizing (5-10 issues per loop) belongs to `/triage`'s
+Grouping rules. Here, 10 is only the most issues one statement takes up
+front, as long as it passes the 4,000-character check in Assemble; that
 character limit, not the issue count, is the binding constraint. With 10
 or fewer issues, never ask about splitting up front. With more than 10,
 before slot filling, ask via `AskUserQuestion`: (1) "Split (Recommended)":
@@ -175,13 +176,14 @@ included:
   `/goal` never switches the model, so naming the model only in prose would
   bind nothing; the Agent tool's `model` argument does.
 - Fixups for the reviewer's findings go back to that same implementer via
-  `SendMessage`, so it keeps its context instead of a fresh subagent
-  re-deriving it from a summary (global CLAUDE.md, Model behavior).
-  The main loop never runs Edit/Write on code itself; it keeps branch,
-  commit, PR, verification runs, and the merge.
-- Review with a `code-reviewer` subagent before completion counts, launched
-  with `model: opus`, or `model: fable` when the change touches a security
-  boundary or makes an architectural decision (`review-gate` skill).
+  `SendMessage` (global CLAUDE.md, Model behavior). The main loop never
+  runs Edit/Write on code itself; it keeps branch, commit, PR, verification
+  runs, and the merge.
+- Review with a `code-reviewer` subagent before completion counts. The
+  reviewer's model (`opus`, or `fable` for a security boundary or an
+  architectural decision) is chosen per the `review-gate` skill; the
+  statement still names the model literally, as the implementer's `sonnet`
+  is, because only the Agent tool's `model` argument binds it.
 - On the reviewer's approval, the PR is pre-authorized to squash-merge via
   `gh pr merge --squash --delete-branch` without asking again. This is the
   merge rule the global CLAUDE.md already sets (Workflow, Git workflow by
@@ -211,9 +213,9 @@ Build the statement on a single line from this template:
 
     /goal <task summary drawn from the user's stated goal>. Delegate the
     implementation to a subagent launched with model: sonnet, then have a
-    code-reviewer subagent (model: opus, or model: fable if the change touches
-    a security boundary or an architectural decision) review
-    the change; send any review fixups back to that implementer via
+    code-reviewer subagent (model per the review-gate skill: opus, or fable
+    for a security boundary or architectural decision) review the change;
+    send any review fixups back to that implementer via
     SendMessage, and never Edit/Write code in the main loop; settle
     medium/low findings by the review-gate skill tiers (auto-fix in the same PR,
     listed under `## Auto-fixed` in the PR body; needs-decision as a
@@ -239,8 +241,8 @@ summary, and join the per-issue completion conditions with "and":
     /goal Resolve issue #<N1> (<title1>[, decided: <decision1>]) and issue
     #<N2> (<title2>[, decided: <decision2>]) [...].
     Delegate each implementation to a subagent launched with model: sonnet,
-    then have a code-reviewer subagent (model: opus, or model: fable if the
-    change touches a security boundary or an architectural decision) review
+    then have a code-reviewer subagent (model per the review-gate skill:
+    opus, or fable for a security boundary or architectural decision) review
     each change; send any review fixups back to that implementer via
     SendMessage, and never Edit/Write code in the main loop; settle
     medium/low findings by the review-gate skill tiers (auto-fix in the same PR,

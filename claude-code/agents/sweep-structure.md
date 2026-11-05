@@ -42,6 +42,6 @@ rules.
   fixes against invented ones.
 
 ## Every finding
-Title, file/line, evidence, a concrete proposed fix, and your confidence
-(high/medium/low). If you find many, report the strongest first and note
-that more exist rather than writing up every one in equal depth.
+Report each finding in `FINDING_SCHEMA` (`skills/maintain-sweep/SKILL.md`).
+If you find many, report the strongest first and note that more exist
+rather than writing up every one in equal depth.

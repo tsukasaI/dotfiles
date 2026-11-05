@@ -32,5 +32,4 @@ cwd/env, nondeterministic ordering.
   with confidence low instead of guessing at a fix.
 
 ## Every finding
-Title, file/line, evidence, a concrete proposed fix, and your confidence
-(high/medium/low).
+Report each finding in `FINDING_SCHEMA` (`skills/maintain-sweep/SKILL.md`).

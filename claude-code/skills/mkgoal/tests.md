@@ -36,8 +36,9 @@ and whenever the main-loop model changes tier.
   pattern: delegate the implementation to a `model: sonnet` subagent and
   send review fixups back to that implementer via SendMessage, with no code
   Edit/Write in the main loop,
-  review with a `code-reviewer` subagent (`model: opus`, or `model: fable`
-  for a security-boundary or architectural change), and squash-merge via
+  review with a `code-reviewer` subagent (model per the `review-gate`
+  skill: `opus`, or `fable` for a security-boundary or architectural
+  change), and squash-merge via
   `gh pr merge --squash --delete-branch` once the reviewer approves. It is never
   asked about as a slot.
 - The assembled statement always contains the follow-up clauses: medium/low

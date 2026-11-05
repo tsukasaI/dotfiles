@@ -22,3 +22,7 @@ claude-code/skills/synced/
 
 # API declarations Claude Code writes beside a loaded plugin on every load.
 claude-code/mod/.claude-plugin/types/
+
+# Links into ~/engineer/coding-guidelines, created by setup.sh; that repo is
+# the source, not this one.
+claude-code/rules/coding-guidelines/
