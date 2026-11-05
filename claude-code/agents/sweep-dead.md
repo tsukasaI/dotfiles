@@ -33,5 +33,4 @@ Internal-only, beta, or flagged features that may have been forgotten.
   what evidence is missing. Don't guess.
 
 ## Every finding
-Title, file/line, evidence, a concrete proposed fix, and your confidence
-(high/medium/low).
+Report each finding in `FINDING_SCHEMA` (`skills/maintain-sweep/SKILL.md`).

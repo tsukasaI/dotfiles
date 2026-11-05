@@ -33,5 +33,5 @@ simplified without changing behavior.
   confidence low.
 
 ## Every finding
-Title, file/line, evidence, a concrete proposed fix, and your confidence
-(high/medium/low). If you find many, report the strongest first.
+Report each finding in `FINDING_SCHEMA` (`skills/maintain-sweep/SKILL.md`).
+If you find many, report the strongest first.
