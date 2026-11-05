@@ -35,6 +35,10 @@ REPO=tsukasaI/dotfiles
 GITLEAKS_VERSION=8.30.1
 ATLAS_VERSION=1.3.0
 ATLAS_SHA256=cfc773e5b4e845bc01d680390c174648938a7f88bf30e5a2c83ae85217c21587
+CARGO_DENY_VERSION=0.20.2
+CARGO_DENY_SHA256=9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f
+CARGO_AUDIT_VERSION=0.22.2
+CARGO_AUDIT_SHA256=7fb9497f8594b389e5fce5ef9b92db08432996895b2e0c5a0167a69ed445c428
 TOOL_DIR=/usr/local/bin
 
 REF=${1-}
@@ -138,6 +142,24 @@ GOBIN=$TOOL_DIR go install "github.com/zricethezav/gitleaks/v8@v$GITLEAKS_VERSIO
     echo "$ATLAS_SHA256  $stage/atlas" | sha256sum -c --quiet - &&
     install -m 755 "$stage/atlas" "$TOOL_DIR/atlas"
 } || warn "atlas was not installed"
+
+# Not cargo install: building from source would eat into the setup script's
+# time limit on every snapshot rebuild.
+install_cargo_tool() {
+  local name=$1 url=$2 sha=$3
+  curl -fsSL --proto '=https' --retry 3 --max-time 120 -o "$stage/$name.tar.gz" "$url" &&
+    echo "$sha  $stage/$name.tar.gz" | sha256sum -c --quiet - &&
+    mkdir -p "$stage/$name" &&
+    tar -xzf "$stage/$name.tar.gz" -C "$stage/$name" --strip-components=1 &&
+    install -m 755 "$stage/$name/$name" "$TOOL_DIR/$name"
+}
+
+install_cargo_tool cargo-deny \
+  "https://github.com/EmbarkStudios/cargo-deny/releases/download/$CARGO_DENY_VERSION/cargo-deny-$CARGO_DENY_VERSION-x86_64-unknown-linux-musl.tar.gz" \
+  "$CARGO_DENY_SHA256" || warn "cargo-deny was not installed"
+install_cargo_tool cargo-audit \
+  "https://github.com/rustsec/rustsec/releases/download/cargo-audit/v$CARGO_AUDIT_VERSION/cargo-audit-x86_64-unknown-linux-musl-v$CARGO_AUDIT_VERSION.tgz" \
+  "$CARGO_AUDIT_SHA256" || warn "cargo-audit was not installed"
 
 log "installed ${#installed[@]} files + CLAUDE.md from $REPO@$REF into $CLAUDE_DIR"
 ((warnings == 0)) || log "finished with warnings (see WARN above)"

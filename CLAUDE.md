@@ -60,7 +60,8 @@ verification log: `docs/cloud-sessions.md`).
   `agents/` from raw.githubusercontent.com at a pinned commit, verifies each
   file against `cloud/manifest.sha256`, appends `cloud/CLAUDE.cloud.md` (the
   cloud-only deltas) to `~/.claude/CLAUDE.md`, turns git signing off, and
-  installs sqlite3, gitleaks and atlas at the versions pinned in the script.
+  installs sqlite3, gitleaks, atlas, cargo-deny and cargo-audit at the versions
+  pinned in the script.
 - Two environments, split by network and secret boundary rather than by repo:
   `personal-dev` (Custom: the default list plus `atlasbinaries.com`, this
   script) and `macromenu-ingest` (Custom: the default list plus

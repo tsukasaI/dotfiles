@@ -212,7 +212,23 @@ isn't kept, so a WARN can't be read back; the signing step wasn't checked.
   in about 41 s, including `db:check` (atlas validate and diff dry-run) and
   gitleaks. Its dependency audit doesn't fail the run.
 
+## shguard and fini without any preparation (2026-11-04)
+
+- shguard: fmt, clippy, test (262 passed, 3 ignored) and the spike lockfile check
+  passed with the submodule uninitialised, so shguard needs no hook.
+  `cargo deny check` failed because the tool was missing.
+- fini: fmt, clippy and the scripts test passed. `cargo audit` failed because the
+  tool was missing. `cargo test` failed in `test_per_entry_walk_error_does_not_abort_walk`
+  and `test_issue_87_walk_error_message`, because root ignores mode `000`.
+
+Hence setup.sh installs cargo-deny and cargo-audit. Their digests are the ones the
+GitHub release API reports for the x86_64 musl archives. CI gets its own versions
+from its actions, which may differ from these pins.
+
 ## Not verified here
 
+- The cargo-deny and cargo-audit installs in a real setup-script run: the
+  archive layout, whether the release downloads are reachable, and whether
+  both tools can fetch the advisory database.
 - triage/mkgoal/maintain-sweep running end to end with REST in place of
   `gh issue`.
