@@ -19,6 +19,7 @@ There is no staging or deploy step (hooks apply on the next tool call,
 |---|---|
 | `nix-darwin/flake.nix` | Source of truth for packages, Homebrew, and macOS defaults. Single host config; `system.primaryUser` must equal `whoami`. |
 | `claude-code/` | The user's **global** Claude Code config. Symlinked by `setup.sh`: `CLAUDE.md`, `settings.json`, `rules/`, `skills/`, `agents/`, `themes/` into `~/.claude/`, and `shguard/config.toml` into `~/.config/shguard/` (the path shguard reads). Referenced from `settings.json` by `$HOME/dotfiles/...` (`~/dotfiles/...` for `mod/`) path instead: `hooks/`, `statusline.ts` (`~/.claude/hooks` is herdr's own directory), and `mod/` (the `dotfiles-mod` plugin, via `env.CLAUDE_CODE_PLUGIN_DIRS`; see `hooks/README.md`). |
+| `claude-code/rules/coding-guidelines/` | Gitignored. `setup.sh` links files from `~/engineer/coding-guidelines` (separate repo `tsukasaI/coding-guidelines`, the owner of code conventions) here, so they load as user-level rules. |
 | `.claude/` | Project-scoped Claude state for *this repo only* (plans, memory, local settings, skills, rules, worktrees). Not the same thing as `claude-code/`. |
 | `nvim/` | lazy.nvim: a plugin's keymaps live inside its own spec in `lua/plugins/`, not in `init.lua`. |
 | `git/` | Global gitconfig; `gitconfig-oss` swaps `user.email` for `~/oss/**` via `includeIf`. No global hooks (see Pitfalls). |

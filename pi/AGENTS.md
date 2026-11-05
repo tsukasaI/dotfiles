@@ -1,6 +1,6 @@
 # Global instructions (pi)
 
-<!-- distilled-from: claude-code/CLAUDE.md sha256:b3c99da5e5ced6da4db074eada2c75096374b4bd3d7205334a5eb050dec271f6 -->
+<!-- distilled-from: claude-code/CLAUDE.md sha256:c43f9a0951ff2a68ab773afff6fc02a53380724bbddef2b38a86c948c2092b08 -->
 
 Source: `~/dotfiles/pi/AGENTS.md`, symlinked to `~/.pi/agent/AGENTS.md`.
 Distilled from `~/dotfiles/claude-code/CLAUDE.md`, keeping only the parts
@@ -47,6 +47,10 @@ prompt directly, so don't repeat their content in this file. A repo's own `AGENT
 - For subjective goals (最適化, いい感じ, 楽に), ask for the acceptance
   criterion first.
 - Read scope literally. "this file" means this file only.
+- The coding-guidelines rules (`~/.claude/rules/coding-guidelines/`) say
+  what new code should look like. Where the surrounding code already
+  violates one, match the surrounding code, list each violation in the
+  final reply, and leave fixing it to a separate change.
 
 ## Truthfulness
 
