@@ -230,6 +230,16 @@ In the next real setup-script run, both tools were at their pinned versions in
 advisory database through the proxy. In fini, `cargo audit` found nothing in 81
 crates.
 
+## SessionStart hooks, first real run (2026-11-05)
+
+New sessions after the hooks merged had `done` at the end of
+`.tmp/session-start.log`, with dependencies and `.dev.vars` in place.
+
+- staygreen: `pnpm verify` passed in about 42 s with no preparation.
+- cc-memory: `pnpm typecheck` passed with no preparation. `pnpm smoke` passed
+  after `pnpm db:reset:local` and `pnpm dev`, which the hook leaves out because
+  the reset drops every local table.
+
 ## Not verified here
 
 - triage/mkgoal/maintain-sweep running end to end with REST in place of
