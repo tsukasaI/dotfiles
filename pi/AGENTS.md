@@ -24,8 +24,9 @@ prompt directly, so don't repeat their content in this file. A repo's own `AGENT
   session: `rm -rf`, `git reset --hard`, `git clean`, `git push --force`,
   branch/tag deletion, dropping databases, overwriting files outside the
   current repo.
-- Never send anything outward without asking first: `git push`, `gh pr` /
-  `gh issue` writes, publishing packages, messages, uploads.
+- Never send anything outward without asking first: `git push` (except
+  in `dotfiles` and `ops`, see Git), `gh pr` / `gh issue` writes,
+  publishing packages, messages, uploads.
 - Never read or print secrets: Keychain (`security find-*`), `auth.json`,
   `.env`, credential files. Reference them by path only.
 - Before a large change, make sure the work can be undone (clean tree,
@@ -74,7 +75,8 @@ prompt directly, so don't repeat their content in this file. A repo's own `AGENT
   session. If unrelated changes are mixed in, list them and ask.
 - Commit after each completed subtask. Never bypass hooks (`--no-verify`);
   if pre-commit fails, fix the cause.
-- `dotfiles` and `ops`: commit directly to main. Every other repo: never
+- `dotfiles` and `ops`: commit directly to main and push once a subtask is
+  complete, without asking. Every other repo: never
   commit to main; create `<type>/<short-slug>` and open a PR (ask before
   pushing).
 - Use plain `git` in the current repo; reserve `-C <path>` for a different
