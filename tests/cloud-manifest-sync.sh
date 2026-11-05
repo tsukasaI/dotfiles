@@ -46,6 +46,15 @@ fi
 
 want=$(expected)
 
+# setup.sh refuses a manifest without the coding-guidelines pin; catch an
+# untracked or deleted pin file here instead of in a cloud session.
+for f in cloud/coding-guidelines.ref cloud/coding-guidelines.sha256; do
+  grep -q "  $f\$" <<<"$want" || {
+    echo "FAIL claude-code/$f is not tracked; git add it, then run --write" >&2
+    exit 1
+  }
+done
+
 # Not diff or mktemp for the verdict: in a commit hook inside the Claude Code
 # Bash sandbox, mktemp and diff on a pipe both fail with "Operation not
 # permitted", which would read as a drifted manifest.

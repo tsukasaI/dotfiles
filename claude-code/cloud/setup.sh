@@ -100,27 +100,27 @@ done
 # coding-guidelines, a separate repo, installed as user-level rules. Its
 # commit and per-file digests come from the two cloud/coding-guidelines.*
 # files just verified above, so the chain of trust stays this pin.
+# Both files are required: a manifest that drops them must not install a
+# session silently missing the guidelines.
 cg_paths=()
-if [[ -f $stage/files/cloud/coding-guidelines.ref ]]; then
-  cg_ref=$(<"$stage/files/cloud/coding-guidelines.ref")
-  [[ $cg_ref =~ ^[0-9a-f]{40}$ ]] || die "malformed cloud/coding-guidelines.ref"
-  [[ -f $stage/files/cloud/coding-guidelines.sha256 ]] ||
-    die "cloud/coding-guidelines.ref without cloud/coding-guidelines.sha256"
-  while read -r digest path; do
-    [[ $digest =~ ^[0-9a-f]{64}$ ]] || die "malformed coding-guidelines line: $digest $path"
-    [[ $path =~ ^(principles|languages/[a-z]+|frontend/[a-z]+)\.md$ ]] ||
-      die "coding-guidelines path outside the installed set: $path"
-    cg_paths+=("$path")
-  done <"$stage/files/cloud/coding-guidelines.sha256"
-  ((${#cg_paths[@]} > 0)) || die "empty coding-guidelines manifest"
-  for path in "${cg_paths[@]}"; do
-    curl -fsSL --proto '=https' --retry 3 --max-time 60 --create-dirs \
-      -o "$stage/cg/$path" "https://raw.githubusercontent.com/$CG_REPO/$cg_ref/$path" ||
-      die "could not fetch coding-guidelines $path at $cg_ref"
-  done
-  (cd "$stage/cg" && sha256sum -c --quiet --strict -) <"$stage/files/cloud/coding-guidelines.sha256" ||
-    die "coding-guidelines digest mismatch at $cg_ref"
-fi
+[[ -f $stage/files/cloud/coding-guidelines.ref && -f $stage/files/cloud/coding-guidelines.sha256 ]] ||
+  die "the manifest lacks cloud/coding-guidelines.ref or cloud/coding-guidelines.sha256"
+cg_ref=$(<"$stage/files/cloud/coding-guidelines.ref")
+[[ $cg_ref =~ ^[0-9a-f]{40}$ ]] || die "malformed cloud/coding-guidelines.ref"
+while read -r digest path; do
+  [[ $digest =~ ^[0-9a-f]{64}$ ]] || die "malformed coding-guidelines line: $digest $path"
+  [[ $path =~ ^(principles|languages/[a-z]+|frontend/[a-z]+)\.md$ ]] ||
+    die "coding-guidelines path outside the installed set: $path"
+  cg_paths+=("$path")
+done <"$stage/files/cloud/coding-guidelines.sha256"
+((${#cg_paths[@]} > 0)) || die "empty coding-guidelines manifest"
+for path in "${cg_paths[@]}"; do
+  curl -fsSL --proto '=https' --retry 3 --max-time 60 --create-dirs \
+    -o "$stage/cg/$path" "https://raw.githubusercontent.com/$CG_REPO/$cg_ref/$path" ||
+    die "could not fetch coding-guidelines $path at $cg_ref"
+done
+(cd "$stage/cg" && sha256sum -c --quiet --strict -) <"$stage/files/cloud/coding-guidelines.sha256" ||
+  die "coding-guidelines digest mismatch at $cg_ref"
 
 mkdir -p "$CLAUDE_DIR" || die "cannot create $CLAUDE_DIR"
 installed=()
