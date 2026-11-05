@@ -14,6 +14,10 @@ Patterns that the sandbox or shguard denies by mechanism, not by policy:
 - shguard refuses a `gh` body file outside `/private/tmp` and the repository
   (`dotfiles-gh-upload-path`: gh runs unsandboxed and uploads it), and
   `gh api` with `-X`/`-f`/`-F`/`--input`, which turn it into a write.
+- shguard refuses `gh` with `-R`/`--repo` or a URL operand, which can send the
+  token to another host, so `gh pr` commands reach only the cwd's repository.
+  Read another repository with a GET `gh api repos/<o>/<r>/...` (`-H` is refused
+  too); give the user the command for a write.
 
 ## Excluded commands and what shguard allows
 
