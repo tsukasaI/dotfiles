@@ -1,14 +1,7 @@
 # Workflow
 - Commit messages must be in English, regardless of conversation language.
 - Use plain `git add` / `git commit` / `git status` inside the current project — the cwd is already the repo. Reserve `-C <path>` for a genuinely different repository.
-- `git push/fetch/pull/ls-remote`, `git remote prune`, `gh`, and `go mod download`/`go mod tidy`/`go get` run outside the Bash sandbox (`sandbox.excludedCommands` in `settings.json`): inside it, SSH remotes can't resolve `github.com` and `gh` can't read the keychain.
-  - shguard allows everyday git/gh writes (commit, rebase, `reset --soft`, switch, stash, fetch/pull, push to a named remote, `gh pr create|merge|comment`, `gh issue create|comment`, GET-only `gh api`) and refuses what loses work for good or has no row (`reset --hard`, `checkout`, `restore`, `clean`, `branch -d`, `gh pr merge --admin`, `gh api` writes). Unstage with `git reset -- <path>`; for a refused command, stop and give me the command.
-  - Only the exact prefixes listed there are excluded: for git, the bare form or `origin` after the subcommand or one of the listed flags (`git push`, `git push origin <branch>`, `git push -u origin <branch>`, `git fetch origin`, `git remote prune origin`, `git pull --rebase origin main`). Any other form, and any line with a redirect or pipe, runs sandboxed and fails SSH, so put other flags after `origin`.
-  - Every other git command, `git commit` included, runs sandboxed (GPG reaches its agent via `sandbox.network.allowUnixSockets`).
-  - Run excluded commands standalone, not chained after `cd`/`&&`, because every command in a chain must match the exclusion or the whole line runs sandboxed.
-  - A newline inside an argument splits the line the same way, so a multi-line `gh pr create -b`/`gh issue create -b` fails on the keychain: write the body to a file under the scratchpad (`/private/tmp/claude-501/...`) and pass `--body-file`.
-  - A backquote anywhere in the line, even inside single quotes or escaped in double quotes, also drops the exclusion (8 of 8 observed `gh` calls ran sandboxed): keep backquotes out of `--title`/`--body`/`--comment` and put Markdown text in a `--body-file`.
-  - If `gh auth status` inside the sandbox reports an invalid keyring token, that is the sandbox, not a broken login; never run `gh auth refresh` for it.
+- `git push/fetch/pull/ls-remote`, `git remote prune`, `gh`, and `go mod download`/`go mod tidy`/`go get` run outside the Bash sandbox. The exact excluded prefixes, what shguard allows or refuses for git/gh, and the chaining/newline/backquote/`--body-file` gotchas live in `rules/git-sandbox.md`.
 - "commitして" with no scope = commit ONLY files changed in this session. If the working tree has unrelated changes mixed in, list them and confirm instead of guessing.
 - Commit after each completed subtask; never start the next subtask while pre-commit fails — fix the check first. Bypass flags (`--no-verify`, `git push --force`, `--force-with-lease`) are hook-blocked; when force is genuinely needed, give me the `--force-with-lease` command.
 - Git workflow by repo:
@@ -69,6 +62,12 @@
   |---|---|---|
   | Subagents (Explore, web-researcher, Agent/Workflow `agent()`) | Cheapest model that can do the subtask; default `sonnet` | `model:` argument at call time |
   | Maintenance investigation agents (`/maintain-sweep`: `sweep-*`, `crash-fuzzer`) | `opus` | `agents/*.md` frontmatter (deliberate exception to the 2-of-4 rule below); no `effort:` on purpose, so they inherit the session's effort |
+  | `code-reviewer` agent (review gate) | `opus`; `fable` only for a security boundary or an architectural decision, per the `review-gate` skill | `agents/code-reviewer.md` frontmatter; `fable` is a call-time `model:` override |
+  | `/maintain-sweep` triage agent | `fable` (one call over all findings) | `model:` in the skill's Workflow script |
+
+  An agent whose `agents/*.md` frontmatter sets `model:` is the exception to
+  passing `model:` at call time (the `dotfiles-mod` rule-guards hook allows
+  such a call without one).
 
 - When delegating to Agent or Workflow `agent()`, pass `model:` explicitly (default `sonnet`) — don't rely on inheritance from the main loop. Escalate above the default only when the subtask meets ≥2 of: (a) no existing pattern in this codebase to imitate, (b) a security/auth/crypto boundary, (c) multiple valid approaches with a real trade-off, (d) it already failed once at the default tier.
   - Example (escalate): "design a cache-invalidation strategy for this service" — no precedent, real trade-offs.
