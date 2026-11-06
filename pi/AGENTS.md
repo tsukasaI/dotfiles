@@ -1,6 +1,6 @@
 # Global instructions (pi)
 
-<!-- distilled-from: claude-code/CLAUDE.md sha256:c43f9a0951ff2a68ab773afff6fc02a53380724bbddef2b38a86c948c2092b08 -->
+<!-- distilled-from: claude-code/CLAUDE.md sha256:5d588fa4d13dff0d5aa8232af52e5004afc37744a3d2d6e88ad9ff6b85939af3 -->
 
 Source: `~/dotfiles/pi/AGENTS.md`, symlinked to `~/.pi/agent/AGENTS.md`.
 Distilled from `~/dotfiles/claude-code/CLAUDE.md`, keeping only the parts
@@ -20,8 +20,8 @@ prompt directly, so don't repeat their content in this file. A repo's own `AGENT
 - When a guard blocks a call, never retry with an equivalent command
   (`unlink` for `rm`, a different tool, piping around it). Show me the
   command verbatim in a fenced block, or the intended edit as a diff, and
-  stop. Exception: when shguard refuses `find`, use the built-in file
-  search (or `rg --files`) at once; fd is refused too.
+  stop. Exception: when shguard refuses `find`, use `fd` with a path relative
+  to the cwd, the built-in file search, or `rg --files` at once.
 - Never run destructive commands without my explicit go-ahead in this
   session: `rm -rf`, `git reset --hard`, `git clean`, `git push --force`,
   branch/tag deletion, dropping databases, overwriting files outside the

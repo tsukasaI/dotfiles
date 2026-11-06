@@ -1114,9 +1114,10 @@ can be fixed:
 - **gap (pending upstream)** rules carry no reason text, so the agent no
   longer reads "use fd" style guidance (tsukasaI/shguard#1112);
   `blocked-band.tsx` points a refused `find` at the Glob tool instead.
-- **regression (pending upstream)** `fd`, `bun`, `sed`, `awk` and other
+- **regression (pending upstream)** `bun`, `sed`, `awk` and other
   denylisted heads cannot get a row even from the user config, so agents
-  cannot run `fd` or `bun test` (tsukasaI/shguard#1111); the other missing
+  cannot run `bun test` (tsukasaI/shguard#1111; `fd` got a row in 0.11, relative
+  paths only and without `-x`); the other missing
   rows (`git log -5`, `git fetch`, `gh api`, `nix build`, ...) are
   tsukasaI/shguard#1115.
 - **gap (permanent, user-owned)** `jq -n env` prints the environment; the

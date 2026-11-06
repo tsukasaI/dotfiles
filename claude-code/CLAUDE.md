@@ -22,7 +22,7 @@
     - `learned(scope)`: discovered quirks / gotchas
 - Editor: nvim
 - When a Bash command is blocked by a PreToolUse hook, never retry with an equivalent shell command (`unlink` for `rm`, piping around a block, etc.); repeat it verbatim in a fenced bash block so I can `/copy` it. A dedicated tool (Read, Grep, Glob, Edit, Write) that does the job is fine to use; otherwise just stop.
-  - Exception: when shguard refuses `find`, use the Glob tool at once (fd is refused too).
+  - Exception: when shguard refuses `find`, use `fd` at once with a path relative to the cwd, or the Glob tool when the session has it.
   - A blocked Edit/Write still needs presenting by you.
 - Before setup work that ends in a hook-protected action (editing linter/formatter configs, destructive git ops), check the protection first — don't discover it after installing/initializing.
 - Enter plan mode when the change spans multiple files/subsystems or involves an architectural decision; single-file fixes don't need a plan. I'll ask when I want more than this default. If the approach breaks down mid-task, stop and re-plan.
