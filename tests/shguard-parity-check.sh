@@ -329,6 +329,21 @@ case_ "git config edit"                  'git config edit'                     d
 case_ "git config list"                  'git config list'                     deny "dotfiles-git-config-subcommand"
 case_ "git check-ignore -v"              'git check-ignore -v a.ics'           allow
 case_ "git check-ignore --stdin"         'git check-ignore --stdin'            deny "the row lists no --stdin"
+case_ "git cherry -v"                    'git cherry -v origin/main'           allow
+case_ "git range-diff"                   'git range-diff main a b'             allow
+case_ "git range-diff --output"          'git range-diff --output=x main a b'  deny "the row lists no --output"
+case_ "git range-diff --ext-diff"        'git range-diff --ext-diff main a b'  deny "the row lists no --ext-diff"
+case_ "gh search issues"                 'gh search issues foo --limit 5'      allow
+case_ "gh search prs"                    'gh search prs foo --state open'      allow
+case_ "gh search repos"                  'gh search repos foo --language go'   allow
+case_ "gh search code"                   'gh search code foo --limit 5'        allow
+case_ "gh search --web"                  'gh search issues foo --web'          deny "the row lists no --web"
+case_ "gh search --jq"                   'gh search issues foo --json title --jq .' deny "a jq filter can print gh's environment"
+case_ "gh search URL"                    'gh search issues https://evil.example/x' deny "a URL operand can name another host"
+case_ "gh search commits"                'gh search commits foo'               deny "the search rows are a closed list"
+case_ "gh pr review comment"             'gh pr review 1 --comment -b ok'      allow
+case_ "gh pr review --approve"           'gh pr review 1 --approve'            deny "a formal review decision stays with the owner"
+case_ "gh pr review --request-changes"   'gh pr review 1 --request-changes -b no' deny "a formal review decision stays with the owner"
 case_ "date +format"                     'date +%Y'                            deny "no row for date"
 case_ "date -u +format"                  'date -u +%Y'                         deny "no row for date"
 case_ "date -s"                          'date -s 12:00'                       deny "no row for date"

@@ -999,3 +999,123 @@ targets = [
   { pat = "list", kind = "exact" },
 ]
 outcome = "block"
+[[row]]
+key = ["git", "cherry"]
+source = "https://git-scm.com/docs/git-cherry"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "v" },
+  { long = "abbrev", value = { takes = "inert" } },
+]
+
+# Not the diff options range-diff forwards: --output writes a file and
+# --ext-diff runs a configured program.
+[[row]]
+key = ["git", "range-diff"]
+source = "https://git-scm.com/docs/git-range-diff"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { long = "creation-factor", value = { takes = "inert" } },
+  { long = "no-dual-color" },
+  { long = "no-color" },
+  { short = "s", long = "no-patch" },
+  { long = "stat" },
+]
+
+[[row]]
+key = ["gh", "search"]
+source = "https://cli.github.com/manual/gh_search"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+
+# Not --web: it opens a browser. Not -R/--repo: it can send the token to another
+# host; narrow with a repo: term in the query instead.
+# Query words take "path" so gh-url-operand sees a URL operand; -q/--jq is listed
+# only so that gh-jq blocks it with its reason.
+[[row]]
+key = ["gh", "search", "issues"]
+source = "https://cli.github.com/manual/gh_search_issues"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "q", long = "jq", value = { takes = "inert" } },
+  { long = "json", value = { takes = "inert" } },
+  { short = "t", long = "template", value = { takes = "inert" } },
+  { short = "L", long = "limit", value = { takes = "inert" } },
+  { long = "state", value = { takes = "inert" } },
+  { long = "sort", value = { takes = "inert" } },
+  { long = "order", value = { takes = "inert" } },
+]
+
+[[row]]
+key = ["gh", "search", "prs"]
+source = "https://cli.github.com/manual/gh_search_prs"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "q", long = "jq", value = { takes = "inert" } },
+  { long = "json", value = { takes = "inert" } },
+  { short = "t", long = "template", value = { takes = "inert" } },
+  { short = "L", long = "limit", value = { takes = "inert" } },
+  { long = "state", value = { takes = "inert" } },
+  { long = "sort", value = { takes = "inert" } },
+  { long = "order", value = { takes = "inert" } },
+]
+
+[[row]]
+key = ["gh", "search", "repos"]
+source = "https://cli.github.com/manual/gh_search_repos"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "q", long = "jq", value = { takes = "inert" } },
+  { long = "json", value = { takes = "inert" } },
+  { short = "t", long = "template", value = { takes = "inert" } },
+  { short = "L", long = "limit", value = { takes = "inert" } },
+  { long = "language", value = { takes = "inert" } },
+  { long = "sort", value = { takes = "inert" } },
+  { long = "order", value = { takes = "inert" } },
+]
+
+[[row]]
+key = ["gh", "search", "code"]
+source = "https://cli.github.com/manual/gh_search_code"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+opt = [
+  { short = "q", long = "jq", value = { takes = "inert" } },
+  { long = "json", value = { takes = "inert" } },
+  { short = "t", long = "template", value = { takes = "inert" } },
+  { short = "L", long = "limit", value = { takes = "inert" } },
+  { long = "language", value = { takes = "inert" } },
+]
+
+# Comment reviews only: --approve and --request-changes record a formal review
+# decision, which the review gate leaves to the owner.
+[[row]]
+key = ["gh", "pr", "review"]
+source = "https://cli.github.com/manual/gh_pr_review"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [
+  { short = "c", long = "comment" },
+  { short = "b", long = "body", value = { takes = "inert" } },
+  { short = "F", long = "body-file", value = { takes = "path" } },
+]
