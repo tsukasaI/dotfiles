@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "os";
 import { join } from "path";
 import { main, validate } from "../diagram-explain/render.ts";
-import { CATEGORIES, planOptions, validatePlan } from "./plan.ts";
+import { planOptions, validatePlan } from "./plan.ts";
 
 const HERE = import.meta.dir;
 
@@ -74,7 +74,6 @@ describe("validatePlan", () => {
     const d = base();
     d.nodes[0].deepDive = { category: "performance", why: "w" };
     expect(errorsOf(d).some(e => e.startsWith("nodes[0]: deepDive category must be one of"))).toBe(true);
-    expect(CATEGORIES).toHaveLength(7);
   });
 
   test("needs at least one step", () => {

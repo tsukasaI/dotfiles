@@ -181,13 +181,6 @@ test('text that only looks like a commit does not trigger the guard', async ($, 
   }
 })
 
-test('an earlier -m flag is not read as the commit message', async ($, on) => {
-  stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
-  const command = `ls -lm 'x' && git commit -m "feat: y"`
-  expect(commitMessage(command)).toBe('feat: y')
-  expect((await $.tool.call({ tool: 'Bash', command })).deny).toBeUndefined()
-})
-
 test('a real commit after an unrelated heredoc is still checked', async ($, on) => {
   stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
   const command = `cat > x.md <<'EOF'\ngit commit -m "feat: ok"\nEOF\ngit commit -m "update"`

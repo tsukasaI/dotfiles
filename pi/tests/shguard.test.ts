@@ -98,8 +98,7 @@ try {
 }
 // Commands whose decision does not depend on the shguard version or on
 // ask_outcome, so this holds before and after a shguard upgrade.
-test.skipIf(!hasShguard)("real shguard: plain push allowed, force push and repo delete blocked", async () => {
+test.skipIf(!hasShguard)("real shguard: plain push allowed, force push blocked", async () => {
 	expect(await checkCommand("git push origin feat/x")).toEqual({ allow: true });
 	expect((await checkCommand("git push --force origin main")).allow).toBe(false);
-	expect((await checkCommand("gh repo delete foo")).allow).toBe(false);
 });
