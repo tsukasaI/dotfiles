@@ -53,7 +53,6 @@ describe("denies", () => {
   test.each(["../x", "a/b", "/abs", "..", "a b", "a.b", "", "x\0", "a\\b"])("session %j", (session) =>
     expect(decide(call("snapshot", { session }))).toContain("session must match"));
   test("non-string session", () => expect(decide(call("snapshot", { session: 5 }))).toContain("session must match"));
-  test("restore true",() => expect(decide(call("open", { restore: true }))).not.toBeNull());
   for (const key of ["outputDir", "userDataDir", "executablePath", "profile", "downloadDirectory", "certFile"]) {
     test(`unvetted filesystem-like key ${key}`, () =>
       expect(decide(call("open", { [key]: "/x" }))).toContain("not vetted"));

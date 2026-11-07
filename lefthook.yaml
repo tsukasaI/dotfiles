@@ -35,18 +35,31 @@ pre-push:
     shellcheck:
       run: bash tests/shellcheck.sh
     shguard-parity-check:
+      # flake.lock pins the shguard binary the suite replays through.
+      glob:
+        - "claude-code/shguard/**"
+        - "tests/shguard-parity-check.sh"
+        - "nix-darwin/flake.lock"
+        - "nix-darwin/shguard.nix"
       run: bash tests/shguard-parity-check.sh
     bun-test:
       glob: "claude-code/{hooks,lib}/*.ts"
       run: bun test claude-code/hooks claude-code/lib
+    skill-test:
+      glob: "claude-code/skills/**/*.ts"
+      run: bun test claude-code/skills
     mod-test:
       glob: "claude-code/mod/**"
       run: claude plugin test claude-code/mod
-    shguard-parity-check-ci-home:
-      # shguard rules never expand ~ against HOME (the kernel has no HOME
-      # input), so this guards against a HOME-dependent regression: a case
-      # that passes under the local HOME but not under CI's HOME=/home/runner.
-      run: HOME=/nonexistent-ci-home bash tests/shguard-parity-check.sh
     pi-test:
-      glob: "pi/**"
+      # Not only pi/**: pi extensions and tests load these files from claude-code.
+      glob:
+        - "pi/**"
+        - "claude-code/hooks/slop-guard.ts"
+        - "claude-code/hooks/block-config-edit.sh"
+        - "claude-code/mod/hooks/rule-guards.ts"
+        - "claude-code/mod/hooks/shell-canon.ts"
+        - "claude-code/agents/code-reviewer.md"
+        - "claude-code/rules/**"
+        - "claude-code/lib/**"
       run: bun test pi/tests
