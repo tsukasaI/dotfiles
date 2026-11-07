@@ -2,7 +2,7 @@
 name: ja-lint
 description: Lints Japanese prose for AI-slop patterns (metaphor verbs, filler openers, slop vocabulary, emoji, excess or unrendered bold, excess bullets, repeated sentence endings, trailing or heading colons, redundant brackets, translated terms, leftover prompt instructions) with a deterministic script, and reports findings without editing anything. Use after writing or changing Japanese documents such as 職務経歴書, 自己PR, README, blog posts or specs, and when the user asks to check, lint or de-slop (AI臭さを確認して) Japanese text. Never rewrites; the user decides every fix.
 argument-hint: <file path>
-allowed-tools: Bash(python3 *), Read
+allowed-tools: Bash(ja-lint *), Bash(python3 *), Read
 ---
 
 # /ja-lint: report AI-slop in Japanese text, never fix it
@@ -21,10 +21,14 @@ removes or softens a number, role, scope or outcome.
 ## Run
 
 ```
-python3 ~/.claude/skills/ja-lint/scripts/yomiyasu_lint.py <file>
+ja-lint <file>
 ```
 
-Stdin works when there is no file. Use `--json` if you need to post-process.
+`ja-lint` is built by `nix-darwin/ja-lint.nix` and is the only form shguard
+allows on the Mac. Where it isn't on PATH (cloud sessions, pi), run
+`python3 -I ~/.claude/skills/ja-lint/scripts/yomiyasu_lint.py <file>`.
+
+Use `--json` if you need to post-process.
 Do not pass `--strict` or `--fail-on` (they only change the exit code).
 When the document type is unambiguous, add `--doc-type <type>` (`pr`,
 `article`, `incident`, `proposal`, `minutes`, `manual`, `slides`, `essay`,
@@ -53,4 +57,6 @@ network or subprocess use. Blob pins (`git hash-object <file>`):
 `scripts/test_yomiyasu_lint.py` pins the fence/frontmatter behavior this
 skill relies on (`python3 -I` it). Renewal: when bumping, read the upstream
 diff, copy both files unmodified, run the test, and update the release,
-commit and blob SHAs above.
+commit and blob SHAs above. `ja-lint` runs a store copy, so the new files take
+effect after `darwin-rebuild switch`. Claude cannot edit `scripts/`
+(`block-config-edit.sh`), so the copy step is the user's.

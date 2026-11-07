@@ -391,6 +391,21 @@ case_ "diagram-render"                   'diagram-render d.json --root . --out /
 case_ "diagram-render unknown option"    'diagram-render d.json --watch'       deny
 case_ "explain-plan-render"              'explain-plan-render d.json --root .' allow
 case_ "explain-plan-render unknown opt"  'explain-plan-render d.json --watch'  deny
+case_ "ja-lint"                          'ja-lint doc.md'                      allow
+case_ "ja-lint doc type and json"        'ja-lint doc.md --doc-type pr --json' allow
+case_ "ja-lint absolute path"            'ja-lint /private/tmp/claude-501/x/doc.md' allow
+case_ "ja-lint words"                    'ja-lint doc.md --words x'            deny "reads word lists from any folder"
+case_ "ja-lint strict"                   'ja-lint doc.md --strict'             deny "the skill forbids exit-code flags"
+case_ "ja-lint relative path head"       './ja-lint doc.md'                    deny "a planted file must not match the row"
+case_ "ja-lint env file"                 'ja-lint .env'                        deny
+case_ "ja-lint env variant"              'ja-lint sub/.env.local'              deny
+case_ "ja-lint nested aws dir"           'ja-lint sub/.aws/credentials'        deny
+case_ "ja-lint nested ssh key"           'ja-lint sub/id_rsa'                  deny
+case_ "ja-lint env lookalike"            'ja-lint docs/environment.md'         allow "a name that only starts with env is prose"
+case_ "career-consistency"               'career-consistency --check staleness --verbose career/story.md' allow
+case_ "career-consistency root"          'career-consistency --root x'         deny
+case_ "career-consistency claims"        'career-consistency --claims x'       deny
+case_ "python3 ja-lint script"           'python3 yomiyasu_lint.py doc.md'     deny "only the wrapper has a row"
 case_ "jq filter on a file"              "jq -r '.name' package.json"          allow
 case_ "jq in a pipeline"                 'cat package.json | jq .name'         allow
 case_ "jq -f"                            'jq -f prog.jq x.json'                deny

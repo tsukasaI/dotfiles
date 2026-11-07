@@ -112,6 +112,9 @@ check_path() {
     */claude-code/settings.json | \
     */.claude/settings.json | \
     */claude-code/shguard/config.toml | \
+    */claude-code/skills/ja-lint/scripts/* | \
+    */.claude/skills/ja-lint/scripts/* | \
+    */engineer/ops/scripts/check_career_consistency.py | \
     */.claude/shguard/config.toml | \
     */.config/shguard/config.toml | \
     */lefthook.* | */lefthook-local.* | */.lefthook*)

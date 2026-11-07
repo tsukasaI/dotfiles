@@ -239,6 +239,7 @@
         "~/.cache/nix"
       ],
       "denyWrite": [
+        "~/engineer/ops/scripts/check_career_consistency.py",
         "~/dotfiles/lefthook.yaml",
         "~/dotfiles/lefthook-local.yaml",
         "~/dotfiles/lefthook.yml",

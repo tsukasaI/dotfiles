@@ -35,9 +35,10 @@ There is no staging or deploy step (hooks apply on the next tool call,
 - Verify a flake change without activating:
   `darwin-rebuild build --flake ~/dotfiles/nix-darwin#Ino-macbook-air`.
   Claude can run it (and `nix build`) in the Bash sandbox: `settings.json`
-  allows the nix daemon socket and `~/.cache/nix`. Name the host explicitly,
-  because the sandbox sees the LocalHostName `MacBook-Air` and hostname
-  resolution fails. That access relies on `nix.settings.sandbox = true` in
+  allows the nix daemon socket and `~/.cache/nix`. shguard has no row for
+  `darwin-rebuild` or `nix`, though, so today the user runs these. Name the
+  host explicitly, because the sandbox sees the LocalHostName `MacBook-Air` and
+  hostname resolution fails. That access relies on `nix.settings.sandbox = true` in
   `flake.nix`: never set it to `false` or `relaxed`, because an unsandboxed
   builder (or `__noChroot`) is a way out of the Bash sandbox. Accepted
   residual risk: fixed-output derivations still get network access, a

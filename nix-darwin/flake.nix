@@ -25,6 +25,7 @@
   let
     shguardFor = pkgs: pkgs.callPackage ./shguard.nix { src = shguard; };
     diagramRenderFor = pkgs: pkgs.callPackage ./diagram-render.nix { };
+    jaLintFor = pkgs: pkgs.callPackage ./ja-lint.nix { };
     # One function per host (#14): adding a second machine is one more mkHost
     # call under darwinConfigurations, not a copy of the configuration block.
     mkHost = { primaryUser, system }:
@@ -92,6 +93,8 @@
         }))
         (shguardFor pkgs)
         (diagramRenderFor pkgs)
+        (jaLintFor pkgs)
+        (pkgs.callPackage ./career-consistency.nix { opsDir = "/Users/${primaryUser}/engineer/ops"; })
       ] ++ (with pkgs; [
         # Modern CLI replacements
         bat
@@ -290,6 +293,7 @@
     packages = nixpkgs.lib.genAttrs [ "aarch64-darwin" "x86_64-linux" ] (system: {
       shguard = shguardFor nixpkgs.legacyPackages.${system};
       diagram-render = diagramRenderFor nixpkgs.legacyPackages.${system};
+      ja-lint = jaLintFor nixpkgs.legacyPackages.${system};
     });
 
     darwinConfigurations."Ino-macbook-air" = mkHost {
