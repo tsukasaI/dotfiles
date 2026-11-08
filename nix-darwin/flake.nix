@@ -95,6 +95,7 @@
         (diagramRenderFor pkgs)
         (jaLintFor pkgs)
         (pkgs.callPackage ./career-consistency.nix { opsDir = "/Users/${primaryUser}/engineer/ops"; })
+        (pkgs.callPackage ./dream-extract.nix { inherit primaryUser; opsDir = "/Users/${primaryUser}/engineer/ops"; })
       ] ++ (with pkgs; [
         # Modern CLI replacements
         bat
