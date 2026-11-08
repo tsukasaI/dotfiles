@@ -406,6 +406,15 @@ case_ "career-consistency"               'career-consistency --check staleness -
 case_ "career-consistency root"          'career-consistency --root x'         deny
 case_ "career-consistency claims"        'career-consistency --claims x'       deny
 case_ "python3 ja-lint script"           'python3 yomiyasu_lint.py doc.md'     deny "only the wrapper has a row"
+case_ "dream-extract list"               'dream-extract list'                  allow
+case_ "dream-extract list since"         'dream-extract list 2026-10-24T10:54:38Z' allow
+case_ "dream-extract extract"            'dream-extract extract 045e9227-0178-4b4a-ab0b-77a56d8ea478 0 120 ""' allow
+case_ "dream-extract option"             'dream-extract --help'                deny "the row lists no option"
+case_ "dream-extract redirect"           'dream-extract list > out.txt'        deny
+case_ "dream-extract relative path head" './dream-extract list'                deny "a planted file must not match the row"
+case_ "dream driver via bash"            'bash nix-darwin/dream-extract/dream-extract.sh list' deny "only the wrapper has a row"
+case_ "mkdir dream backup"               'mkdir -p .claude/tmp-dream-backup/owner-text' deny "the wrapper creates it; .claude stays closed"
+case_ "fd session logs"                  'fd -e jsonl . /Users/inouetsukasa/.claude/projects/x' deny "the wrapper lists them; fd-ask-broad stays"
 case_ "jq filter on a file"              "jq -r '.name' package.json"          allow
 case_ "jq in a pipeline"                 'cat package.json | jq .name'         allow
 case_ "jq -f"                            'jq -f prog.jq x.json'                deny

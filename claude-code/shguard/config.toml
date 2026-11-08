@@ -1180,3 +1180,13 @@ targets = [
   # Not component: ja-lint must still reach a project's .claude/rules/*.md.
   { pat = "/Users/inouetsukasa/.claude", kind = "under" },
 ]
+
+# Every word is inert: the wrapper fixes the log and output folders and checks
+# each word's shape. Not a path operand, because Bash may not read ~/.claude
+# (dotfiles-secret-read-*) or mkdir under .claude (mkdir-block-sensitive-target).
+[[row]]
+key = ["dream-extract"]
+source = "https://github.com/tsukasaI/dotfiles/blob/main/nix-darwin/dream-extract.nix"
+order = "strict"
+dashdash = "literal"
+rest = "inert"
