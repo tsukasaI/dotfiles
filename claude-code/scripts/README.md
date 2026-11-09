@@ -57,8 +57,12 @@ bash claude-code/scripts/push-to-turso.sh
 ### スクリプトの動作
 
 1. ローカル DB の **WAL 整合スナップショット**を取得（`.backup`）。hook の追記とレースしない。
-2. Turso にスキーマを用意（`CREATE TABLE IF NOT EXISTS`、ローカルと同一カラム）。
-3. スナップショットの全行を UPSERT（`INSERT ... ON CONFLICT DO UPDATE`）で送信。INSERT文は SQL の `quote()` 関数で
+2. Turso にスキーマを用意（`CREATE TABLE IF NOT EXISTS`、ローカルと同一カラム）し、同じ呼び出しで
+   サーバーが計算した値を受け取れるか確認する。`turso db shell` は未ログインでも exit 0 を返すため、
+   受け取れなければ何も送らずに止まる。
+3. スナップショットのうち**未送信または変化した行だけ**を UPSERT（`INSERT ... ON CONFLICT DO UPDATE`）で送信。
+   送信済みかどうかはローカルの `push_state` テーブル（照合 OK 時の `ended_at` / `size_bytes`）と比べて判定する。
+   1 回の `turso db shell` に詰める量はバイト数で区切る（既定 50MB、`TURSO_PUSH_BATCH_BYTES` で変更可）。INSERT文は SQL の `quote()` 関数で
    自前生成するため、複数行・制御文字を含む transcript 本文も libSQL 互換で安全に送れる
    （`turso db shell` は `.bail`/atomicなBEGIN-COMMIT/`unistr()` を扱えないため、これらに依存しない）。
 4. **削除ゲート**＝送信が成功（exit 0）**かつ**、スナップショットの `session_id` に限定した
@@ -69,7 +73,8 @@ bash claude-code/scripts/push-to-turso.sh
 | フラグ | 挙動 |
 |---|---|
 | (なし) | 送信 → 照合 → 送信済み行をローカルから物理削除 → `VACUUM` |
-| `--keep-local` | 送信 → 照合まで。**削除しない**（初回の検証向け、推奨） |
+| `--keep-local` | 送信 → 照合まで。**削除しない**（初回の検証向け、推奨）。続けてフラグなしで実行すると、送信済み行は再送せず照合と削除だけ行う |
+| `--full` | `push_state` を無視して全行を再送（Turso 側を作り直したときなど） |
 
 ### 冪等性についての注意
 
