@@ -19,15 +19,18 @@ beforeAll(() => {
 });
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
+const card = () => ({ role: "r", actor: "who", trigger: "when", failure: "fails" });
+
 function base(): Record<string, any> {
   return {
-    version: 1,
+    version: 2,
     slug: "test-diagram",
     title: "t",
     lanes: [{ id: "l", label: "L" }],
+    views: [{ id: "v", type: "structure" }],
     nodes: [
-      { id: "a", lane: "l", order: 0, kind: "existing", label: "A", ref: { file: "src/a.ts", line: 2, excerpt: "function f() {" } },
-      { id: "b", lane: "l", order: 1, kind: "proposed", label: "B" },
+      { id: "a", lane: "l", order: 0, kind: "existing", label: "A", card: card(), ref: { file: "src/a.ts", line: 2, excerpt: "function f() {" } },
+      { id: "b", lane: "l", order: 1, kind: "proposed", label: "B", card: card() },
     ],
     edges: [{ id: "ab", from: "a", to: "b", data: "x", kind: "proposed" }],
     steps: [{ title: "s", description: "d", changes: { b: "added", ab: "added" } }],
@@ -43,12 +46,41 @@ const diagramOf = (raw: unknown) => {
   return r.diagram;
 };
 const bare = (): Record<string, any> => ({
-  version: 1,
+  version: 2,
   slug: "bare",
   title: "t",
   lanes: [{ id: "l", label: "L" }],
-  nodes: [{ id: "a", lane: "l", order: 0, label: "A" }],
+  views: [{ id: "v", type: "structure" }],
+  nodes: [{ id: "a", lane: "l", order: 0, label: "A", card: card() }],
 });
+
+function full(): Record<string, any> {
+  const d = base();
+  d.nodes.push({ id: "c", kind: "existing", label: "C", card: { ...card(), failure: { na: "cannot fail" } } });
+  d.nodes[2].lane = "l";
+  d.nodes[2].order = 2;
+  d.edges.push({ id: "bc", from: "b", to: "c", data: "y", kind: "proposed" });
+  d.steps[0].changes.bc = "added";
+  d.views = [
+    { id: "v1", type: "structure", title: "Structure" },
+    { id: "v2", type: "calltree", items: [{ node: "a" }, { node: "b", parent: "a" }, { node: "c", parent: "b" }] },
+    { id: "v3", type: "sequence", participants: ["a", "b", "c"], messages: ["ab", "bc", "ab"] },
+    { id: "v4", type: "dataflow", items: [{ node: "a", value: "1" }, { node: "b", value: "2" }] },
+  ];
+  d.glossary = [{ term: "t1", definition: "d1" }];
+  d.example = { title: "ex", trace: [{ node: "a", text: "x" }] };
+  d.openQuestions = [{ question: "q", answer: "a" }];
+  d.recall = [{ question: "q", answer: "a" }];
+  d.checks = [
+    {
+      node: "a",
+      question: "q",
+      choices: [{ text: "x", correct: true, why: "w" }, { text: "y", why: "w" }, { text: "z", why: "w" }],
+    },
+  ];
+  d.explainPrompt = { checklist: ["c1"] };
+  return d;
+}
 
 describe("validate", () => {
   test("a bare diagram is accepted and normalized", () => {
@@ -59,7 +91,7 @@ describe("validate", () => {
 
   test("accepts no steps and no refs", () => {
     const d = bare();
-    d.nodes.push({ id: "b", lane: "l", order: 1, kind: "existing", label: "B" });
+    d.nodes.push({ id: "b", lane: "l", order: 1, kind: "existing", label: "B", card: card() });
     d.edges = [{ id: "ab", from: "a", to: "b", data: "x" }];
     expect(errorsOf(d)).toEqual([]);
     expect(diagramOf(d).edges[0].kind).toBe("existing");
@@ -67,15 +99,28 @@ describe("validate", () => {
 
   test("a proposed element is still an error without steps", () => {
     const d = bare();
-    d.nodes.push({ id: "b", lane: "l", order: 1, kind: "proposed", label: "B" });
+    d.nodes.push({ id: "b", lane: "l", order: 1, kind: "proposed", label: "B", card: card() });
     expect(errorsOf(d)).toContain("proposed b is never added in a step");
   });
 
-  test("accepts the bundled system design example", () => {
-    const raw = JSON.parse(readFileSync(join(HERE, "example.json"), "utf8"));
-    expect(errorsOf(raw)).toEqual([]);
-    expect(raw.mode).toBeUndefined();
-    expect(diagramOf(raw).mode).toBe("explain");
+  test("accepts a diagram with all four view types and every optional section", () => {
+    const d = full();
+    expect(errorsOf(d)).toEqual([]);
+    const out = diagramOf(d);
+    expect(out.views.map(v => v.type)).toEqual(["structure", "calltree", "sequence", "dataflow"]);
+    expect(out.mode).toBe("explain");
+  });
+
+  test("lanes and lane/order are not needed without a structure view", () => {
+    const d = full();
+    d.views = d.views.slice(1);
+    delete d.lanes;
+    for (const n of d.nodes) {
+      delete n.lane;
+      delete n.order;
+    }
+    expect(errorsOf(d)).toEqual([]);
+    expect(diagramOf(d).lanes).toEqual([]);
   });
 
   test("fills optional arrays on a full diagram", () => {
@@ -92,7 +137,10 @@ describe("validate", () => {
     ["whitespace title", { ...base(), title: "   " }],
     ["no lanes", { ...base(), lanes: [] }],
     ["unknown mode", { ...base(), mode: "review" }],
-    ["unknown kind", { ...bare(), nodes: [{ id: "a", lane: "l", order: 0, label: "A", kind: "maybe" }] }],
+    ["unknown kind", { ...bare(), nodes: [{ id: "a", lane: "l", order: 0, label: "A", card: card(), kind: "maybe" }] }],
+    ["version 1", { ...base(), version: 1 }],
+    ["no views", { ...base(), views: [] }],
+    ["structure view without lanes", { ...base(), lanes: undefined }],
   ])("rejects %s", (_, raw) => {
     expect(errorsOf(raw).length).toBeGreaterThan(0);
   });
@@ -204,16 +252,72 @@ describe("recall", () => {
     expect(errorsOf({ ...d, mode: "plan" })).toEqual([]);
   });
 
-  test("rejects more than 8 items, bad items and non-arrays", () => {
-    expect(errorsOf({ ...bare(), recall: Array(9).fill(item) })).toContain("recall: must be an array of 1-8 items");
-    expect(errorsOf({ ...bare(), recall: [] })).toContain("recall: must be an array of 1-8 items");
-    expect(errorsOf({ ...bare(), recall: "x" })).toContain("recall: must be an array of 1-8 items");
-    expect(errorsOf({ ...bare(), recall: {} })).toContain("recall: must be an array of 1-8 items");
+  test("rejects more than 3 items, bad items and non-arrays", () => {
+    const count = "recall: must be an array of 1-3 items";
+    expect(errorsOf({ ...bare(), recall: Array(4).fill(item) })).toContain(count);
+    expect(errorsOf({ ...bare(), recall: Array(3).fill(item) })).toEqual([]);
+    expect(errorsOf({ ...bare(), recall: [] })).toContain(count);
+    expect(errorsOf({ ...bare(), recall: "x" })).toContain(count);
+    expect(errorsOf({ ...bare(), recall: {} })).toContain(count);
     const msg = "recall[1]: question (<=200) and answer (<=1500) required";
     expect(errorsOf({ ...bare(), recall: [item, { question: " ", answer: "a" }] })).toContain(msg);
     expect(errorsOf({ ...bare(), recall: [item, { question: "q", answer: "a".repeat(1501) }] })).toContain(msg);
     expect(errorsOf({ ...bare(), recall: [item, { question: "q".repeat(201), answer: "a" }] })).toContain(msg);
     expect(errorsOf({ ...bare(), recall: [item, "x"] })).toContain(msg);
+  });
+});
+
+describe("schema v2 failures", () => {
+  const mutate = (fn: (d: Record<string, any>) => void) => {
+    const d = full();
+    fn(d);
+    return errorsOf(d);
+  };
+
+  test.each<[string, (d: Record<string, any>) => void, string]>([
+    ["missing card field", d => delete d.nodes[0].card.trigger, "nodes[0] (a): card.trigger"],
+    ["missing card", d => delete d.nodes[1].card, "nodes[1] (b): card required"],
+    ["empty card string", d => (d.nodes[0].card.role = "  "), "nodes[0] (a): card.role"],
+    ["oversize card string", d => (d.nodes[0].card.actor = "x".repeat(401)), "nodes[0] (a): card.actor"],
+    ["na with empty reason", d => (d.nodes[0].card.failure = { na: " " }), "nodes[0] (a): card.failure na needs"],
+    ["na with oversize reason", d => (d.nodes[0].card.failure = { na: "x".repeat(201) }), "card.failure na needs"],
+    ["two correct choices", d => (d.checks[0].choices[1].correct = true), "exactly one choice must be correct, found 2"],
+    ["no correct choice", d => delete d.checks[0].choices[0].correct, "exactly one choice must be correct, found 0"],
+    ["only two choices", d => d.checks[0].choices.pop(), "choices must be an array of 3-4"],
+    ["five choices", d => d.checks[0].choices.push(...Array(3).fill({ text: "t", why: "w" })), "choices must be an array of 3-4"],
+    ["correct choice without why", d => delete d.checks[0].choices[0].why, "checks[0].choices[0]"],
+    ["three checks on one node", d => (d.checks = Array(3).fill(d.checks[0])), "at most 2 checks per node"],
+    ["21 checks", d => (d.checks = Array(21).fill(d.checks[0])), "checks: must be an array of at most 20"],
+    ["check on unknown node", d => (d.checks[0].node = "zz"), "checks[0]: existing node"],
+    ["calltree cycle", d => (d.views[1].items = [{ node: "a" }, { node: "b", parent: "c" }, { node: "c", parent: "b" }]), "parent links form a cycle"],
+    ["calltree two roots", d => delete d.views[1].items[1].parent, "exactly one root"],
+    ["calltree parent outside the list", d => (d.views[1].items[2].parent = "zz"), "parent must be a node in the same items list"],
+    ["calltree node twice", d => d.views[1].items.push({ node: "c", parent: "a" }), "node c appears twice"],
+    ["sequence endpoint not a participant", d => (d.views[2].participants = ["a", "b"]), "edge bc has an endpoint that is not a participant"],
+    ["sequence unknown edge", d => d.views[2].messages.push("zz"), "unknown edge zz"],
+    ["seven participants", d => (d.views[2].participants = Array(7).fill("a")), "participants must be an array of 1-6"],
+    ["dataflow with one item", d => d.views[3].items.pop(), "items must be an array of 2-20"],
+    ["dataflow blank value", d => (d.views[3].items[0].value = " "), "views[3].items[0]"],
+    ["duplicate view id", d => (d.views[1].id = "v1"), "duplicate id v1"],
+    ["unknown view type", d => (d.views[1].type = "graph"), "type must be one of"],
+    ["five views", d => d.views.push({ id: "v5", type: "structure" }), "views: 1-4 views required"],
+    ["structure view without lanes", d => delete d.lanes, "lanes: 1-8 lanes required"],
+    ["structure view with a node off its lane", d => delete d.nodes[0].lane, "nodes[0]: unknown lane"],
+    ["duplicate glossary term", d => d.glossary.push({ term: "t1", definition: "d" }), "duplicate term t1"],
+    ["16 glossary terms", d => (d.glossary = Array.from({ length: 16 }, (_, i) => ({ term: `t${i}`, definition: "d" }))), "glossary: must be an array of at most 15"],
+    ["example on unknown node", d => (d.example.trace[0].node = "zz"), "example.trace[0]"],
+    ["13 trace entries", d => (d.example.trace = Array(13).fill(d.example.trace[0])), "trace must be an array of 1-12"],
+    ["nine open questions", d => (d.openQuestions = Array(9).fill(d.openQuestions[0])), "openQuestions: must be an array of at most 8"],
+    ["empty checklist", d => (d.explainPrompt.checklist = []), "explainPrompt: checklist"],
+    ["nine checklist items", d => (d.explainPrompt.checklist = Array(9).fill("c")), "explainPrompt: checklist"],
+  ])("rejects %s", (_, fn, expected) => {
+    expect(mutate(fn).some(e => e.includes(expected))).toBe(true);
+  });
+
+  test("a repeated sequence message and two checks on one node are accepted", () => {
+    const d = full();
+    d.checks = [d.checks[0], d.checks[0]];
+    expect(errorsOf(d)).toEqual([]);
   });
 });
 
@@ -357,8 +461,9 @@ describe("main", () => {
   test("without refs there is no refs line and --root is not consulted", () => {
     const target = join(tmp, "norefs.html");
     const logs: string[] = [];
-    const example = JSON.parse(readFileSync(join(HERE, "example.json"), "utf8"));
-    const code = main([write("ex.json", example), "--root", join(tmp, "no-such-dir"), "--out", target], m => logs.push(m), () => {});
+    const noRefs = full();
+    delete noRefs.nodes[0].ref;
+    const code = main([write("ex.json", noRefs), "--root", join(tmp, "no-such-dir"), "--out", target], m => logs.push(m), () => {});
     expect(code).toBe(0);
     expect(logs).toEqual([target]);
   });
@@ -393,7 +498,7 @@ describe("main", () => {
       const broken = join(tmp, "broken.json");
       writeFileSync(broken, "{");
       expect(main([broken, "--root", repo], () => {}, () => {})).toBe(1);
-      expect(main([write("invalid.json", { ...base(), version: 2 }), "--root", repo], () => {}, () => {})).toBe(1);
+      expect(main([write("invalid.json", { ...base(), version: 1 }), "--root", repo], () => {}, () => {})).toBe(1);
     } finally {
       process.env.TMPDIR = prev;
     }

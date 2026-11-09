@@ -18,14 +18,31 @@ const ID = /^[A-Za-z0-9_-]{1,40}$/;
 type Kind = "existing" | "proposed";
 export type Mode = "explain" | "plan";
 export type Ref = { file: string; line: number; excerpt: string };
+const CARD_FIELDS = ["role", "actor", "trigger", "failure"] as const;
+const VIEW_TYPES = ["structure", "calltree", "sequence", "dataflow"] as const;
+
+export type CardField = string | { na: string };
+export type Card = Record<(typeof CARD_FIELDS)[number], CardField>;
 export type DiagramNode = {
   id: string;
-  lane: string;
-  order: number;
+  lane?: string;
+  order?: number;
   label: string;
   kind: Kind;
+  card: Card;
   ref?: Ref;
   deepDive?: { category: string; why: string };
+};
+export type View = { id: string; type: (typeof VIEW_TYPES)[number]; title?: string } & (
+  | { type: "structure" }
+  | { type: "calltree"; items: { node: string; parent?: string }[] }
+  | { type: "sequence"; participants: string[]; messages: string[] }
+  | { type: "dataflow"; items: { node: string; value: string }[] }
+);
+export type Check = {
+  node: string;
+  question: string;
+  choices: { text: string; correct?: true; why: string }[];
 };
 export type DiagramEdge = { id: string; from: string; to: string; data: string; kind: Kind; ref?: Ref };
 export type Step = {
@@ -35,17 +52,23 @@ export type Step = {
   predict?: { question: string; hint?: string };
 };
 export type Diagram = {
-  version: 1;
+  version: 2;
   mode: Mode;
   slug: string;
   title: string;
   summary: string;
   lanes: { id: string; label: string }[];
+  views: View[];
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   steps: Step[];
   boundaries: { label: string; reason: string }[];
   recall: { question: string; answer: string }[];
+  glossary: { term: string; definition: string }[];
+  example?: { title: string; trace: { node: string; text: string }[] };
+  openQuestions: { question: string; answer: string }[];
+  checks: Check[];
+  explainPrompt?: { checklist: string[] };
 };
 
 export type RefStatus = "ok" | "moved" | "mismatch" | "missing" | "outside";
@@ -131,10 +154,171 @@ function checkSteps(
   }
 }
 
+function checkCard(card: unknown, where: string, errors: string[]): void {
+  if (!isObj(card)) return void errors.push(`${where}: card required (role, actor, trigger, failure)`);
+  for (const field of CARD_FIELDS) {
+    const v = card[field];
+    const na = isObj(v) ? v.na : undefined;
+    if (isText(v, 400)) continue;
+    if (isObj(v) && "na" in v) {
+      if (!isText(na, 200)) errors.push(`${where}: card.${field} na needs a non-empty reason (<=200 chars)`);
+    } else errors.push(`${where}: card.${field} must be text (<=400 chars) or { "na": reason }`);
+  }
+}
+
+function checkCalltree(items: unknown, where: string, nodeIds: Set<string>, errors: string[]): void {
+  if (!Array.isArray(items) || items.length < 1 || items.length > 60) return void errors.push(`${where}: items must be an array of 1-60`);
+  const listed = new Set<string>();
+  for (const [i, it] of items.entries()) {
+    if (!isObj(it) || typeof it.node !== "string" || !nodeIds.has(it.node)) {
+      errors.push(`${where}.items[${i}]: unknown node`);
+    } else if (listed.has(it.node)) errors.push(`${where}.items[${i}]: node ${it.node} appears twice`);
+    else listed.add(it.node);
+  }
+  const parentOf = new Map<string, string | undefined>();
+  for (const [i, it] of items.entries()) {
+    if (!isObj(it) || typeof it.node !== "string") continue;
+    if (it.parent !== undefined && (typeof it.parent !== "string" || !listed.has(it.parent))) {
+      errors.push(`${where}.items[${i}]: parent must be a node in the same items list`);
+      continue;
+    }
+    parentOf.set(it.node, it.parent as string | undefined);
+  }
+  const roots = [...parentOf].filter(([, p]) => p === undefined);
+  if (roots.length !== 1) errors.push(`${where}: exactly one root (item without parent) required, found ${roots.length}`);
+  for (const start of parentOf.keys()) {
+    let at: string | undefined = start;
+    for (let hops = 0; at !== undefined && hops <= parentOf.size; hops++) at = parentOf.get(at);
+    if (at !== undefined) return void errors.push(`${where}: parent links form a cycle`);
+  }
+}
+
+function checkViews(
+  views: unknown,
+  nodeIds: Set<string>,
+  endpoints: Map<string, [string, string]>,
+  errors: string[],
+): void {
+  if (!Array.isArray(views) || views.length < 1 || views.length > 4) return void errors.push("views: 1-4 views required");
+  const ids = new Set<string>();
+  views.forEach((v, i) => {
+    const where = `views[${i}]`;
+    if (!isObj(v)) return void errors.push(`${where}: must be an object`);
+    if (typeof v.id !== "string" || !ID.test(v.id)) errors.push(`${where}: id must match ${ID.source}`);
+    else if (ids.has(v.id)) errors.push(`${where}: duplicate id ${v.id}`);
+    else ids.add(v.id);
+    if (v.title !== undefined && !isText(v.title, 40)) errors.push(`${where}: title must be text (<=40 chars)`);
+    switch (v.type) {
+      case "structure":
+        break;
+      case "calltree":
+        checkCalltree(v.items, where, nodeIds, errors);
+        break;
+      case "sequence": {
+        const p = v.participants;
+        const parts = new Set<string>();
+        if (!Array.isArray(p) || p.length < 1 || p.length > 6) errors.push(`${where}: participants must be an array of 1-6 node ids`);
+        else
+          for (const id of p) {
+            if (typeof id !== "string" || !nodeIds.has(id)) errors.push(`${where}: unknown participant ${String(id)}`);
+            else if (parts.has(id)) errors.push(`${where}: duplicate participant ${id}`);
+            else parts.add(id);
+          }
+        if (!Array.isArray(v.messages) || v.messages.length < 1 || v.messages.length > 60) {
+          errors.push(`${where}: messages must be an array of 1-60 edge ids`);
+          break;
+        }
+        for (const m of v.messages) {
+          const ends = typeof m === "string" ? endpoints.get(m) : undefined;
+          if (!ends) errors.push(`${where}: unknown edge ${String(m)}`);
+          else if (!parts.has(ends[0]) || !parts.has(ends[1])) {
+            errors.push(`${where}: edge ${String(m)} has an endpoint that is not a participant`);
+          }
+        }
+        break;
+      }
+      case "dataflow":
+        if (!Array.isArray(v.items) || v.items.length < 2 || v.items.length > 20) {
+          errors.push(`${where}: items must be an array of 2-20`);
+          break;
+        }
+        v.items.forEach((it, j) => {
+          if (!isObj(it) || typeof it.node !== "string" || !nodeIds.has(it.node) || !isText(it.value, 300)) {
+            errors.push(`${where}.items[${j}]: existing node and value (<=300 chars) required`);
+          }
+        });
+        break;
+      default:
+        errors.push(`${where}: type must be one of ${VIEW_TYPES.join(", ")}`);
+    }
+  });
+}
+
+function checkList(x: unknown, name: string, max: number, errors: string[], each: (item: unknown, where: string) => void): void {
+  if (x === undefined) return;
+  if (!Array.isArray(x) || x.length > max) return void errors.push(`${name}: must be an array of at most ${max}`);
+  x.forEach((item, i) => each(item, `${name}[${i}]`));
+}
+
+function checkExtras(raw: Obj, nodeIds: Set<string>, errors: string[]): void {
+  const terms = new Set<string>();
+  checkList(raw.glossary, "glossary", 15, errors, (g, where) => {
+    if (!isObj(g) || !isText(g.term, 40) || !isText(g.definition, 300)) {
+      return void errors.push(`${where}: term (<=40) and definition (<=300) required`);
+    }
+    if (terms.has(g.term)) errors.push(`${where}: duplicate term ${g.term}`);
+    terms.add(g.term);
+  });
+
+  if (raw.example !== undefined) {
+    const ex = raw.example;
+    if (!isObj(ex) || !isText(ex.title, 120)) errors.push("example: title required (<=120 chars)");
+    else if (!Array.isArray(ex.trace) || ex.trace.length < 1 || ex.trace.length > 12) errors.push("example: trace must be an array of 1-12");
+    else
+      ex.trace.forEach((t, i) => {
+        if (!isObj(t) || typeof t.node !== "string" || !nodeIds.has(t.node) || !isText(t.text, 300)) {
+          errors.push(`example.trace[${i}]: existing node and text (<=300 chars) required`);
+        }
+      });
+  }
+
+  checkList(raw.openQuestions, "openQuestions", 8, errors, (q, where) => {
+    if (!isObj(q) || !isText(q.question, 200) || !isText(q.answer, 1500)) {
+      errors.push(`${where}: question (<=200) and answer (<=1500) required`);
+    }
+  });
+
+  const perNode = new Map<string, number>();
+  checkList(raw.checks, "checks", 20, errors, (c, where) => {
+    if (!isObj(c) || typeof c.node !== "string" || !nodeIds.has(c.node) || !isText(c.question, 200)) {
+      return void errors.push(`${where}: existing node and question (<=200) required`);
+    }
+    perNode.set(c.node, (perNode.get(c.node) ?? 0) + 1);
+    if (perNode.get(c.node) === 3) errors.push(`${where}: at most 2 checks per node (${c.node})`);
+    if (!Array.isArray(c.choices) || c.choices.length < 3 || c.choices.length > 4) {
+      return void errors.push(`${where}: choices must be an array of 3-4`);
+    }
+    c.choices.forEach((ch, j) => {
+      if (!isObj(ch) || !isText(ch.text, 150) || !isText(ch.why, 300) || (ch.correct !== undefined && ch.correct !== true)) {
+        errors.push(`${where}.choices[${j}]: text (<=150), why (<=300) and optional correct: true required`);
+      }
+    });
+    const correct = c.choices.filter(ch => isObj(ch) && ch.correct === true).length;
+    if (correct !== 1) errors.push(`${where}: exactly one choice must be correct, found ${correct}`);
+  });
+
+  if (raw.explainPrompt !== undefined) {
+    const cl = isObj(raw.explainPrompt) ? raw.explainPrompt.checklist : undefined;
+    if (!Array.isArray(cl) || cl.length < 1 || cl.length > 8 || !cl.every(c => isText(c, 200))) {
+      errors.push("explainPrompt: checklist must be an array of 1-8 texts (<=200 chars each)");
+    }
+  }
+}
+
 export function validate(raw: unknown): { diagram: Diagram } | { errors: string[] } {
   const errors: string[] = [];
   if (!isObj(raw)) return { errors: ["top level must be an object"] };
-  if (raw.version !== 1) errors.push("version must be 1");
+  if (raw.version !== 2) errors.push("version must be 2");
   if (raw.mode !== undefined && raw.mode !== "explain" && raw.mode !== "plan") errors.push("mode must be explain or plan");
   const isPlan = raw.mode === "plan";
   if (typeof raw.slug !== "string" || !SLUG.test(raw.slug)) errors.push("slug must match [a-z0-9][a-z0-9-]{0,59}");
@@ -143,15 +327,18 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
     errors.push("summary must be a string (<=2000 chars)");
   }
 
+  const hasStructure = Array.isArray(raw.views) && raw.views.some(v => isObj(v) && v.type === "structure");
   const lanes = new Set<string>();
-  if (!Array.isArray(raw.lanes) || raw.lanes.length < 1 || raw.lanes.length > 8) errors.push("lanes: 1-8 lanes required");
-  else
-    raw.lanes.forEach((l, i) => {
-      if (!isObj(l) || typeof l.id !== "string" || !ID.test(l.id) || !isText(l.label, 60)) {
-        errors.push(`lanes[${i}]: id and label (<=60 chars) required`);
-      } else if (lanes.has(l.id)) errors.push(`lanes[${i}]: duplicate id ${l.id}`);
-      else lanes.add(l.id);
-    });
+  if (hasStructure || raw.lanes !== undefined) {
+    if (!Array.isArray(raw.lanes) || raw.lanes.length < 1 || raw.lanes.length > 8) errors.push("lanes: 1-8 lanes required for a structure view");
+    else
+      raw.lanes.forEach((l, i) => {
+        if (!isObj(l) || typeof l.id !== "string" || !ID.test(l.id) || !isText(l.label, 60)) {
+          errors.push(`lanes[${i}]: id and label (<=60 chars) required`);
+        } else if (lanes.has(l.id)) errors.push(`lanes[${i}]: duplicate id ${l.id}`);
+        else lanes.add(l.id);
+      });
+  }
 
   const kinds = new Map<string, Kind>();
   const claim = (id: unknown, where: string): id is string => {
@@ -174,12 +361,15 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
       if (!isObj(n)) return void errors.push(`${where}: must be an object`);
       const kind = checkElement(n, where, errors);
       if (claim(n.id, where) && kind) kinds.set(n.id, kind);
-      if (typeof n.lane !== "string" || !lanes.has(n.lane)) errors.push(`${where}: unknown lane`);
-      if (!isInt(n.order, 0, 49)) errors.push(`${where}: order must be 0-49`);
-      const cell = `${n.lane}/${n.order}`;
-      if (cells.has(cell)) errors.push(`${where}: another node already sits at lane ${n.lane} order ${n.order}`);
-      cells.add(cell);
+      if (hasStructure || n.lane !== undefined || n.order !== undefined) {
+        if (typeof n.lane !== "string" || !lanes.has(n.lane)) errors.push(`${where}: unknown lane`);
+        if (!isInt(n.order, 0, 49)) errors.push(`${where}: order must be 0-49`);
+        const cell = `${n.lane}/${n.order}`;
+        if (cells.has(cell)) errors.push(`${where}: another node already sits at lane ${n.lane} order ${n.order}`);
+        cells.add(cell);
+      }
       if (!isText(n.label, 120)) errors.push(`${where}: label required (<=120 chars)`);
+      checkCard(n.card, typeof n.id === "string" ? `${where} (${n.id})` : where, errors);
       if (n.deepDive !== undefined) {
         const dd = n.deepDive;
         if (!isPlan) errors.push(`${where}: deepDive requires mode "plan"`);
@@ -223,7 +413,7 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
   }
 
   if (raw.recall !== undefined) {
-    if (!Array.isArray(raw.recall) || raw.recall.length < 1 || raw.recall.length > 8) errors.push("recall: must be an array of 1-8 items");
+    if (!Array.isArray(raw.recall) || raw.recall.length < 1 || raw.recall.length > 3) errors.push("recall: must be an array of 1-3 items");
     else
       raw.recall.forEach((r, i) => {
         if (!isObj(r) || !isText(r.question, 200) || !isText(r.answer, 1500)) {
@@ -231,6 +421,9 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
         }
       });
   }
+
+  checkViews(raw.views, nodeIds, endpoints, errors);
+  checkExtras(raw, nodeIds, errors);
 
   // An invalid steps value skips the replay: its "never added" noise would only bury the real error.
   if (raw.steps !== undefined && (!Array.isArray(raw.steps) || raw.steps.length > 30)) errors.push("steps: at most 30 steps");
@@ -243,11 +436,15 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
       ...raw,
       mode: isPlan ? "plan" : "explain",
       summary: raw.summary ?? "",
+      lanes: raw.lanes ?? [],
       nodes: (raw.nodes as unknown[]).map(withKind),
       edges: ((raw.edges as unknown[]) ?? []).map(withKind),
       steps: raw.steps ?? [],
       boundaries: raw.boundaries ?? [],
       recall: raw.recall ?? [],
+      glossary: raw.glossary ?? [],
+      openQuestions: raw.openQuestions ?? [],
+      checks: raw.checks ?? [],
     } as unknown as Diagram,
   };
 }

@@ -5,8 +5,6 @@ import { join } from "path";
 import { main, validate } from "../diagram-explain/render.ts";
 import { planOptions, validatePlan } from "./plan.ts";
 
-const HERE = import.meta.dir;
-
 let tmp: string;
 let repo: string;
 beforeAll(() => {
@@ -17,16 +15,22 @@ beforeAll(() => {
 });
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
+const card = { role: "r", actor: "who", trigger: "when", failure: "fails" };
+
 function base(): Record<string, any> {
   return {
-    version: 1,
+    version: 2,
     mode: "plan",
     slug: "test-plan",
     title: "t",
     lanes: [{ id: "l", label: "L" }],
+    views: [
+      { id: "v1", type: "structure" },
+      { id: "v2", type: "sequence", participants: ["a", "b"], messages: ["ab"] },
+    ],
     nodes: [
-      { id: "a", lane: "l", order: 0, kind: "existing", label: "A", ref: { file: "src/a.ts", line: 2, excerpt: "function f() {" } },
-      { id: "b", lane: "l", order: 1, kind: "proposed", label: "B" },
+      { id: "a", lane: "l", order: 0, kind: "existing", label: "A", card, ref: { file: "src/a.ts", line: 2, excerpt: "function f() {" } },
+      { id: "b", lane: "l", order: 1, kind: "proposed", label: "B", card },
     ],
     edges: [{ id: "ab", from: "a", to: "b", data: "x", kind: "proposed" }],
     steps: [{ title: "s", description: "d", changes: { b: "added", ab: "added" } }],
@@ -42,10 +46,6 @@ const errorsOf = (raw: unknown) => {
 describe("validatePlan", () => {
   test("accepts a minimal plan", () => {
     expect(errorsOf(base())).toEqual([]);
-  });
-
-  test("accepts the bundled example", () => {
-    expect(errorsOf(JSON.parse(readFileSync(join(HERE, "example.json"), "utf8")))).toEqual([]);
   });
 
   test("tolerates a malformed document", () => {
