@@ -17,8 +17,9 @@
 #      UPSERT keeps re-runs idempotent.
 #   4. Gate deletion on BOTH: the push exited 0 AND per-table counts reconcile. On
 #      success, record the snapshot rows in push_state so the next run skips them.
-#   5. Delete from the LIVE local DB only the rows that were in the snapshot, then VACUUM
-#      to reclaim space. Rows added by the hook after the snapshot are left intact.
+#   5. Delete from the LIVE local DB only the snapshot sessions whose live row is unchanged
+#      since the snapshot, then VACUUM to reclaim space. Rows the hook added or re-saved
+#      after the snapshot are left intact.
 #
 # On any doubt the script keeps the local data and exits non-zero (fail-safe).
 # Re-runs are idempotent: a row already in Turso is only overwritten by a newer copy
@@ -247,10 +248,21 @@ sqlite3 "$DB" <<SQL
 ATTACH '$SNAP' AS snap;
 PRAGMA foreign_keys=OFF;
 BEGIN IMMEDIATE;
-DELETE FROM transcript_raw WHERE session_id IN (SELECT session_id FROM snap.transcript_raw);
-DELETE FROM session_days   WHERE (session_id, day) IN (SELECT session_id, day FROM snap.session_days);
-DELETE FROM sessions       WHERE session_id IN (SELECT session_id FROM snap.sessions);
-DELETE FROM push_state     WHERE session_id IN (SELECT session_id FROM snap.sessions);
+-- Not every snapshot session_id: a session resumed after the snapshot was re-saved with a
+-- newer transcript that never reached Turso, so only sessions whose live row still matches
+-- the snapshot are removed. The rest stay, and their stale push_state makes the next run send them.
+CREATE TEMP TABLE confirmed AS
+  SELECT s.session_id
+  FROM snap.sessions s
+  LEFT JOIN snap.transcript_raw st ON st.session_id = s.session_id
+  JOIN main.sessions l ON l.session_id = s.session_id
+  LEFT JOIN main.transcript_raw lt ON lt.session_id = s.session_id
+  WHERE coalesce(l.ended_at,'') = coalesce(s.ended_at,'')
+    AND coalesce(lt.size_bytes,-1) = coalesce(st.size_bytes,-1);
+DELETE FROM transcript_raw WHERE session_id IN (SELECT session_id FROM confirmed);
+DELETE FROM session_days   WHERE session_id IN (SELECT session_id FROM confirmed);
+DELETE FROM sessions       WHERE session_id IN (SELECT session_id FROM confirmed);
+DELETE FROM push_state     WHERE session_id IN (SELECT session_id FROM confirmed);
 COMMIT;
 DETACH snap;
 SQL
@@ -258,7 +270,7 @@ SQL
 echo "VACUUM (reclaiming space)..."
 sqlite3 "$DB" "VACUUM;"
 
-echo "--- remaining local rows (added after snapshot, if any) ---"
+echo "--- remaining local rows (added or re-saved after snapshot, if any) ---"
 for t in "${TABLES[@]}"; do
   printf '  %-15s %s\n' "$t" "$(sqlite3 "$DB" "SELECT count(*) FROM $t;")"
 done
