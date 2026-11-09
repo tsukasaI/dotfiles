@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "mode": "plan",
   "slug": "example-render-binary",
   "title": "例: render.ts を nix でバイナリ化し、shguard に行を足す",
@@ -18,6 +18,16 @@
       "label": "ガード"
     }
   ],
+  "views": [
+    { "id": "v-structure", "type": "structure" },
+    {
+      "id": "v-seq",
+      "type": "sequence",
+      "title": "時間順",
+      "participants": ["render", "drv", "bin", "row"],
+      "messages": ["e-render-drv", "e-drv-bin", "e-bin-row"]
+    }
+  ],
   "nodes": [
     {
       "id": "render",
@@ -25,6 +35,12 @@
       "order": 0,
       "kind": "existing",
       "label": "render.ts: template を import で埋め込む",
+      "card": {
+        "role": "図の JSON を検証して、template に埋め込んだ HTML を書き出す",
+        "actor": "利用者のマシン上で動く bun のプロセス",
+        "trigger": "diagram-render の呼び出し（手動、または skill からのコマンド実行）",
+        "failure": "JSON が不正なら HTML を書かずに終了コード 1 で止まる"
+      },
       "ref": {
         "file": "claude-code/skills/diagram-explain/render.ts",
         "line": 7,
@@ -37,6 +53,12 @@
       "order": 0,
       "kind": "existing",
       "label": "diagram-render.nix: bun build --compile",
+      "card": {
+        "role": "render.ts を単体の実行ファイルにコンパイルする derivation",
+        "actor": "nix のビルダー（nix.settings.sandbox = true のサンドボックス内）",
+        "trigger": "darwin-rebuild switch でビルドされたとき（手動）",
+        "failure": "ビルドが失敗すると switch が止まり、古いバイナリが残る"
+      },
       "ref": {
         "file": "nix-darwin/diagram-render.nix",
         "line": 18,
@@ -48,7 +70,13 @@
       "lane": "build",
       "order": 1,
       "kind": "proposed",
-      "label": "diagram-render バイナリ（提案）"
+      "label": "diagram-render バイナリ（提案）",
+      "card": {
+        "role": "コンパイル済みの図の描画コマンドとして PATH に置かれる",
+        "actor": "利用者のマシン上のプロセス（Claude の Bash から呼ばれる）",
+        "trigger": "skill がコマンドとして実行したとき",
+        "failure": "バイナリが古いと、render.ts の変更が反映されずに動く"
+      }
     },
     {
       "id": "row",
@@ -56,6 +84,12 @@
       "order": 0,
       "kind": "existing",
       "label": "shguard の diagram-render 行",
+      "card": {
+        "role": "diagram-render の呼び出しを catalog の行に照らして許可するか決める",
+        "actor": "PreToolUse フックとして動く shguard のプロセス",
+        "trigger": "Claude が Bash ツールを呼ぶたびに、実行の前で走る",
+        "failure": "行が引数の形に合わなければ ask になり、ask_outcome = deny で拒否される"
+      },
       "ref": {
         "file": "claude-code/shguard/config.toml",
         "line": 67,
@@ -113,6 +147,26 @@
     {
       "label": "render.ts の検証ロジック",
       "reason": "図の JSON を検証して HTML を書くだけで、実行する権限や外部への作用を持たない。"
+    }
+  ],
+  "checks": [
+    {
+      "node": "row",
+      "question": "shguard の行で引数の宣言が緩すぎると、どうなる？",
+      "choices": [
+        { "text": "意図しない引数の呼び出しまで許可される", "correct": true, "why": "行に合う形なら allow になるので、宣言が緩いほど通る呼び出しが増える。" },
+        { "text": "すべての呼び出しが拒否される", "why": "緩い宣言は拒否を増やさず、許可を増やす向きに働く。" },
+        { "text": "ビルド時に nix が警告して止める", "why": "nix は shguard の設定を読まないので、ビルドとは関係ない。" }
+      ]
+    },
+    {
+      "node": "bin",
+      "question": "render.ts を書き換えた直後に、diagram-render の動作はどうなる？",
+      "choices": [
+        { "text": "すぐに新しい動作になる", "why": "実行されるのはコンパイル済みのバイナリなので、ソースの変更は読まれない。" },
+        { "text": "nix でビルドし直すまで、古い動作のまま", "correct": true, "why": "バイナリは darwin-rebuild switch のビルド時にソースから作られる。" },
+        { "text": "shguard が再コンパイルする", "why": "shguard は呼び出しの許可を判定するだけで、ビルドはしない。" }
+      ]
     }
   ]
 }

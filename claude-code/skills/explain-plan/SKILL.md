@@ -43,6 +43,9 @@ rules below.
   and a `slug` naming the plan.
 - `steps`: one frame per plan step (at least one). Frame 0, the current
   state, is implicit.
+- Cards, `recall` and `checks` follow diagram-explain. Aim `checks` at what
+  the plan changes (which component now does what, and when), so the user can
+  confirm they follow the plan before approving it. They are not a gate.
 - Every `existing` node needs a `ref`. Edges take a `ref` when one line shows
   the hand-off.
 - Deep dive: mark a node with `deepDive` when it falls in one of these

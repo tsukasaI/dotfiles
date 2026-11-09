@@ -111,6 +111,13 @@ describe("validate", () => {
     expect(out.mode).toBe("explain");
   });
 
+  test("accepts the bundled system design example", () => {
+    const raw = JSON.parse(readFileSync(join(HERE, "example.json"), "utf8"));
+    expect(errorsOf(raw)).toEqual([]);
+    expect(raw.mode).toBeUndefined();
+    expect(diagramOf(raw).mode).toBe("explain");
+  });
+
   test("lanes and lane/order are not needed without a structure view", () => {
     const d = full();
     d.views = d.views.slice(1);

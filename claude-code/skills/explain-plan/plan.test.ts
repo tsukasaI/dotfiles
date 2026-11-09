@@ -5,6 +5,8 @@ import { join } from "path";
 import { main, validate } from "../diagram-explain/render.ts";
 import { planOptions, validatePlan } from "./plan.ts";
 
+const HERE = import.meta.dir;
+
 let tmp: string;
 let repo: string;
 beforeAll(() => {
@@ -46,6 +48,10 @@ const errorsOf = (raw: unknown) => {
 describe("validatePlan", () => {
   test("accepts a minimal plan", () => {
     expect(errorsOf(base())).toEqual([]);
+  });
+
+  test("accepts the bundled example", () => {
+    expect(errorsOf(JSON.parse(readFileSync(join(HERE, "example.json"), "utf8")))).toEqual([]);
   });
 
   test("tolerates a malformed document", () => {
