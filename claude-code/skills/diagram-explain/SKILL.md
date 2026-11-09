@@ -32,11 +32,14 @@ are in `render.ts`.
   events), not every function or class. Every edge's `data` names what flows.
 - `views` (1-4) pick the forms that fit the subject; every view shares the
   same nodes, cards and steps. Offer only the views the subject needs:
-  - `structure`: where things live. `lanes` are columns, `order` the row;
-    never give coordinates. System design starts here.
+  - `structure`: where things live. `lanes` are columns, `order` the row,
+    one node per cell; never give coordinates. System design starts here.
+    `lanes`, `lane` and `order` are needed only with this view.
   - `sequence`: who calls whom, in time order. Pair it with `structure` when
     a new component's timing matters (an outbox: who writes it in which
-    transaction, who reads it and how often).
+    transaction, who reads it and how often). At most 6 participants: pick
+    the ones on the path being explained. List every edge the steps add, and
+    a removed edge too; each message shows only while its edge is present.
   - `calltree`: the main view for reading code: entry function at the root,
     callees below, so the picture grows downward the way the code is
     explored. Small errors are acceptable as long as the overall flow is
@@ -58,8 +61,12 @@ are in `render.ts`.
   the requirement it answers (scale, latency, durability), saying in
   `description` which requirement forced it and what it costs. Nodes that
   appear in a step are `kind: "proposed"` and listed as `added`; `changed`
-  and `removed` mark later revisions. Omit `steps` for a single static
-  picture.
+  and `removed` mark later revisions; an existing component that a step
+  reworks (a consumer made idempotent) is `changed` there, and its card
+  describes the final state. Omit `steps` for a single static picture, and
+  `edges` when no view draws them (a calltree plus dataflow needs none).
+- Length limits per field live in `render.ts`; exit 1 names every field
+  over its limit.
 - `recall` (optional, 1-3): the key points, answered in the reader's own
   words: why a step's decision was made or what happens in the picture, each
   with one answer of 1-3 sentences. Avoid yes/no and "which is best"
