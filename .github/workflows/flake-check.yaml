@@ -1,13 +1,13 @@
-# Split from ci.yaml so the macos-14 runner (slower, more expensive) only
+# Split from ci.yaml so the macOS runner (slower, more expensive) only
 # runs when nix-darwin config actually changed — not on every hook/skill edit.
 name: flake-check
 
 on:
   push:
     branches: [main]
-    paths: ["nix-darwin/**"]
+    paths: ["nix-darwin/**", ".github/workflows/flake-check.yaml"]
   pull_request:
-    paths: ["nix-darwin/**"]
+    paths: ["nix-darwin/**", ".github/workflows/flake-check.yaml"]
 
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
     # --no-build` only confirmed the darwinConfigurations output exists without
     # evaluating the module set; evaluating the system drvPath forces full
     # module evaluation while still building nothing.
-    runs-on: macos-14
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
