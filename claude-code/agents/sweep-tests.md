@@ -24,7 +24,9 @@ low-coverage.
 Tests that pass/fail inconsistently: timing, shared state, inherited
 cwd/env, nondeterministic ordering.
 - For known flaky tests (or ones found from CI failure history), run them
-  repeatedly under `timeout` to narrow the trigger condition.
+  repeatedly under `timeout` to narrow the trigger condition. If the
+  guardrail refuses `timeout` or the test command, investigate statically
+  and say in the report that nothing was executed.
 - Report the trigger condition and a root-cause fix. Never propose
   retries, longer timeouts as the sole fix, or skipping the test: that
   hides the problem.

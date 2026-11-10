@@ -122,7 +122,7 @@ system design の練習など、plan がない場面でも図解を使うため�
 
 - 決定 15・16 の件数の上限の具体的な値。
 - 「関数単位で理解すべきだった」具体的な場面の例（カテゴリ一覧の検証用）。
-- shguard に `bun test` と `render.ts` の直接実行の行がなく、Claude はテストと描画を回せない（ユーザーが `!` で実行している）。行を足すか。
+- shguard に `bun test` の行がなく、Claude はテストを回せない（ユーザーが `!` で実行している）。描画は `explain-plan-render` の行（`claude-code/shguard/config.toml`）で Claude も実行できる。
 - スマホ幅（375px）での表示は agent-browser で viewport を変えられず未検証。実機かブラウザの開発者ツールで確認する。
 - ブラウザでの UI 検証（コマ送り、パネル）は未実施。Claude Code セッションで `browser-test` を使って行う。
 - 推測・未確認: Claude Code の plan mode で `$TMPDIR` への書き込みと `explain-plan-render` の実行が許されるか。

@@ -56,4 +56,5 @@ can't resolve `github.com` and `gh` can't read the keychain.
   Markdown text in a `--body-file`.
 - If `gh auth status` inside the sandbox reports an invalid keyring token,
   that is the sandbox, not a broken login; never run `gh auth refresh` for
-  it.
+  it. shguard refuses `gh auth status` from Claude anyway: check access with
+  a read such as `gh issue list` instead.

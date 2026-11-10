@@ -296,8 +296,13 @@ Rules:
   first-turn directive.
 - The standard-constraint, sonnet/reviewer/squash-merge, review-tier,
   stuck-rule, and Follow-ups clauses from Standing implementation pattern
-  above are always included
-  verbatim in intent, regardless of repo. Never drop them for brevity.
+  above are always included verbatim in intent. Never drop them for
+  brevity. The one exception is a `dotfiles` or `ops` target: those repos
+  commit straight to main with no review gate, and their config/doc edits
+  stay in the main loop (global CLAUDE.md, Workflow and Model behavior), so
+  replace the sonnet/reviewer/squash-merge and review-tier clauses with
+  "edit in the main loop, commit to main and push after each issue"; keep
+  the standard-constraint, stuck-rule, and Follow-ups clauses.
 
 *Done:* single-line checkable `/goal` statement drafted from template, `wc -m` ≤ 4,000.
 

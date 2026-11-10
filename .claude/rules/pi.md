@@ -67,8 +67,10 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   `file-guard.ts` gates read/grep/find/ls by the `Read(...)` rules in
   `claude-code/settings.json` (plus `~/.pi/agent/auth.json`) and write/edit
   by `claude-code/hooks/block-config-edit.sh`, and also protects pi's own
-  guards (`file-guard.ts`, `shguard.ts`, `settings.json`, `.pi` extension
-  dirs), so changing those is a manual edit, as on the Claude Code side.
+  guards and the files that run unsandboxed (`file-guard.ts`, `shguard.ts`,
+  `style-guards.ts`, `settings.json`, `pi-factory`, `Dockerfile.pi`, `.pi`
+  extension dirs), so changing those is a manual edit, as on the Claude
+  Code side.
   Known gaps: grep/find/ls on a parent of a denied path still reach it,
   and a new file in `extensions/` can register its own tools.
   `compact-diff.ts` (`registerToolRenderer`, display only) collapses edit

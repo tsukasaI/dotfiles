@@ -31,15 +31,15 @@ contradictions, and unscoped clusters of unreasoned prohibitions, not length.
   worked examples and named tools still exist before trusting them.
 
 ## Model-specific
-- **Opus 5.5**: thinking is always on and effort is the depth control; lower
+- **Opus**: thinking is always on and effort is the depth control; lower
   `effort:` before adding "be brief" or "think less" prose. Emphasis only on
   the one instruction that's actually under-triggering; marking everything
   critical erases the signal. Re-test rules written for older Opus verbosity
   or over-verification before keeping them.
-- **Sonnet 5**: state scope explicitly — it won't generalize a rule from one
+- **Sonnet**: state scope explicitly — it won't generalize a rule from one
   case to another on its own. A worked example gets followed literally,
   including a wrong one, so keep examples correct and current.
-- **Fable 5.1**: state the goal and constraints, not the steps, unless the
+- **Fable**: state the goal and constraints, not the steps, unless the
   operation is fragile enough to need an exact script. State the autonomy
   boundary and the scope explicitly: it tends to ask permission it doesn't
   need and to widen scope and test coverage on its own.

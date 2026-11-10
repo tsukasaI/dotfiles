@@ -129,6 +129,8 @@ f974911ac917c739017107dbc62f8842e787dcab tsukasa inoue <inoue.tsukasa.4@gmail.co
 
 ## Setup-script box, first real run (2026-11-03, environment `dotfiles-cloud`)
 
+The environment was later renamed `personal-dev` (see `claude-code/cloud/CLAUDE.md`).
+
 - Loading: after the manual run above, `/context` in the resumed session
   listed `/root/.claude/CLAUDE.md` and the five unconditional rules
   (`security`, `surgical-changes`, `user-handoff`, `git-sandbox`,

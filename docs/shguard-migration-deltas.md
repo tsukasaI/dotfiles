@@ -1109,8 +1109,9 @@ How the 0.9 config was carried over (`claude-code/shguard/config.toml`):
 Accepted gaps and regressions (0.10 vs 0.9), tracked upstream where they
 can be fixed:
 
-- **gap (pending upstream)** `cat sub/.env`, `*.pem`: no basename targets
-  (tsukasaI/shguard#1113).
+- **gap (fixed in 0.11)** `cat sub/.env`, `*.pem`: no basename targets
+  (tsukasaI/shguard#1113); since 0.11 a target matches a basename at any
+  depth.
 - **gap (pending upstream)** rules carry no reason text, so the agent no
   longer reads "use fd" style guidance (tsukasaI/shguard#1112);
   `blocked-band.tsx` points a refused `find` at the Glob tool instead.

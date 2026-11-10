@@ -8,7 +8,7 @@ description: >
   した" / a legitimate command got blocked), or config.tomlへのルール追加.
   NOT for: hooks in other repos, settings.json permission changes (see
   update-config skill instead), or changes unrelated to these files.
-allowed-tools: Bash, Read, Edit, Grep, Glob
+allowed-tools: Bash, Read, Edit, Write, Grep, Glob
 ---
 
 # hooks-guardrails

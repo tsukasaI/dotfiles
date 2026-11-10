@@ -16,7 +16,9 @@ your findings are triaged and filed as issues, and the fix happens later.
   report instead — do not fuzz it.
 - Run every fuzz target under `timeout`: `kill`/`pkill` are blocked by this
   environment's guardrail hooks, so you cannot terminate a hung process any
-  other way.
+  other way. If the guardrail refuses `timeout` or the target's run
+  command, do not fuzz without it: investigate statically and say in the
+  report that nothing was executed.
 - For each crash: capture the stack trace and exact repro steps, then trace
   it to the root cause in the code (not just the throw site).
 - Do not edit any files. Report each crash as a finding: title, file/line

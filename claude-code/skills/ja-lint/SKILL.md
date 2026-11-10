@@ -2,7 +2,7 @@
 name: ja-lint
 description: Lints Japanese prose for AI-slop patterns (metaphor verbs, filler openers, slop vocabulary, emoji, excess or unrendered bold, excess bullets, repeated sentence endings, trailing or heading colons, redundant brackets, translated terms, leftover prompt instructions) with a deterministic script, and reports findings without editing anything. Use after writing or changing Japanese documents such as 職務経歴書, 自己PR, README, blog posts or specs, and when the user asks to check, lint or de-slop (AI臭さを確認して) Japanese text. Never rewrites; the user decides every fix.
 argument-hint: <file path>
-allowed-tools: Bash(ja-lint *), Bash(python3 *), Read
+allowed-tools: Bash(ja-lint *), Bash(python3 -I *), Read
 ---
 
 # /ja-lint: report AI-slop in Japanese text, never fix it

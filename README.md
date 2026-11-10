@@ -35,8 +35,10 @@ Personal dotfiles for macOS (Apple Silicon) managed with nix-darwin.
 ## Installation
 
 ```sh
-# Clone
+# Clone (coding-guidelines is linked into claude-code/rules by setup.sh;
+# set CODING_GUIDELINES to use another path)
 git clone https://github.com/tsukasaI/dotfiles.git ~/dotfiles
+git clone https://github.com/tsukasaI/coding-guidelines.git ~/engineer/coding-guidelines
 
 # Symlink configs
 bash setup.sh
@@ -136,7 +138,7 @@ a change as done.
 ### Read tool restrictions
 
 `settings.json` `permissions.deny` still covers the `Read` tool (the hook is Bash-only):
-see the `Read(...)` entries there (secrets, credentials, `.env*`, private keys, build output).
+see the `Read(...)` entries there (secrets, credentials, `.env*`, private keys).
 
 ### Session habits
 

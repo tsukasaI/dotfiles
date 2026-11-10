@@ -58,8 +58,9 @@ Claude Code on the web loads no `~/.claude` from this machine, so the
 environment's setup script installs the shared config instead. Details are in
 `claude-code/cloud/CLAUDE.md`, which loads when working under that directory.
 
-- After editing anything the manifest covers, run
-  `bash tests/cloud-manifest-sync.sh --write`; CI fails on drift.
+- After editing anything the manifest covers, have the user run
+  `! bash tests/cloud-manifest-sync.sh --write` before committing (shguard
+  has no `bash` row, so Claude can't); pre-commit and CI fail on drift.
 
 ## Concepts
 

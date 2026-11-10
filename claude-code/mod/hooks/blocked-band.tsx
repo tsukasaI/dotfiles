@@ -17,7 +17,7 @@ const SHGUARD_DENY =
   /rule `[^`]+` hit \(item |\(ask_outcome = deny\)|shguard cannot load its config or catalog|shguard: internal error/
 const RULE = /rule `([^`]+)` hit/
 // find can have no shguard row, so it is refused as unknown; nothing unsafe
-// is being stopped and the Glob tool does the job.
+// is being stopped and fd or the Glob tool does the job.
 const FIND = /^\s*find(?:\s|$)/
 
 const NOTE =
@@ -28,7 +28,7 @@ const NOTE =
 
 const FIND_NOTE =
   'dotfiles-mod: shguard refuses find because it cannot check its options, not because this ' +
-  'search is unsafe. Retry right away with the Glob tool (fd is refused too).'
+  'search is unsafe. Retry right away with fd on a path relative to the cwd (no -x), or the Glob tool.'
 
 export function parseShguardDeny(text: string | undefined): { rule: string } | undefined {
   if (text === undefined || !SHGUARD_DENY.test(text)) return undefined
