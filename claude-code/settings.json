@@ -125,8 +125,8 @@
         "hooks": [
           {
             "type": "command",
-            "timeout": 10,
-            "command": "bun --config=/dev/null $HOME/dotfiles/claude-code/hooks/agent-browser-guard.ts || exit 2"
+            "command": "bun --config=/dev/null $HOME/dotfiles/claude-code/hooks/agent-browser-guard.ts || exit 2",
+            "timeout": 10
           }
         ]
       },
@@ -135,7 +135,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/dotfiles/claude-code/hooks/block-config-edit.sh"
+            "command": "$HOME/dotfiles/claude-code/hooks/block-config-edit.sh",
+            "onFailure": "block"
           },
           {
             "type": "command",
@@ -179,7 +180,6 @@
     "enabled": true,
     "allowUnsandboxedCommands": false,
     "network": {
-      "allowLocalBinding": true,
       "allowedDomains": [
         "github.com",
         "api.github.com",
@@ -227,11 +227,12 @@
         "~/.gnupg/S.gpg-agent",
         "~/.gnupg/S.keyboxd",
         "/nix/var/nix/daemon-socket/socket",
-         "/private/tmp/claude-501/why3server*",
-         "/tmp/claude-501/why3server*",
-         "/tmp/claude-501",
-         "/private/tmp/claude-501"
-      ]
+        "/private/tmp/claude-501/why3server*",
+        "/tmp/claude-501/why3server*",
+        "/tmp/claude-501",
+        "/private/tmp/claude-501"
+      ],
+      "allowLocalBinding": true
     },
     "filesystem": {
       "allowWrite": [
@@ -259,6 +260,7 @@
         "~/dotfiles/.lefthook",
         "~/dotfiles/.lefthook-local",
         "~/dotfiles/mise",
+        "~/dotfiles/pi",
         "~/dotfiles/.git/branches",
         "~/dotfiles/.git/remotes",
         "~/dotfiles/tests",
@@ -307,6 +309,14 @@
       "go get:*"
     ]
   },
+  "modelSettings": {
+    "claude-fable-5-2": {
+      "effortLevel": "high"
+    },
+    "claude-opus-5-5": {
+      "effortLevel": "medium"
+    }
+  },
   "advisorModel": "fable",
   "askUserQuestionTimeout": "never",
   "plansDirectory": ".claude/plans",
@@ -316,9 +326,9 @@
     "mode": "hold"
   },
   "autoMemoryEnabled": false,
-  "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "custom:dark-ansi-readable",
+  "verbose": true,
   "preferredNotifChannel": "ghostty",
   "switchModelsOnFlag": false,
   "autoContinueAtUsageLimit": true,
