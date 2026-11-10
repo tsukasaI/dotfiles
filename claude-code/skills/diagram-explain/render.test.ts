@@ -19,6 +19,13 @@ beforeAll(() => {
 });
 afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
+// Not `process.env.TMPDIR = prev`: with TMPDIR unset that stores the string
+// "undefined", and os.tmpdir() then returns it to every later test file.
+function restoreTmpdir(prev: string | undefined): void {
+  if (prev === undefined) delete process.env.TMPDIR;
+  else process.env.TMPDIR = prev;
+}
+
 const card = () => ({ role: "r", actor: "who", trigger: "when", failure: "fails" });
 
 function base(): Record<string, any> {
@@ -448,7 +455,7 @@ describe("main", () => {
     try {
       expect(main([json, "--root", repo], m => logs.push(m), () => {})).toBe(0);
     } finally {
-      process.env.TMPDIR = prev;
+      restoreTmpdir(prev);
     }
     expect(logs[0]).toBe(outputPath("test-diagram", { TMPDIR: out }));
     expect(logs[0]).toContain("diagram-explain");
@@ -507,7 +514,7 @@ describe("main", () => {
       expect(main([broken, "--root", repo], () => {}, () => {})).toBe(1);
       expect(main([write("invalid.json", { ...base(), version: 1 }), "--root", repo], () => {}, () => {})).toBe(1);
     } finally {
-      process.env.TMPDIR = prev;
+      restoreTmpdir(prev);
     }
     expect(existsSync(out)).toBe(false);
   });
