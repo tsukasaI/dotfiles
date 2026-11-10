@@ -122,7 +122,6 @@ system design の練習など、plan がない場面でも図解を使うため�
 
 - 決定 15・16 の件数の上限の具体的な値。
 - 「関数単位で理解すべきだった」具体的な場面の例（カテゴリ一覧の検証用）。
-- `bun test claude-code/skills` は lefthook の pre-push（`skill-test`）に入った。CI に入れるかは未決。
 - shguard に `bun test` と `render.ts` の直接実行の行がなく、Claude はテストと描画を回せない（ユーザーが `!` で実行している）。行を足すか。
 - スマホ幅（375px）での表示は agent-browser で viewport を変えられず未検証。実機かブラウザの開発者ツールで確認する。
 - ブラウザでの UI 検証（コマ送り、パネル）は未実施。Claude Code セッションで `browser-test` を使って行う。

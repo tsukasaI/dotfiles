@@ -121,6 +121,31 @@ jobs:
       - name: coding-guidelines pin check
         run: bash tests/coding-guidelines-pin.sh
 
+  # Not `claude plugin test claude-code/mod`: the runner has no Claude Code
+  # CLI, so that suite stays on lefthook's pre-push.
+  bun-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: hooks and lib
+        run: bun test claude-code/hooks claude-code/lib
+      - name: skills
+        run: bun test claude-code/skills
+      - name: pi
+        run: bun test pi/tests
+
+  ja-lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: ja-lint unit tests
+        run: python3 -I claude-code/skills/ja-lint/scripts/test_yomiyasu_lint.py
+
   gitleaks:
     runs-on: ubuntu-latest
     steps:

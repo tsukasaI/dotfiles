@@ -105,7 +105,7 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   pi's boundary preview reports `canContinue: false` after an assistant
   reply; the appended custom message makes `continue: true` valid, so don't
   gate on it.
-- `bun test pi/tests` runs on pre-push (lefthook), not in CI.
+- `bun test pi/tests` runs on pre-push (lefthook) and in CI.
 - Load check without model calls: send `{"type":"get_commands"}` to
   `pi --mode rpc --no-session`.
 - The `--container` mode uses its own `pi-agent-home` volume, so none of
