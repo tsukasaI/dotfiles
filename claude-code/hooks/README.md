@@ -62,7 +62,7 @@ guardrails stay here as settings hooks.
 - **Rule guards**: deny an Agent call without `model:` (unless the agent
   definition pins one, or it is a fork); deny `git commit` on main/master
   outside `tsukasaI/dotfiles`/`ops`, and a `-m` message that isn't
-  Conventional Commits or contains Japanese. Unreadable cases pass.
+  Conventional Commits or contains Japanese. A message it can't read is denied.
 - **PR review band**: PRs opened via `gh pr create` and their
   `code-reviewer` state (a wording guess; display only, never a merge gate).
 

@@ -295,8 +295,11 @@ case_ "gh search commits"                'gh search commits foo'               d
 case_ "gh pr review comment"             'gh pr review 1 --comment -b ok'      allow
 case_ "gh pr review --approve"           'gh pr review 1 --approve'            deny "a formal review decision stays with the owner"
 case_ "gh pr review --request-changes"   'gh pr review 1 --request-changes -b no' deny "a formal review decision stays with the owner"
-case_ "date +format"                     'date +%Y'                            deny "no row for date"
-case_ "date -s"                          'date -s 12:00'                       deny "no row for date"
+case_ "date +format"                     'date +%Y'                            allow "the date row: -u and one operand"
+case_ "date -u +format"                  'date -u +%F'                         allow
+case_ "date -s"                          'date -s 12:00'                       deny "the date row lists only -u"
+case_ "date -r file"                     'date -r x'                           deny "-r reads a file's mtime"
+case_ "date two operands"                'date +%A extra'                      deny "one operand only"
 case_ "gh auth status"                   'gh auth status'                      deny "gh auth stays out on purpose"
 case_ "gh auth status --show-token"      'gh auth status --show-token'         deny
 case_ "gh ssh-key add"                   'gh ssh-key add k.pub'                deny

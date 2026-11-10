@@ -55,6 +55,17 @@ long = "unbuffered"
 short = "e"
 long = "exit-status"
 
+# Not -r/-f/-j: -r reads a file's mtime and -f/-j parse input. A clock-setting
+# operand passes the row but fails without root.
+[[row]]
+key = ["date"]
+source = "https://man.freebsd.org/cgi/man.cgi?query=date"
+order = "strict"
+dashdash = "literal"
+plus_words = "operand"
+positionals = ["inert"]
+opt = [{ short = "u" }]
+
 # No operand and no option: `shguard init` writes a config and `shguard check`
 # reads arbitrary files.
 [[row]]

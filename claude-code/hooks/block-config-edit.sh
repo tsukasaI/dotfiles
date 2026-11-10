@@ -117,6 +117,12 @@ check_path() {
     */engineer/ops/scripts/check_career_consistency.py | \
     */.claude/shguard/config.toml | \
     */.config/shguard/config.toml | \
+    */dotfiles/pi/pi-factory | \
+    */dotfiles/pi/Dockerfile.pi | \
+    */dotfiles/pi/settings.json | \
+    */dotfiles/pi/extensions/file-guard.ts | \
+    */dotfiles/pi/extensions/shguard.ts | \
+    */dotfiles/pi/extensions/style-guards.ts | \
     */lefthook.* | */lefthook-local.* | */.lefthook*)
       printf '[BLOCKED: GUARDRAIL_PROTECTION] "%s" defines the PreToolUse guardrails and must not be edited by Claude.\nAsk the user to apply the change manually (for shguard config.toml and this hook, the hooks-guardrails skill has the procedure).\n' "$basename" >&2
       exit 2
