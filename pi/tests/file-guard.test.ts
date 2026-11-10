@@ -69,6 +69,9 @@ describe("pi guard files", () => {
 		expect(isPiGuardFile("/r/pi/extensions/shguard.ts", "/r/pi")).toBe(true);
 		expect(isPiGuardFile("/r/PI/Extensions/File-Guard.ts", "/r/pi")).toBe(true);
 		expect(isPiGuardFile("/r/pi/settings.json", "/r/pi")).toBe(true);
+		expect(isPiGuardFile("/r/pi/pi-factory", "/r/pi")).toBe(true);
+		expect(isPiGuardFile("/r/pi/Dockerfile.pi", "/r/pi")).toBe(true);
+		expect(isPiGuardFile("/r/pi/extensions/style-guards.ts", "/r/pi")).toBe(true);
 		expect(isPiGuardFile("/Users/me/.pi/agent/settings.json", "/r/pi")).toBe(true);
 		expect(isPiGuardFile("/Users/me/.pi/agent/extensions/x.ts", "/r/pi")).toBe(true);
 		expect(isPiGuardFile("/proj/.pi/extensions/x.ts", "/r/pi")).toBe(true);

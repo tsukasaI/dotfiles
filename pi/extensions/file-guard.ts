@@ -92,7 +92,7 @@ export function matchesAny(path: string, rules: RegExp[]): boolean {
 
 export function isPiGuardFile(path: string, piDir = PI_DIR): boolean {
 	const lower = path.toLowerCase();
-	const own = ["extensions/file-guard.ts", "extensions/shguard.ts", "settings.json"].map((f) => join(piDir, f).toLowerCase());
+	const own = ["extensions/file-guard.ts", "extensions/shguard.ts", "extensions/style-guards.ts", "settings.json", "pi-factory", "Dockerfile.pi"].map((f) => join(piDir, f).toLowerCase());
 	if (own.includes(lower)) return true;
 	return /\/\.pi\/(agent\/)?(settings\.json$|extensions(\/|$))/.test(lower);
 }
