@@ -25,8 +25,11 @@ ja-lint <file>
 ```
 
 `ja-lint` is built by `nix-darwin/ja-lint.nix` and is the only form shguard
-allows on the Mac. Where it isn't on PATH (cloud sessions, pi), run
-`python3 -I ~/.claude/skills/ja-lint/scripts/yomiyasu_lint.py <file>`.
+allows on the Mac. It feeds the file to the script on stdin, so any path
+works. Where it isn't on PATH (cloud sessions, pi), run
+`python3 -I ~/.claude/skills/ja-lint/scripts/yomiyasu_lint.py - < <file>`:
+the script refuses a file operand outside the cwd or under a dot directory
+(exit 2).
 
 Use `--json` if you need to post-process.
 Do not pass `--strict` or `--fail-on` (they only change the exit code).
@@ -47,12 +50,12 @@ the file, so an empty result means "no pattern hit", not "no AI slop".
 `scripts/yomiyasu_lint.py` and `scripts/markdown_visibility.py` (which the
 linter imports) are vendored unmodified from
 https://github.com/nanaism/yomiyasu (MIT, see `LICENSE`; Unicode-derived
-emoji data, see `UNICODE-LICENSE.txt`) at release `v2.4.0`, commit
-`ae258d7a57b335673e30b88a018ae08d4f72c449`. Standard library only, no
+emoji data, see `UNICODE-LICENSE.txt`) at release `v3.0.0`, commit
+`7b212ff2f037953b8c233ae315e5c08e7fc36da6`. Standard library only, no
 network or subprocess use. Blob pins (`git hash-object <file>`):
 
-- `scripts/yomiyasu_lint.py`: `288b9526d2c176540fd45e1d419e4bb1eb23e107`
-- `scripts/markdown_visibility.py`: `446f5862342561dc45b443c75763b707697f9f31`
+- `scripts/yomiyasu_lint.py`: `9670465b81281e1172a8141eabbfcb228363c755`
+- `scripts/markdown_visibility.py`: `82f8282b8cc4187deaeedc1daad8eef6df53f0a9`
 
 `scripts/test_yomiyasu_lint.py` pins the fence/frontmatter behavior this
 skill relies on (`python3 -I` it). Renewal: when bumping, read the upstream
