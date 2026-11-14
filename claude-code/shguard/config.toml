@@ -1272,3 +1272,106 @@ order = "permute"
 dashdash = "ends"
 positionals = ["path"]
 opt = [{ long = "redact" }]
+# ───── Project check scripts for /goal loops (dotfiles#132) ─────
+# Each row names one package.json script, with no options or operands, so the
+# command line cannot add arguments to it (`pnpm smoke -- <url>`) or pick
+# another script. The script body is repo code and runs as cargo test does
+# (P3: the repo is trusted to that extent); the loop can edit package.json, so
+# the boundary is the sandbox, not this row. Keychain items the loop must not
+# read have `security` removed from their ACL (dotfiles#132). Production smoke,
+# `pnpm run release` and `pnpm dev` have no row and stay user-run.
+# cwd_sensitive: pnpm and npm read the project's package.json and .npmrc.
+[[row]]
+key = ["pnpm"]
+source = "https://pnpm.io/cli/run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+[[row]]
+key = ["pnpm", "typecheck"]
+source = "https://pnpm.io/cli/run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+[[row]]
+key = ["pnpm", "test"]
+source = "https://pnpm.io/cli/test"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+[[row]]
+key = ["pnpm", "lint"]
+source = "https://pnpm.io/cli/run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+[[row]]
+key = ["pnpm", "fmt:check"]
+source = "https://pnpm.io/cli/run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+# Offline: checks that the smoke refuses SMOKE_REMOTE_* against production.
+[[row]]
+key = ["pnpm", "smoke:guard"]
+source = "https://pnpm.io/cli/run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+# bun is an INEXPRESSIBLE_HEADS entry (`bun <file>` runs whatever the command
+# line names), so slotfinder's checks run through npm, which only runs scripts
+# package.json defines (tsukasaI/shguard#1277 tracks a bun opt-in).
+[[row]]
+key = ["npm"]
+source = "https://docs.npmjs.com/cli/commands/npm-run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+[[row]]
+key = ["npm", "test"]
+source = "https://docs.npmjs.com/cli/commands/npm-test"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+[[row]]
+key = ["npm", "run"]
+source = "https://docs.npmjs.com/cli/commands/npm-run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+[[row]]
+key = ["npm", "run", "typecheck"]
+source = "https://docs.npmjs.com/cli/commands/npm-run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+[[row]]
+key = ["npm", "run", "lint"]
+source = "https://docs.npmjs.com/cli/commands/npm-run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+[[row]]
+key = ["npm", "run", "format:check"]
+source = "https://docs.npmjs.com/cli/commands/npm-run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+[[row]]
+key = ["npm", "run", "build:web"]
+source = "https://docs.npmjs.com/cli/commands/npm-run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"

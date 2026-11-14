@@ -436,6 +436,22 @@ case_ "rm (any)"                         'rm foo'                              d
 case_ "git log -n"                       'git log -n 5 --oneline'              allow
 case_ "git log -<number>"                'git log --oneline -5'                allow "0.11 accepts -<number> (shguard#1115)"
 case_ "cd then git"                      'cd /tmp && git status'               deny "cwd_sensitive after cd"
+case_ "pnpm typecheck"                   'pnpm typecheck'                      allow "dotfiles#132 check script"
+case_ "pnpm test / lint / fmt:check"     'pnpm test && pnpm lint && pnpm fmt:check' allow
+case_ "pnpm smoke:guard"                 'pnpm smoke:guard'                    allow "offline guard check"
+case_ "pnpm smoke (no row)"              'pnpm smoke'                          deny "remote-capable; smoke:local only"
+case_ "pnpm smoke with a target"         'pnpm smoke -- https://example.com'   deny "no operands"
+case_ "pnpm dev"                         'pnpm dev'                            deny "long-running; no row"
+case_ "pnpm run release"                 'pnpm run release'                    deny "user-run only"
+case_ "pnpm typecheck with args"         'pnpm typecheck --watch'              deny "no options"
+case_ "pnpm exec"                        'pnpm exec tsc'                       deny "runs a named binary"
+case_ "pnpm dlx"                         'pnpm dlx cowsay hi'                  deny "downloads and runs"
+case_ "cd then pnpm"                     'cd /tmp && pnpm typecheck'           deny "cwd_sensitive after cd"
+case_ "npm test and run scripts"         'npm test && npm run typecheck && npm run lint && npm run format:check && npm run build:web' allow
+case_ "npm run deploy"                   'npm run deploy'                      deny "only listed scripts"
+case_ "npm run with args"                'npm run lint -- --fix'               deny "no operands"
+case_ "npm exec"                         'npm exec cowsay'                     deny "runs a named binary"
+case_ "bun test (inexpressible)"         'bun test'                            deny "INEXPRESSIBLE_HEADS"
 
 # ── config-load fail-closed ────────────────────────────────────────────────
 # A config that fails to load denies every Bash call (since 0.10 there is
