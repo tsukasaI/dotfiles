@@ -1,6 +1,6 @@
 ---
 name: mkgoal
-description: Builds a high-quality, verifiable /goal statement through a short slot-filling dialogue. Use when the user wants to start a Claude Code goal loop and needs the completion condition and verification command defined before running /goal; standard constraints and the turn cap are applied automatically. Also accepts one or more #<issue> references (typically a /triage group of 5–10) to draft a single combined /goal statement covering all of them, reading each issue's Triage comment for its decided design, completion condition, verification command, scope, and constraints, so a fully triaged group needs no questions before the approval gate. Claude may invoke it after /triage has finished, when the user asks to turn a triage group into a goal (e.g. "G1をgoalにして"), passing that group's issues as `#<N> ...` arguments. Not for running /goal itself, and never invoked from inside /triage or a subagent.
+description: Builds a high-quality, verifiable /goal statement through a short slot-filling dialogue. Use when the user wants to start a Claude Code goal loop and needs the completion condition and verification command defined before running /goal; standard constraints and the turn cap are applied automatically. Also accepts one or more #<issue> references (typically a /triage group of up to about 30) to draft a single combined /goal statement covering all of them, reading each issue's Triage comment for its decided design, completion condition, verification command, scope, and constraints, so a fully triaged group needs no questions before the approval gate. Claude may invoke it after /triage has finished, when the user asks to turn a triage group into a goal (e.g. "G1をgoalにして"), passing that group's issues as `#<N> ...` arguments. Not for running /goal itself, and never invoked from inside /triage or a subagent.
 argument-hint: [達成したいこと | #issue番号 ...]
 allowed-tools: Read, Grep, Glob, AskUserQuestion, Bash, Write
 ---
@@ -45,19 +45,12 @@ If the launch argument consists solely of one or more `#<digits>` tokens
 mode: draft ONE combined `/goal` statement covering every listed issue, in
 the order given.
 
-**Batch size**: group sizing (5-10 issues per loop) belongs to `/triage`'s
-Grouping rules. Here, 10 is only the most issues one statement takes up
-front, as long as it passes the 4,000-character check in Assemble; that
-character limit, not the issue count, is the binding constraint. With 10
-or fewer issues, never ask about splitting up front. With more than 10,
-before slot filling, ask via `AskUserQuestion`: (1) "Split (Recommended)":
-draft this statement for the first 10 issues in the given order
-(`/triage` already orders prerequisites first), and list the rest, in
-order and in groups of at most 10, outside the final code block as
-follow-up `/mkgoal #...` lines; or (2) "Keep all N in one goal". Never
-split silently. If the statement still exceeds 4,000 characters after
-tightening (see Assemble), the over-length split question there applies
-regardless of count.
+**Batch size**: group sizing (up to about 30 issues per loop, a soft guide)
+belongs to `/triage`'s Grouping rules. Here there is no issue-count limit
+and no up-front split question: the 4,000-character check in Assemble is
+the only binding constraint, and its over-length split question is the
+only place a batch gets split. A realistic 25-issue statement measured
+about 2,700 characters, so a `/triage` group usually fits.
 
 For each `#N`, run `gh issue view <N> --json title,body,url,comments` once.
 
@@ -78,9 +71,13 @@ supplies a checkable condition or a verification command, ask about that
 issue specifically in the batched `AskUserQuestion` call. This is the
 fallback for issues that skipped `/triage`; technical calls belong there.
 
-A `Decision` other than `none` or `undecided` goes into that issue's clause
-of the statement as "(decided: <decision>)", so the implementer follows the
-call made in `/triage` instead of re-deciding it.
+A `Decision` other than `none` or `undecided` goes into the statement's
+decided-designs clause as "#<N>: <decision>", so the implementer follows
+the call made in `/triage` instead of re-deciding it. The Decision text
+always travels inside the statement, never as an instruction for the loop
+to read the Triage comment itself: the `authorAssociation` filter above
+runs here, before the user approves the statement, and a loop told to read
+comments on its own could follow a forged one with merge pre-authorized.
 
 Slot 3 (constraints) and slot 4 (turn cap) are filled without asking, once
 across the whole batch: the turn cap is `15 × number of issues`, and slot 3
@@ -201,6 +198,18 @@ included:
   issue (reason: stuck, with the failing output) and move on to the next
   issue. A raised turn cap is safe only because this stops a loop that has
   stopped converging.
+- In issue mode, the final turn re-runs every issue's verification command
+  and the goal is judged on that output (issues filed as stuck excepted,
+  listed by URL). A long loop compacts its transcript, so the evaluator may
+  no longer see the output an early issue produced; a single closing
+  re-run keeps every condition visible at once.
+- What the global CLAUDE.md or the `review-gate` skill already states (the
+  reviewer model choice, the medium/low tier criteria, `## Auto-fixed` in
+  the PR body) is named by reference in the statement, not restated, to
+  leave room for more issues. Restated in full because nothing else binds
+  them: the literal `model: sonnet`, the SendMessage fixup rule, the
+  no-ask merge, the needs-decision cap, the stuck rule, the per-turn
+  output, and the Follow-ups block.
 - The final turn shows a `## Follow-ups` block: `Auto-fixed:` one line per
   finding (`file:line`, numstat line, PR URL) and `Needs-decision:` one line
   per issue (URL, reason). The evaluator reads the transcript, not the PR
@@ -213,57 +222,59 @@ Build the statement on a single line from this template:
 
     /goal <task summary drawn from the user's stated goal>. Delegate the
     implementation to a subagent launched with model: sonnet, then have a
-    code-reviewer subagent (model per the review-gate skill: opus, or fable
-    for a security boundary or architectural decision) review the change;
-    send any review fixups back to that implementer via
-    SendMessage, and never Edit/Write code in the main loop; settle
-    medium/low findings by the review-gate skill tiers (auto-fix in the same PR,
-    listed under `## Auto-fixed` in the PR body; needs-decision as a
-    `needs-decision` issue with a decision note, created without asking, at
-    most 3 issues, the rest as a checklist in one parent issue); run
-    `<verification command>`[, `git diff --numstat -- <test glob>`][,
-    `git diff --stat`] and show their full output in the conversation
-    each turn; if the verification command fails the same way 3 turns in a
-    row, file the remaining work as a `needs-decision` issue with that
-    output; the goal is met when that output confirms <objective condition>
-    (or the work was filed as stuck), while [no line under <test glob> is
-    deleted][, changes stay within <scope>][, <constraints>] holds, and the
-    final turn shows a
-    `## Follow-ups` block listing each auto-fixed finding (`file:line`,
-    numstat line, PR URL) and each needs-decision issue (URL, reason); open
-    issues never block completion; once the reviewer approves, squash-merge
-    the PR via `gh pr merge --squash --delete-branch` without asking again;
-    or stop after <N> turns.
+    code-reviewer subagent review it per the review-gate skill (reviewer
+    model, medium/low tiers, `## Auto-fixed` in the PR body); send fixups
+    back to that implementer via SendMessage and never Edit/Write code in
+    the main loop; create needs-decision issues without asking, at most 3,
+    the rest as a checklist in one parent issue; once the reviewer
+    approves, squash-merge via `gh pr merge --squash --delete-branch`
+    without asking; run `<verification command>`[, `git diff --numstat --
+    <test glob>`][, `git diff --stat`] and show their full output each
+    turn; if the verification command fails the same way 3 turns in a
+    row, file the remaining work as a needs-decision issue with that
+    output; the goal is met when that output confirms <objective
+    condition> (or the work was filed as stuck), while [no line under
+    <test glob> is deleted][, changes stay within <scope>][,
+    <constraints>] holds, and the final turn shows a `## Follow-ups` block
+    listing each auto-fixed finding (`file:line`, numstat line, PR URL)
+    and each needs-decision issue (URL, reason); open issues never block
+    completion; or stop after <N> turns.
 
-In issue mode, list each issue as its own named clause instead of one task
-summary, and join the per-issue completion conditions with "and":
+In issue mode, name the issues by number only (no titles), state the
+decided designs once, and group the checks by command:
 
-    /goal Resolve issue #<N1> (<title1>[, decided: <decision1>]) and issue
-    #<N2> (<title2>[, decided: <decision2>]) [...].
-    Delegate each implementation to a subagent launched with model: sonnet,
-    then have a code-reviewer subagent (model per the review-gate skill:
-    opus, or fable for a security boundary or architectural decision) review
-    each change; send any review fixups back to that implementer via
-    SendMessage, and never Edit/Write code in the main loop; settle
-    medium/low findings by the review-gate skill tiers (auto-fix in the same PR,
-    listed under `## Auto-fixed` in the PR body; needs-decision as a
-    `needs-decision` issue with a decision note, created without asking, at
-    most <3 × number of issues> issues, the rest as a checklist in one
-    parent issue); for #<N1>, run `<verification command 1>`; for #<N2>, run
-    `<verification command 2>` [...][; also run `git diff --numstat --
-    <test glob>`][ and `git diff --stat`]; show full output each turn; if an
-    issue's command fails the same way 3 turns in a row, file its remaining
-    work as a `needs-decision` issue with that output and move on to the
-    next issue. The goal is met when every issue's output confirms its own
-    condition (or its work was filed as stuck), while [no line under
-    <test glob> is deleted][, changes stay within <union of scopes>][, for
-    #<N>, <constraint>] holds, and the final turn shows a
-    `## Follow-ups` block listing each
-    auto-fixed finding (`file:line`, numstat line, PR URL) and each
-    needs-decision issue (URL, reason); open issues never block completion;
-    once the reviewer approves a PR, squash-merge it via
-    `gh pr merge --squash --delete-branch` without asking again; or stop
-    after <N> turns.
+    /goal Resolve issues #<N1> #<N2> [...] in this order[, with these
+    decided designs: #<Na>: <decision a>; #<Nb>: <decision b>]. For each
+    issue, delegate the implementation to a subagent launched with model:
+    sonnet, then have a code-reviewer subagent review it per the
+    review-gate skill (reviewer model, medium/low tiers, `## Auto-fixed`
+    in the PR body); send fixups back to that implementer via SendMessage
+    and never Edit/Write code in the main loop; create needs-decision
+    issues without asking, at most <3 × number of issues>, the rest as a
+    checklist in one parent issue; once the reviewer approves, squash-merge
+    via `gh pr merge --squash --delete-branch` without asking. Checks (each
+    must exit 0 unless a condition is given): `<command A>` for #<N1>
+    #<N3> [...]; `<command B>` <condition B> for #<N2>[; ...][; also run
+    `git diff --numstat -- <test glob>`][ and `git diff --stat`], and show
+    all of their full output each turn. If an issue's check fails the same
+    way 3 turns in a row, file its remaining work as a needs-decision
+    issue with that output and move on to the next issue. The goal is met
+    when the final turn re-runs every check and its output confirms each
+    issue's condition (issues filed as stuck excepted, listed by URL),
+    while [no line under <test glob> is deleted][, changes stay within
+    <union of scopes>][, for #<N>, <constraint>] holds, and the final turn
+    shows a `## Follow-ups` block listing each auto-fixed finding
+    (`file:line`, numstat line, PR URL) and each needs-decision issue
+    (URL, reason); open issues never block completion; or stop after <N>
+    turns.
+
+Check grouping: issues whose verification command and completion
+condition are identical share one entry, listed in the order the command
+first appears in the batch. A condition that is exactly "the command exits
+0" is left implicit by the "each must exit 0" clause; any other condition
+(an output string, a metric threshold) is written right after its command.
+The decided-designs clause lists only issues whose Decision is not `none`;
+drop it when none has one.
 
 Rules:
 - Single line, no line breaks, at most 4,000 characters. If over, tighten
@@ -277,8 +288,8 @@ Rules:
   `printf` has no catalog row.
   The count includes `/goal ` and the trailing newline, so it is slightly conservative; it
   passes at 4,000 or less. Show the count next to the draft. Over 4,000:
-  tighten wording (shorter per-issue clauses, titles abbreviated, not
-  removed) and re-run. Still over in issue mode: ask via `AskUserQuestion`
+  tighten wording (shorter decisions and conditions, merged check entries;
+  never a dropped Decision, check, or constraint) and re-run. Still over in issue mode: ask via `AskUserQuestion`
   "Split (Recommended)": cover the longest leading run of issues that fits
   and list the rest as follow-up `/mkgoal #...` lines outside the final
   code block; or "Tighten further" with the user's guidance. Never present
@@ -294,15 +305,17 @@ Rules:
   it and instructs showing its output each turn too.
 - The task summary states what to achieve. The statement doubles as Claude's
   first-turn directive.
-- The standard-constraint, sonnet/reviewer/squash-merge, review-tier,
-  stuck-rule, and Follow-ups clauses from Standing implementation pattern
-  above are always included verbatim in intent. Never drop them for
-  brevity. The one exception is a `dotfiles` or `ops` target: those repos
-  commit straight to main with no review gate, and their config/doc edits
-  stay in the main loop (global CLAUDE.md, Workflow and Model behavior), so
-  replace the sonnet/reviewer/squash-merge and review-tier clauses with
+- The standard-constraint, sonnet/reviewer/squash-merge, review-gate
+  reference, needs-decision cap, stuck-rule, final re-run (issue mode), and
+  Follow-ups clauses from Standing implementation pattern above are always
+  included verbatim in intent. Never drop them for brevity. The one
+  exception is a `dotfiles` or `ops` target: those repos commit straight
+  to main with no review gate, and their config/doc edits stay in the main
+  loop (global CLAUDE.md, Workflow and Model behavior), so replace the
+  sonnet/reviewer/squash-merge and review-gate reference clauses with
   "edit in the main loop, commit to main and push after each issue"; keep
-  the standard-constraint, stuck-rule, and Follow-ups clauses.
+  the standard-constraint, needs-decision cap, stuck-rule, final re-run,
+  and Follow-ups clauses.
 
 *Done:* single-line checkable `/goal` statement drafted from template, `wc -m` ≤ 4,000.
 

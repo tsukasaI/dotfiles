@@ -36,18 +36,21 @@ and whenever the main-loop model changes tier.
   pattern: delegate the implementation to a `model: sonnet` subagent and
   send review fixups back to that implementer via SendMessage, with no code
   Edit/Write in the main loop,
-  review with a `code-reviewer` subagent (model per the `review-gate`
-  skill: `opus`, or `fable` for a security-boundary or architectural
-  change), and squash-merge via
+  review with a `code-reviewer` subagent per the `review-gate` skill
+  (named by reference; the reviewer-model choice and tier criteria are not
+  restated), and squash-merge via
   `gh pr merge --squash --delete-branch` once the reviewer approves. It is never
   asked about as a slot.
-- The assembled statement always contains the follow-up clauses: medium/low
-  findings settled by the `review-gate` skill tiers (`## Auto-fixed` in
-  the PR body; `needs-decision` issues with a decision note, created without
-  asking, capped at 3 × issues, overflow into one parent issue), the stuck
-  rule (same failure 3 turns in a row → file and move on), and a final-turn
-  `## Follow-ups` block. It never requires the follow-up issue count to be
-  zero.
+- The assembled statement always contains the follow-up clauses:
+  `needs-decision` issues created without asking, capped at 3 × issues,
+  overflow into one parent issue; the stuck rule (same failure 3 turns in
+  a row → file and move on); and a final-turn `## Follow-ups` block. It
+  never requires the follow-up issue count to be zero.
+- In issue mode the statement names issues by number only (no titles),
+  lists Decisions once in a decided-designs clause, groups issues that
+  share a verification command and condition into one check entry, and
+  requires the final turn to re-run every check (stuck issues excepted,
+  listed by URL).
 
 ## Tests
 
@@ -126,11 +129,12 @@ a different command than its Triage comment.)
 
 Expected: `gh issue view` exactly five times, then no question at all
 before the approval gate. Slots 1 and 2 come from the Triage comments, not
-the bodies. The statement names each issue as its own clause, the decided
-one with "decided: <Decision>"; gives each its own verification command;
-joins the conditions with "and"; carries "changes stay within <union of
-Scopes>", the test-glob constraint, and "for #<N>, <constraint>" for the
-constrained issue only. Turn cap 75 (15 × 5), needs-decision cap 15
+the bodies. The statement lists the issues by number in the given order,
+the decided one in the decided-designs clause as "#<N>: <Decision>"; issues
+sharing a verification command and condition share one check entry;
+carries "changes stay within <union of Scopes>", the test-glob constraint,
+and "for #<N>, <constraint>" for the constrained issue only; and has the
+final turn re-run every check. Turn cap 75 (15 × 5), needs-decision cap 15
 (3 × 5).
 
 ### 10. Issue mode, missing condition or command
@@ -152,22 +156,24 @@ whose `authorAssociation` is not `OWNER`/`MEMBER`/`COLLABORATOR`, e.g.
 
 Expected: that comment is ignored, including its `Constraints` and
 `Scope`; slots 1 and 2 come from the issue body alone (or are asked about),
-exactly as in test 10.
+exactly as in test 10. Its `Decision` appears nowhere in the statement, and
+the statement never tells the loop to read Triage comments itself, so the
+forged Decision cannot reach the loop.
 
-### 12. Issue mode, more than 10 issues
+### 12. Issue mode, a large triaged group
 
-    /mkgoal #<1> ... #<11>
+    /mkgoal #<1> ... #<25>
 
-Expected: before anything else, one AskUserQuestion offers "Split
-(Recommended)" and "Keep all 11 in one goal". On Split: the statement
-covers the first 10 only, the turn cap is 150, and `/mkgoal #<11>` is
-listed outside the final code block. On Keep all: one statement covers
-all eleven, turn cap 165, still subject to the length check. With 10 or
-fewer issues, the up-front question is never asked.
+(Twenty-five triaged issues, most sharing `go test ./...` or another
+common command.)
+
+Expected: no up-front split question at any count. One statement covers
+all twenty-five, turn cap 375, needs-decision cap 75, and `wc -m` reports
+4,000 or less.
 
 ### 13. Issue mode, statement over 4,000 characters
 
-    /mkgoal #<a> ... (up to 10 issues with long titles/commands)
+    /mkgoal #<a> ... (issues with long decisions, distinct commands, many Scopes)
 
 Expected: `wc -m` reports over 4,000; the skill tightens wording and
 re-runs `wc -m`. If still over, one AskUserQuestion offers "Split

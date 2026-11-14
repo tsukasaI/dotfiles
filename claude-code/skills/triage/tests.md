@@ -20,8 +20,9 @@ on a scratch repo, not on a backlog you care about.
   reading `undecided`, and the date taken from `date +%F`.
 - The final output lists the `go` issues in work order, one line per
   group, followed by at most one pointer line to `/mkgoal`; the skill
-  never runs `/mkgoal` or `/goal`. Every group holds 5–10 issues, except
-  when fewer than 5 issues are `go` or a dependency unit alone exceeds 10.
+  never runs `/mkgoal` or `/goal`. With T `go` issues there are ceil(T / 30)
+  groups of near-equal size; a group passes 30 only when whole dependency
+  units force it.
 
 ## Tests
 
@@ -84,14 +85,15 @@ anywhere in the transcript.
 Run three backlogs of `go`-worthy issues:
 
 - (a) Seven independent issues.
-- (b) Thirteen issues: a chain of four where each depends on the previous
-  one, plus nine independent issues.
-- (c) Twelve issues forming one dependency chain.
+- (b) Forty issues: a chain of four where each depends on the previous
+  one, plus thirty-six independent issues.
+- (c) Thirty-five issues forming one dependency chain.
 
 Expected: (a) one group of 7, not seven groups of 1. (b) two groups of
-near-equal size (7 + 6 or 6 + 7), the chain of four kept whole inside one
-group in dependency order. (c) one group of 12, not split. Hand off lines
-match each Triage comment's `Group: G<n> (order <k>)`.
+near-equal size (20 + 20, or as close as the whole chain allows), the
+chain of four kept whole inside one group in dependency order. (c) one
+group of 35, not split. Hand off lines match each Triage comment's
+`Group: G<n> (order <k>)`.
 
 ### 8. Fan-out above 5 issues
 

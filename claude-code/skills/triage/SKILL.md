@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Organizes the open GitHub issues in the current repo and settles their direction. Reads the code each issue touches (fanning out to sonnet Explore agents when the backlog is large) and proposes one board covering stale issues, duplicates to merge, groups of 5–10 issues sized for one /goal loop each, and work order. The user approves or revises the board in one step, then settles every open technical call (design option, completion condition, verification command, change-specific constraint). Records each "go" issue's decision, completion condition, verification command, scope, and constraints as a structured Triage comment on the issue, so /mkgoal needs no further technical questions. Use when reviewing the backlog or deciding what to build next. Ends with the go issues in work order, one line per group.
+description: Organizes the open GitHub issues in the current repo and settles their direction. Reads the code each issue touches (fanning out to sonnet Explore agents when the backlog is large) and proposes one board covering stale issues, duplicates to merge, groups of up to about 30 issues sized for one /goal loop each, and work order. The user approves or revises the board in one step, then settles every open technical call (design option, completion condition, verification command, change-specific constraint). Records each "go" issue's decision, completion condition, verification command, scope, and constraints as a structured Triage comment on the issue, so /mkgoal needs no further technical questions. Use when reviewing the backlog or deciding what to build next. Ends with the go issues in work order, one line per group.
 disable-model-invocation: true
 argument-hint: (none, scans the current repo)
 allowed-tools: Bash, Read, Grep, Glob, Write, AskUserQuestion, Agent
@@ -25,7 +25,8 @@ and the whole backlog in view, and leaves the answers on each issue in
 GitHub, where any later step (`/mkgoal`, or a human picking an issue by
 hand) can read them. Every technical call is made here, so `/mkgoal` only
 assembles; and groups are sized for one long-running `/goal` loop each
-(5–10 issues), since a loop for a single issue is rarely worth starting.
+(up to about 30 issues), since a loop for a single issue is rarely worth starting
+and the backlog should mostly clear in as few loops as possible.
 
 ## Scan
 
@@ -109,12 +110,14 @@ Grouping (for `go` issues only), one group per `/goal` loop:
 
 1. Units: issues that depend on each other or touch the same code form one
    unit, in dependency order. A unit is never split across groups.
-2. Packing: with T `go` issues, make ceil(T / 10) groups of near-equal
-   size (13 → 7 + 6, 21 → 7 + 7 + 7), filling them with whole units in
-   work order, so every group holds 5–10 issues. When whole units make an
-   exact split impossible, stay as close to equal as they allow.
-3. With T < 5, all `go` issues form G1. A unit larger than 10 forms its own
-   group; `/mkgoal` asks about splitting it.
+2. Packing: with T `go` issues, make ceil(T / 30) groups of near-equal
+   size (with T ≤ 30 a single G1; 40 → 20 + 20; 70 → 24 + 23 + 23),
+   filling them with whole units in work order. 30 is a soft guide, not a
+   hard cap: when whole units make an exact split impossible, stay as close
+   to equal as they allow, even if a group goes slightly past 30.
+3. A unit larger than 30 forms its own group. The binding limit is the
+   4,000-character `/goal` statement, not the count: `/mkgoal` measures it
+   and splits a group that does not fit.
 
 Name groups `G1`, `G2`, ... in work order.
 
@@ -223,7 +226,7 @@ skill's output. Do not draft a goal statement.
 |---|---|
 | "古そうだから stale で閉じよう" | stale にするのはコードに解決済みの根拠 (`file:line`) がある時だけ。古さは根拠にならない。 |
 | "同じファイルを触るから重複だ" | 重複は同じコードへの同じ変更を求めている時だけ。ファイルが重なるだけなら同じグループにまとめる。 |
-| "独立した issue は1件ずつ別グループにしよう" | 1 issue の /goal はほぼ使わない。独立していても作業順に詰めて 5〜10 件のグループにする。依存単位だけは割らない。 |
+| "独立した issue は1件ずつ別グループにしよう" | 1 issue の /goal はほぼ使わない。独立していても作業順に詰めて最大 30 件程度のグループにする。依存単位だけは割らない。 |
 | "決めきれないから undecided で go にしておこう" | go は全部決まった状態で出す。決められないなら「Move to schedule」。/mkgoal に技術判断を残さない。 |
 | "制約を書いておいた方が安全だ" | テスト削除禁止と Scope 外禁止は /mkgoal が毎回自動で入れる。Constraints にはその変更だけに効くものを、本文かコードに根拠がある時だけ書く。 |
 | "選択肢を増やした方が親切だ" | 選択肢はすべて本文かコードに根拠を持つこと。根拠のない選択肢は作らない。 |
