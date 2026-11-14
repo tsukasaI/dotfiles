@@ -48,8 +48,10 @@ want=$(expected)
 
 # setup.sh refuses a manifest without the coding-guidelines pin; catch an
 # untracked or deleted pin file here instead of in a cloud session.
+# Not grep on a here-string: bash backs <<< with a temp file, which the
+# sandbox refuses inside a commit hook, so the check would misreport the pin.
 for f in cloud/coding-guidelines.ref cloud/coding-guidelines.sha256; do
-  grep -q "  $f\$" <<<"$want" || {
+  [[ $'\n'$want$'\n' == *"  $f"$'\n'* ]] || {
     echo "FAIL claude-code/$f is not tracked; git add it, then run --write" >&2
     exit 1
   }
