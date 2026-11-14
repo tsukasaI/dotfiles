@@ -300,6 +300,9 @@ case_ "date -u +format"                  'date -u +%F'                         a
 case_ "date -s"                          'date -s 12:00'                       deny "the date row lists only -u"
 case_ "date -r file"                     'date -r x'                           deny "-r reads a file's mtime"
 case_ "date two operands"                'date +%A extra'                      deny "one operand only"
+case_ "sha256sum paths"                  'sha256sum -- skills/mkgoal/SKILL.md' allow "the sha256sum row: paths only"
+case_ "sha256sum -c"                     'sha256sum -c cloud/manifest.sha256'  deny "-c reads paths from a file's contents"
+case_ "sha256sum credential"             'sha256sum .env'                      deny "path operands still hit the target rules"
 case_ "gh auth status"                   'gh auth status'                      deny "gh auth stays out on purpose"
 case_ "gh auth status --show-token"      'gh auth status --show-token'         deny
 case_ "gh ssh-key add"                   'gh ssh-key add k.pub'                deny

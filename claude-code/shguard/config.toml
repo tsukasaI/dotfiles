@@ -1201,3 +1201,46 @@ source = "https://github.com/tsukasaI/dotfiles/blob/main/nix-darwin/dream-extrac
 order = "strict"
 dashdash = "literal"
 rest = "inert"
+
+# Not -c/--check: it reads the paths to hash from a file's contents, which the
+# per-path target rules never see.
+[[row]]
+key = ["sha256sum"]
+source = "https://www.gnu.org/software/coreutils/manual/html_node/sha2-utilities.html"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+rest = "path"
+
+[[rule]]
+id = "dotfiles-secret-read-sha256sum"
+key = ["sha256sum"]
+outcome = "block"
+targets = [
+  { pat = ".env", kind = "component" },
+  { pat = ".envrc", kind = "component" },
+  { pat = ".env.", kind = "component_prefix" },
+  { pat = ".env-", kind = "component_prefix" },
+  { pat = ".env_", kind = "component_prefix" },
+  { pat = ".ssh", kind = "component" },
+  { pat = ".gnupg", kind = "component" },
+  { pat = ".aws", kind = "component" },
+  { pat = ".kube", kind = "component" },
+  { pat = ".docker", kind = "component" },
+  { pat = ".config/gh", kind = "component" },
+  { pat = ".config/gcloud", kind = "component" },
+  { pat = ".pi/agent/auth.json", kind = "component" },
+  { pat = ".claude.json", kind = "component" },
+  { pat = ".netrc", kind = "component" },
+  { pat = ".npmrc", kind = "component" },
+  { pat = ".pypirc", kind = "component" },
+  { pat = ".pgpass", kind = "component" },
+  { pat = ".zsh_history", kind = "component" },
+  { pat = ".bash_history", kind = "component" },
+  { pat = "id_rsa", kind = "component" },
+  { pat = "id_ed25519", kind = "component" },
+  { pat = "id_ecdsa", kind = "component" },
+  { pat = "id_dsa", kind = "component" },
+  { pat = "kubeconfig", kind = "component" },
+  { pat = "/Users/inouetsukasa/.claude", kind = "under" },
+]

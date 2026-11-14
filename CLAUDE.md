@@ -58,9 +58,14 @@ Claude Code on the web loads no `~/.claude` from this machine, so the
 environment's setup script installs the shared config instead. Details are in
 `claude-code/cloud/CLAUDE.md`, which loads when working under that directory.
 
-- After editing anything the manifest covers, have the user run
-  `! bash tests/cloud-manifest-sync.sh --write` before committing (shguard
-  has no `bash` row, so Claude can't); pre-commit and CI fail on drift.
+- After editing anything the manifest covers, update
+  `claude-code/cloud/manifest.sha256` before committing; pre-commit and CI
+  fail on drift. Claude can't run `--write` (shguard has no `bash` row, and
+  the sandbox write-protects `claude-code/`), so it runs `sha256sum --
+  claude-code/<path>` per changed file and Edits that line (paths in the
+  manifest are relative to `claude-code/`). A file added or removed changes
+  the line set: have the user run `! bash tests/cloud-manifest-sync.sh
+  --write` instead.
 
 ## Concepts
 
