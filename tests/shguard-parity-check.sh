@@ -249,7 +249,7 @@ case_ "rg on \$TMPDIR path"              'rg foo "$TMPDIR/x.log"'              d
 # ── interpreter variants (deltas #26 round 4) ─────────────────────────────
 case_ "node script"                      'node script.js'                      deny "no row for node"
 case_ "bun -e"                           "bun -e '1'"                          deny
-case_ "bun test"                         'bun test'                            deny "no row for bun"
+case_ "bun test"                         'bun test'                            deny "bun is a runs_code head: a row keeps it an Ask"
 case_ "deno eval"                        "deno eval '1'"                       deny
 case_ "perl -E"                          "perl -E 'say 1'"                     deny
 case_ "python3.12 -c"                    "python3.12 -c 'print(1)'"            deny
@@ -421,7 +421,14 @@ case_ "dream-extract relative path head" './dream-extract list'                d
 case_ "dream driver via bash"            'bash nix-darwin/dream-extract/dream-extract.sh list' deny "only the wrapper has a row"
 case_ "mkdir dream backup"               'mkdir -p .claude/tmp-dream-backup/owner-text' deny "the wrapper creates it; .claude stays closed"
 case_ "fd session logs"                  'fd -e jsonl . /Users/inouetsukasa/.claude/projects/x' deny "the wrapper lists them; fd-ask-broad stays"
-case_ "jq filter on a file"              "jq -r '.name' package.json"          allow
+case_ "gitleaks git and dir"             'gitleaks git --redact && gitleaks dir . --redact' allow
+case_ "gitleaks git unredacted"          'gitleaks git'                        allow "accepted gap: a row cannot require --redact"
+case_ "gitleaks --no-redact"             'gitleaks git --no-redact'            deny "the row lists only --redact"
+case_ "gitleaks --report-path"           'gitleaks git --redact --report-path r.json' deny "writes a file"
+case_ "gitleaks -r"                      'gitleaks dir . --redact -r r.json'   deny "writes a file"
+case_ "gitleaks --config"                'gitleaks git --redact -c x.toml'     deny "reads another file"
+case_ "gitleaks detect"                  'gitleaks detect --redact'            deny "only git and dir have rows"
+case_ "jq filter on a file"            "jq -r '.name' package.json"          allow
 case_ "jq in a pipeline"                 'cat package.json | jq .name'         allow
 case_ "jq -f"                            'jq -f prog.jq x.json'                deny
 case_ "jq --rawfile"                     'jq --rawfile a /etc/passwd -n .'     deny

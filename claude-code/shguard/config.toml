@@ -1244,3 +1244,31 @@ targets = [
   { pat = "kubeconfig", kind = "component" },
   { pat = "/Users/inouetsukasa/.claude", kind = "under" },
 ]
+# --redact is listed but cannot be required (a row has no required option), so
+# bare `gitleaks git` also passes and prints unredacted findings; accepted by
+# the owner. Left out: -r/--report-path (writes a file), -c/--config and
+# --gitleaks-ignore-path (read other files), --log-opts (passes args to git).
+[[row]]
+key = ["gitleaks"]
+source = "https://github.com/gitleaks/gitleaks#usage"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+[[row]]
+key = ["gitleaks", "git"]
+source = "https://github.com/gitleaks/gitleaks#usage"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [{ long = "redact" }]
+
+[[row]]
+key = ["gitleaks", "dir"]
+source = "https://github.com/gitleaks/gitleaks#usage"
+cwd_sensitive = true
+order = "permute"
+dashdash = "ends"
+positionals = ["path"]
+opt = [{ long = "redact" }]
