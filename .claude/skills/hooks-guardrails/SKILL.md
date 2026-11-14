@@ -39,9 +39,14 @@ narrow first, widen only on evidence.
    Allow, and the user owns it. A `[[rule]]` (outcome `block` or `ask`) can
    only raise a decision and has no reason text, so its `id` is the reason.
    Heads like `find`, `sed`, `awk`, `bun`, `node`, `python*`, `sh`,
-   `env`, `xargs`, `sudo`, `ssh` have no row; 0.11 added one for `fd`, so
-   check upstream tsukasaI/shguard#1111 before assuming a head can never
-   get one. Match existing formatting and comments in the
+   `env`, `xargs`, `sudo`, `ssh` have no row, and a user row cannot add
+   one: they are shguard's `INEXPRESSIBLE_HEADS`, so a row for them fails
+   to load unless it sets `runs_code = true`, which keeps every command
+   under it an Ask (a refusal here). A config that fails to load denies
+   every Bash call system-wide, so a draft row for such a head locks the
+   session out (tsukasaI/shguard#1277 asks for an opt-in). 0.11 added a
+   row for `fd`, so check upstream tsukasaI/shguard#1111 before assuming a
+   head can never get one. Match existing formatting and comments in the
    surrounding `# ─────` section.
 
 3. **Write the rule narrowly.** Prefer a specific command shape over a broad
