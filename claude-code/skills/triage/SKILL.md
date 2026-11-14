@@ -32,11 +32,22 @@ and the backlog should mostly clear in as few loops as possible.
 
     gh issue list --state open --json number,title,body,labels,createdAt,url,comments
 
-If this returns zero issues, say so and stop; there is nothing to triage.
+If this returns zero issues and the notes scan below finds no unsettled
+note, say so and stop; there is nothing to triage.
 
 An issue that already carries a Triage comment (see Triage comment contract)
 is still re-triaged; mark it "triaged <date>" on the board so the user sees
 the earlier call, and note anything in the code that changed since.
+
+Also collect the review notes left on merged PRs (the `review-gate` skill's
+`## Not filed` section):
+
+    gh pr list --state merged --search "not-filed in:body" --limit 50 --json number,url,body,comments
+
+Keep only PRs whose body carries `<!-- not-filed:v1 -->` and that have no
+comment starting with `<!-- triage-notes:v1 -->` from an OWNER, MEMBER, or
+COLLABORATOR (an earlier triage already settled those). Each line under the
+heading is one note: severity, summary, `file:line`, options A/B.
 
 ## Analyze (read-only)
 
@@ -45,6 +56,10 @@ For each issue, read the code it concerns (Read/Grep/Glob) and determine:
 - **Status**: still valid / partly resolved / already resolved, with
   `file:line` evidence. "Already resolved" needs evidence in the code, not a
   guess from age.
+- **Severity**: critical / high / medium / low. Take the decision note's
+  `Severity` field; else a severity tag in the title (e.g. `[Medium]`);
+  else judge it from the code and give a one-line reason. Older
+  `needs-decision` issues predate the field, so most need the last two.
 - **Scope**: the files or directories a fix would touch.
 - **Depends on**: other open issues that must land first, or that touch the
   same code.
@@ -54,9 +69,10 @@ For each issue, read the code it concerns (Read/Grep/Glob) and determine:
   bug with one obvious fix has no design question; do not invent one.
   An issue labeled `needs-decision` whose body starts with
   `<!-- decision-note:v1 -->` (contract in the `review-gate` skill)
-  already states its question: take `Decide` as the design question and
-  `Options` as its options and recommendation, citing the note as their
-  grounding, then check them against the current code like any other. The
+  already states its question: take `Decide` as the design question,
+  `Options` as its options and recommendation, and `Severity` (when
+  present) as its severity, citing the note as their grounding, then check
+  them against the current code like any other. The
   label is the trust signal, since only collaborators can apply labels.
 - **Completion condition and verification command candidates**: an objective
   done-state and the command that would show it (`go test ./...`, a
@@ -74,7 +90,7 @@ For each issue, read the code it concerns (Read/Grep/Glob) and determine:
 **Fan-out**: with more than 5 open issues, split them across up to 3
 `Agent` calls (`subagent_type: Explore`, `model: sonnet`), launched in one
 message. Give each agent its issues' number, title, and body, and ask it to
-return exactly the six fields above per issue, with `file:line` evidence.
+return exactly the seven fields above per issue, with `file:line` evidence.
 Before using any agent's report, verify one load-bearing claim from it
 yourself (e.g. re-read the `file:line` it cites for an "already resolved"
 verdict).
@@ -83,7 +99,7 @@ Duplicate and overlap detection runs in the main loop over all results
 together: two issues are duplicates when they ask for the same change to the
 same code, not merely when they share a file.
 
-*Done:* every open issue has all six fields, and every agent report had one
+*Done:* every open issue has all seven fields, and every agent report had one
 claim verified.
 
 ## Board
@@ -98,13 +114,21 @@ Proposed action is exactly one of:
 - `go`: work on it now
 - `schedule`: keep it open, revisit later
 - `close: stale`: already resolved; the evidence column cites `file:line`
+- `close: keep as is`: a `needs-decision` issue whose recommended option is
+  to leave the code unchanged; closed with that decision recorded, no PR
 - `merge → #M`: duplicate; #M is the canonical issue that stays open
 
-Ordering: start from the label heuristic (a `priority:*`, `bug`, or
-`needs-decision` label outranks unlabeled or `enhancement`-only; within the
-same rank, older `createdAt` first), then adjust so every issue comes after
-the issues it depends on. `needs-decision` ranks with `bug` because those
-issues are follow-ups a `/goal` run left waiting on the user.
+Notes from merged PRs: a note of severity medium or above gets its own row,
+named `PR#<n> note <k>`, with action `file` (it becomes a new issue, which
+this board then treats like any other `go`/`schedule` row) or `drop`. Low
+notes default to `drop` and show as one row per PR with their count; the
+user can promote a single one through a revision.
+
+Ordering: severity first (critical > high > medium > low), then a
+`priority:*` or `bug` label over unlabeled or `enhancement`-only, then
+older `createdAt`; then adjust so every issue comes after the issues it
+depends on. The `needs-decision` label does not raise rank by itself: it
+marks where a question came from, not how much it matters.
 
 Grouping (for `go` issues only), one group per `/goal` loop:
 
@@ -171,6 +195,13 @@ The approved board is the user's explicit authorization for the action
 listed on each issue, scoped to that issue and that action only. Apply each:
 
 - **close: stale**: `gh issue close <N> --reason "not planned" --comment "<evidence, one line>"`
+- **close: keep as is**: `gh issue close <N> --reason "not planned" --comment "Decision: <kept option, one line>; alternative not taken: <option B, one line>"`
+- **file** (a PR note): `gh issue create --title "<note summary>" --label needs-decision --body-file <file>`,
+  the body a decision note (`review-gate` contract) with `Source: <PR URL>, note <k>`;
+  then apply that new issue's own `go`/`schedule` action as for any other row
+- **drop** and **file**, once per PR whose notes were on the board:
+  `gh pr comment <PR> --body-file <file>`, the body starting with
+  `<!-- triage-notes:v1 -->` and listing each note as `filed → #N` or `dropped`
 - **merge → #M**: first `gh issue comment <M> --body-file <file>` (what #N adds that #M lacks, or "nothing beyond #M"),
   then `gh issue close <N> --duplicate-of <M>`
 - **schedule**: `gh issue comment <N> --body "Scheduled: revisit later."`
@@ -196,6 +227,7 @@ verbatim:
     <!-- triage:v1 -->
     ## Triage YYYY-MM-DD
     - Group: G<n> (order <k>)
+    - Severity: <critical|high|medium|low>
     - Decision: <chosen option, one line | none>
     - Completion condition: <objective done-state>
     - Verification: `<command>`
@@ -240,11 +272,13 @@ skill's output. Do not draft a goal statement.
 - Agent use is limited to `subagent_type: Explore` with `model: sonnet`, at
   most 3 per run, for Analyze only.
 - Bash is scoped to `gh issue list`, `gh issue view`, `gh issue close`,
-  `gh issue comment`, and `date +%F`. Never `gh issue edit` or
+  `gh issue comment`, `gh issue create` (only for a `file` note),
+  `gh pr list` (only the notes scan), `gh pr comment` (only the
+  `triage-notes:v1` record), and `date +%F`. Never `gh issue edit` or
   `gh issue delete`, never touch already-closed issues, never any other
   command.
-- Never close or comment on an issue unless the approved board lists that
-  action for that issue.
+- Never close, create, or comment on an issue or PR unless the approved
+  board lists that action for it.
 - Never record a Decision, completion condition, verification command, or
   constraint the user did not pick or accept in Design (a candidate
   Analyze found unambiguously in the issue body or code is recorded without

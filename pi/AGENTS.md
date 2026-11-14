@@ -1,6 +1,6 @@
 # Global instructions (pi)
 
-<!-- distilled-from: claude-code/CLAUDE.md sha256:5d588fa4d13dff0d5aa8232af52e5004afc37744a3d2d6e88ad9ff6b85939af3 -->
+<!-- distilled-from: claude-code/CLAUDE.md sha256:6b3c65049150b581451340c69bf29118fd0bbe0a0c7b5668bc1c3e83660a2769 -->
 
 Source: `~/dotfiles/pi/AGENTS.md`, symlinked to `~/.pi/agent/AGENTS.md`.
 Distilled from `~/dotfiles/claude-code/CLAUDE.md`, keeping only the parts

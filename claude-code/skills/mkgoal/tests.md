@@ -30,8 +30,9 @@ and whenever the main-loop model changes tier.
 - The assembled statement always contains the standard constraints whose
   input exists: no deleted lines under the inferred test glob (with
   `git diff --numstat -- <glob>` shown each turn) and, when a Scope is
-  known, changes within it (with `git diff --stat`). The approval-gate
-  summary names the glob and Scope, or says none was found.
+  known, changes within it except doc/comment fixes listed under
+  `## Auto-fixed` (with `git diff --stat`). The approval-gate summary names
+  the glob and Scope, or says none was found.
 - The assembled statement always contains the standing implementation
   pattern: delegate the implementation to a `model: sonnet` subagent and
   send review fixups back to that implementer via SendMessage, with no code
@@ -39,18 +40,21 @@ and whenever the main-loop model changes tier.
   review with a `code-reviewer` subagent per the `review-gate` skill
   (named by reference; the reviewer-model choice and tier criteria are not
   restated), and squash-merge via
-  `gh pr merge --squash --delete-branch` once the reviewer approves. It is never
-  asked about as a slot.
+  `gh pr merge --squash --delete-branch` once the reviewer approves or the
+  PR is docs-only. It is never asked about as a slot.
 - The assembled statement always contains the follow-up clauses:
   `needs-decision` issues created without asking, capped at 3 × issues,
   overflow into one parent issue; the stuck rule (same failure 3 turns in
-  a row → file and move on); and a final-turn `## Follow-ups` block. It
+  a row → file and move on); the Unverified rule (a check refused by a
+  hook or the sandbox → nothing filed, `gh pr checks` shown, merge only if
+  CI passed that check); and a final-turn `## Follow-ups` block with
+  `Auto-fixed`, `Needs-decision`, `Not filed` and `Unverified` lines. It
   never requires the follow-up issue count to be zero.
 - In issue mode the statement names issues by number only (no titles),
   lists Decisions once in a decided-designs clause, groups issues that
   share a verification command and condition into one check entry, and
-  requires the final turn to re-run every check (stuck issues excepted,
-  listed by URL).
+  requires the final turn to re-run every check (stuck and Unverified
+  issues excepted, listed by URL).
 
 ## Tests
 
@@ -191,3 +195,12 @@ the statement says "no line under `**/*_test.go` is deleted" and shows
 `git diff --numstat -- **/*_test.go` each turn, without asking. Without
 one, that constraint is absent and the approval-gate summary says no test
 convention was found; no glob is guessed.
+
+### 15. dotfiles target
+
+Run test 2 in the `dotfiles` repo.
+
+Expected: the sonnet/reviewer/squash-merge and review-gate clauses are
+replaced by "edit in the main loop, commit to main and push after each
+issue"; the Unverified clause names no PR or CI and instead lists the
+refused command for the user under `Unverified:`.

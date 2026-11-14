@@ -6,7 +6,7 @@
 - Commit after each completed subtask; never start the next subtask while pre-commit fails — fix the check first. Bypass flags (`--no-verify`, `git push --force`, `--force-with-lease`) are hook-blocked; when force is genuinely needed, give me the `--force-with-lease` command.
 - Git workflow by repo:
   - `dotfiles` and `ops` → commit directly to main and push once a subtask is complete, no explicit "commit" instruction needed.
-  - Every other repo → NEVER commit to main: create a branch (`<type>/<short-slug>`), open a PR. Merge via `gh pr merge --squash --delete-branch` once the `code-reviewer` review approves (see the `review-gate` skill); if no review ran, or it did not approve, stop and wait for me to say so.
+  - Every other repo → NEVER commit to main: create a branch (`<type>/<short-slug>`), open a PR. Merge via `gh pr merge --squash --delete-branch` once the `code-reviewer` review approves (see the `review-gate` skill); if no review ran, or it did not approve, stop and wait for me to say so. Exception: a docs-only PR, as `review-gate` defines it, merges without review. A PR whose check the loop could not run merges only when CI ran that check and it passed.
 - Commit message format (Contextual Commits = Conventional Commits + structured body):
   ```
   <type>(<scope>): <description>

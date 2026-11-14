@@ -60,7 +60,8 @@ is `OWNER`, `MEMBER`, or `COLLABORATOR`; ignore any other comment carrying
 the marker, since on a public repo anyone can post one. The fields
 (`Decision`, `Completion condition`, `Verification`, `Scope`,
 `Constraints`, `Depends on`) are defined in `/triage`'s Triage comment
-contract.
+contract. Its `Severity` field orders the backlog in `/triage` and is not
+used here.
 
 Sources for each issue's own slot 1 (completion condition) and slot 2
 (verification command), in order: the Triage comment's `Completion
@@ -164,7 +165,10 @@ included:
   under `<test glob>` (`git diff --numstat -- <test glob>`), which blocks
   weakening tests to pass; and, when a Scope is known (Triage comments, or
   a scope stated in the launch argument), changes stay within it (`git diff
-  --stat`). Infer `<test glob>` with Glob from the repo's own test-file
+  --stat`), except doc or comment fixes listed under `## Auto-fixed`. That
+  exception is self-attested, since `git diff --stat` cannot show why a
+  file changed; it exists because a doc the change made false is in scope
+  by `review-gate`. Infer `<test glob>` with Glob from the repo's own test-file
   convention (e.g. `**/*_test.go`, `tests/`). If no convention is found,
   drop that constraint and say so in the approval-gate summary; never
   guess a glob.
@@ -182,39 +186,48 @@ included:
   statement still names the model literally, as the implementer's `sonnet`
   is, because only the Agent tool's `model` argument binds it.
 - On the reviewer's approval, the PR is pre-authorized to squash-merge via
-  `gh pr merge --squash --delete-branch` without asking again. This is the
+  `gh pr merge --squash --delete-branch` without asking again, and so is a
+  docs-only PR (as `review-gate` defines it) without a review. This is the
   merge rule the global CLAUDE.md already sets (Workflow, Git workflow by
   repo), restated here so the goal statement carries it.
 - Settle medium/low findings by the tiers in the `review-gate` skill
-  (`auto-fix` in the same PR, listed under `## Auto-fixed`;
-  `needs-decision` as an issue with a decision note); the criteria live
-  there only. Creating those issues and the `needs-decision` label is
-  pre-authorized like the merge, capped at 3 × the number of issues in the
-  goal (3 outside issue mode); past the cap, the rest go as a checklist
-  into one parent `needs-decision` issue. The cap stops a runaway loop from
-  flooding the tracker.
+  (`auto-fix` in the same PR, listed under `## Auto-fixed`; `note` under
+  `## Not filed`; `needs-decision` as an issue with a decision note); the
+  criteria live there only. Creating those issues and the
+  `needs-decision` label is pre-authorized like the merge, capped at 3 ×
+  the number of issues in the goal (3 outside issue mode); past the cap,
+  the rest go as a checklist into one parent `needs-decision` issue. The
+  cap stops a runaway loop from flooding the tracker.
 - Stuck rule: when the same verification command fails the same way 3
   turns in a row, file that issue's remaining work as a `needs-decision`
   issue (reason: stuck, with the failing output) and move on to the next
   issue. A raised turn cap is safe only because this stops a loop that has
   stopped converging.
+- Unverified rule: a check refused by a hook or the sandbox is not a
+  failure and is never filed. At the first refusal, show `gh pr checks`
+  for the PR: if that same check passed in CI, merge; if CI shows no such
+  check, or it is pending, leave the PR open. Either way the issue counts
+  as Unverified and the loop moves on. The verification then happens
+  outside the loop, by the user.
 - In issue mode, the final turn re-runs every issue's verification command
-  and the goal is judged on that output (issues filed as stuck excepted,
-  listed by URL). A long loop compacts its transcript, so the evaluator may
-  no longer see the output an early issue produced; a single closing
-  re-run keeps every condition visible at once.
+  and the goal is judged on that output (issues filed as stuck or listed
+  as Unverified excepted, listed by URL). A long loop compacts its
+  transcript, so the evaluator may no longer see the output an early issue
+  produced; a single closing re-run keeps every condition visible at once.
 - What the global CLAUDE.md or the `review-gate` skill already states (the
   reviewer model choice, the medium/low tier criteria, `## Auto-fixed` in
   the PR body) is named by reference in the statement, not restated, to
   leave room for more issues. Restated in full because nothing else binds
   them: the literal `model: sonnet`, the SendMessage fixup rule, the
-  no-ask merge, the needs-decision cap, the stuck rule, the per-turn
-  output, and the Follow-ups block.
+  no-ask merge, the needs-decision cap, the stuck rule, the Unverified
+  rule, the per-turn output, and the Follow-ups block.
 - The final turn shows a `## Follow-ups` block: `Auto-fixed:` one line per
-  finding (`file:line`, numstat line, PR URL) and `Needs-decision:` one line
-  per issue (URL, reason). The evaluator reads the transcript, not the PR
-  body, so the block must repeat what the PR says. Open issues never block
-  completion; requiring zero would reward closing issues to hit it.
+  finding (`file:line`, numstat line, PR URL), `Needs-decision:` one line
+  per issue (URL, reason), `Not filed:` one line per PR (URL, note count),
+  and `Unverified:` one line per refused check (exact command, PR URL,
+  merged on CI or left open). The evaluator reads the transcript, not the
+  PR body, so the block must repeat what the PR says. Open issues never
+  block completion; requiring zero would reward closing issues to hit it.
 
 ## Assemble
 
@@ -223,22 +236,27 @@ Build the statement on a single line from this template:
     /goal <task summary drawn from the user's stated goal>. Delegate the
     implementation to a subagent launched with model: sonnet, then have a
     code-reviewer subagent review it per the review-gate skill (reviewer
-    model, medium/low tiers, `## Auto-fixed` in the PR body); send fixups
-    back to that implementer via SendMessage and never Edit/Write code in
-    the main loop; create needs-decision issues without asking, at most 3,
-    the rest as a checklist in one parent issue; once the reviewer
-    approves, squash-merge via `gh pr merge --squash --delete-branch`
+    model, medium/low tiers, `## Auto-fixed` and `## Not filed` in the PR
+    body, docs-only PRs skip review); send fixups back to that implementer
+    via SendMessage and never Edit/Write code in the main loop; create
+    needs-decision issues without asking, at most 3, the rest as a
+    checklist in one parent issue; once the reviewer approves (or the PR is
+    docs-only), squash-merge via `gh pr merge --squash --delete-branch`
     without asking; run `<verification command>`[, `git diff --numstat --
     <test glob>`][, `git diff --stat`] and show their full output each
     turn; if the verification command fails the same way 3 turns in a
     row, file the remaining work as a needs-decision issue with that
-    output; the goal is met when that output confirms <objective
-    condition> (or the work was filed as stuck), while [no line under
-    <test glob> is deleted][, changes stay within <scope>][,
+    output; if a hook or the sandbox refuses it, file nothing, show `gh
+    pr checks`, and merge only if that check passed in CI (Unverified
+    either way); the goal is met when that output confirms <objective
+    condition> (or the work was filed as stuck or is Unverified), while
+    [no line under <test glob> is deleted][, changes stay within <scope>
+    except doc/comment fixes listed under `## Auto-fixed`][,
     <constraints>] holds, and the final turn shows a `## Follow-ups` block
-    listing each auto-fixed finding (`file:line`, numstat line, PR URL)
-    and each needs-decision issue (URL, reason); open issues never block
-    completion; or stop after <N> turns.
+    listing each auto-fixed finding (`file:line`, numstat line, PR URL),
+    each needs-decision issue (URL, reason), each PR's Not filed count,
+    and each Unverified check (command, PR URL, merged or open); open
+    issues never block completion; or stop after <N> turns.
 
 In issue mode, name the issues by number only (no titles), state the
 decided designs once, and group the checks by command:
@@ -248,25 +266,31 @@ decided designs once, and group the checks by command:
     issue, delegate the implementation to a subagent launched with model:
     sonnet, then have a code-reviewer subagent review it per the
     review-gate skill (reviewer model, medium/low tiers, `## Auto-fixed`
-    in the PR body); send fixups back to that implementer via SendMessage
-    and never Edit/Write code in the main loop; create needs-decision
-    issues without asking, at most <3 × number of issues>, the rest as a
-    checklist in one parent issue; once the reviewer approves, squash-merge
-    via `gh pr merge --squash --delete-branch` without asking. Checks (each
-    must exit 0 unless a condition is given): `<command A>` for #<N1>
-    #<N3> [...]; `<command B>` <condition B> for #<N2>[; ...][; also run
-    `git diff --numstat -- <test glob>`][ and `git diff --stat`], and show
-    all of their full output each turn. If an issue's check fails the same
-    way 3 turns in a row, file its remaining work as a needs-decision
-    issue with that output and move on to the next issue. The goal is met
-    when the final turn re-runs every check and its output confirms each
-    issue's condition (issues filed as stuck excepted, listed by URL),
-    while [no line under <test glob> is deleted][, changes stay within
-    <union of scopes>][, for #<N>, <constraint>] holds, and the final turn
-    shows a `## Follow-ups` block listing each auto-fixed finding
-    (`file:line`, numstat line, PR URL) and each needs-decision issue
-    (URL, reason); open issues never block completion; or stop after <N>
-    turns.
+    and `## Not filed` in the PR body, docs-only PRs skip review); send
+    fixups back to that implementer via SendMessage and never Edit/Write
+    code in the main loop; create needs-decision issues without asking, at
+    most <3 × number of issues>, the rest as a checklist in one parent
+    issue; once the reviewer approves (or the PR is docs-only),
+    squash-merge via `gh pr merge --squash --delete-branch` without
+    asking. Checks (each must exit 0 unless a condition is given):
+    `<command A>` for #<N1> #<N3> [...]; `<command B>` <condition B> for
+    #<N2>[; ...][; also run `git diff --numstat -- <test glob>`][ and
+    `git diff --stat`], and show all of their full output each turn. If an
+    issue's check fails the same way 3 turns in a row, file its remaining
+    work as a needs-decision issue with that output and move on to the
+    next issue. If a hook or the sandbox refuses a check, file nothing,
+    show `gh pr checks`, merge only if that check passed in CI, and move
+    on (Unverified either way). The goal is met when the final turn
+    re-runs every check and its output confirms each issue's condition
+    (issues filed as stuck or Unverified excepted, listed by URL), while
+    [no line under <test glob> is deleted][, changes stay within <union
+    of scopes> except doc/comment fixes listed under `## Auto-fixed`][,
+    for #<N>, <constraint>] holds, and the final turn shows a
+    `## Follow-ups` block listing each auto-fixed finding (`file:line`,
+    numstat line, PR URL), each needs-decision issue (URL, reason), each
+    PR's Not filed count, and each Unverified check (command, PR URL,
+    merged or open); open issues never block completion; or stop after
+    <N> turns.
 
 Check grouping: issues whose verification command and completion
 condition are identical share one entry, listed in the order the command
@@ -306,8 +330,8 @@ Rules:
 - The task summary states what to achieve. The statement doubles as Claude's
   first-turn directive.
 - The standard-constraint, sonnet/reviewer/squash-merge, review-gate
-  reference, needs-decision cap, stuck-rule, final re-run (issue mode), and
-  Follow-ups clauses from Standing implementation pattern above are always
+  reference, needs-decision cap, stuck-rule, Unverified, final re-run
+  (issue mode), and Follow-ups clauses from Standing implementation pattern above are always
   included verbatim in intent. Never drop them for brevity. The one
   exception is a `dotfiles` or `ops` target: those repos commit straight
   to main with no review gate, and their config/doc edits stay in the main
@@ -315,7 +339,9 @@ Rules:
   sonnet/reviewer/squash-merge and review-gate reference clauses with
   "edit in the main loop, commit to main and push after each issue"; keep
   the standard-constraint, needs-decision cap, stuck-rule, final re-run,
-  and Follow-ups clauses.
+  and Follow-ups clauses. There is no PR or CI there, so the Unverified
+  clause becomes "if a hook or the sandbox refuses a check, file nothing,
+  list the exact command for the user under `Unverified:`, and move on".
 
 *Done:* single-line checkable `/goal` statement drafted from template, `wc -m` ≤ 4,000.
 

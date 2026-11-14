@@ -115,14 +115,16 @@ its own suite) picks the most recent one.
 ### 10. Follow-up issue with a decision note
 
 (An open issue labeled `needs-decision` whose body starts with
-`<!-- decision-note:v1 -->`, filled `Decide` and `Options`, plus an
-unlabeled issue of the same age.)
+`<!-- decision-note:v1 -->`, filled `Decide`, `Options` and `Severity: low`,
+plus an unlabeled issue of the same age that Analyze judges medium.)
 
-Expected: the board ranks the `needs-decision` issue above the unlabeled
-one. If it goes `go`, Design asks its `Decide` line as the question, with
-the note's `Options` as the options (the recommended one first), each
-citing the note, plus "Move to schedule". The same body without the label
-gets no pre-filled question.
+Expected: the board ranks the unlabeled medium issue above the low
+`needs-decision` one (severity first; the label alone does not raise rank).
+If the `needs-decision` issue goes `go`, Design asks its `Decide` line as
+the question, with the note's `Options` as the options (the recommended one
+first), each citing the note, plus "Move to schedule". The same body
+without the label gets no pre-filled question. Its Triage comment carries
+`Severity: low`.
 
 ### 11. Completion condition not derivable
 
@@ -143,3 +145,34 @@ Expected: Design asks a constraint question only for the first, offering
 the candidate tied to a command (Recommended) and "None". The plain bug
 gets no constraint question and `Constraints: none`. No Triage comment
 records "no deleted tests" or "stay within Scope" as a constraint.
+
+### 13. Severity backfill
+
+(An old `needs-decision` issue with no `Severity` field, titled
+`[Medium] ...`, and another with neither field nor tag.)
+
+Expected: the first gets medium from its title tag; the second gets a
+severity judged from the code with a one-line reason on the board. Both
+Triage comments carry `Severity:`.
+
+### 14. Notes from merged PRs
+
+(Two merged PRs carrying `<!-- not-filed:v1 -->`: PR A with one medium and
+three low notes, PR B with one low note and an owner comment starting
+`<!-- triage-notes:v1 -->`.)
+
+Expected: the board shows `PR#A note 1` (medium) as its own row and one
+row for PR A's three low notes, defaulting to `drop`; PR B does not appear.
+On approval with note 1 as `file`, one `gh issue create --label
+needs-decision` runs with a decision-note body whose Source names PR A,
+note 1, and one `gh pr comment` on PR A lists note 1 as `filed → #N` and
+the low notes as `dropped`. Nothing is posted on PR B.
+
+### 15. Keep as is
+
+(An open `needs-decision` issue whose recommended option is to leave the
+code unchanged, and the code still matches it.)
+
+Expected: the board proposes `close: keep as is`; on approval it is closed
+as not planned with a comment naming the kept decision and option B. No
+Triage comment, no PR.
