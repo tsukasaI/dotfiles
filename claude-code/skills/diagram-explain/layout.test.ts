@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createHash } from "crypto";
 import { readFileSync } from "fs";
 import { join } from "path";
 import { layoutViews, wrapText, type NodeBox, type ViewLayout } from "./layout.ts";
@@ -19,6 +20,19 @@ const sizes = ["desktop", "phone"] as const;
 function laidOut(d: Diagram) {
   return layoutViews(d);
 }
+
+describe("vendor", () => {
+  const gitBlobSha = (bytes: Buffer) =>
+    createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
+
+  test.each([
+    ["elk.bundled.js", "fbebd45cfd9cd1fe10c5e5165e3ba16653e129bd"],
+    ["LICENSE.md", "91dd37eefbe62d3d9fb7a1e7e2c7a9a1e2cdcbcc"],
+  ])("%s matches the blob pin in vendor/README.md", (file, sha) => {
+    expect(gitBlobSha(readFileSync(join(HERE, "vendor", file)))).toBe(sha);
+    expect(readFileSync(join(HERE, "vendor", "README.md"), "utf8")).toContain(sha);
+  });
+});
 
 describe("layoutViews", () => {
   test.each(EXAMPLES)("%s: every drawn node and edge has coordinates and no two nodes overlap", async name => {
