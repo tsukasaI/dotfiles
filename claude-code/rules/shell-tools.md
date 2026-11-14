@@ -14,6 +14,7 @@ its `-x` form and absolute paths under `/Users` are refused.
   relative paths)
 - `ls` — one-level directory listing (no built-in)
 - `tokei .` — language-wise LOC; prefer over reading many files just to gauge size
+- `rg -n "\x{30e6}\x{30fc}\x{30b6}\x{30fc}" path`: a pattern with non-ASCII text (Japanese) is refused as a raw byte, but the same text written as `\x{...}` Unicode escapes passes; the path itself must still be ASCII
 
 ## Unsupported shell syntax is refused
 
