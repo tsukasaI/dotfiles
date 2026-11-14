@@ -239,6 +239,10 @@
         "~/.cache/claude-sandbox",
         "~/.cache/nix"
       ],
+      "allowRead": [
+        "~/engineer/cc-memory/.wrangler/state",
+        "~/engineer/staygreen/.wrangler/state"
+      ],
       "denyWrite": [
         "~/engineer/ops/scripts/check_career_consistency.py",
         "~/dotfiles/lefthook.yaml",
