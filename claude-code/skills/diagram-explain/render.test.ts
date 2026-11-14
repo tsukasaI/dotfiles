@@ -484,20 +484,16 @@ describe("c4 views", () => {
     ["oversize c4 tech", d => (node(d, "spa").c4.tech = "x".repeat(41)), "c4 needs a type"],
     ["oversize edge tech", d => (d.edges[0].tech = "x".repeat(41)), "edges[0]: tech must be text (<=40 chars)"],
     ["system in a container view", d => (d.views[1].items[1].node = "shop"), "type system is not allowed in a container view"],
-    ["container in a context view", d => d.views[0].items.push({ node: "spa", col: 3, row: 0 }), "type container is not allowed in a context view"],
+    ["container in a context view", d => d.views[0].items.push({ node: "spa" }), "type container is not allowed in a context view"],
     ["item node without c4", d => delete node(d, "customer").c4, "node customer needs a c4 type"],
     ["unknown item node", d => (d.views[0].items[0].node = "zz"), "views[0].items[0]: unknown node"],
-    ["node listed twice", d => d.views[0].items.push({ node: "shop", col: 3, row: 3 }), "node shop appears twice"],
-    ["two items in one cell", d => (d.views[0].items[1].col = 0), "another item already sits at col 0 row 1"],
-    ["col out of range", d => (d.views[0].items[0].col = 6), "col must be 0-5 and row 0-7"],
-    ["row out of range", d => (d.views[0].items[0].row = 8), "col must be 0-5 and row 0-7"],
+    ["node listed twice", d => d.views[0].items.push({ node: "shop" }), "node shop appears twice"],
     ["no items", d => (d.views[0].items = []), "items must be an array of 1-20"],
     ["bad level", d => (d.views[0].level = "component"), "level must be context or container"],
     ["container view without boundary", d => delete d.views[1].boundary, "boundary required in a container view"],
     ["context view with boundary", d => (d.views[0].boundary = { label: "b", nodes: ["shop"] }), "boundary is not allowed in a context view"],
     ["boundary node not in items", d => d.views[1].boundary.nodes.push("shop"), "boundary node shop is not in items"],
     ["boundary without label", d => (d.views[1].boundary.label = " "), "boundary needs a label"],
-    ["non-member inside the boundary box", d => (d.views[1].items[0].col = 3), "views[1]: customer sits inside the boundary box but is not one of its nodes"],
     ["zoom on a non-system node", d => (d.views[0].zoom.node = "customer"), "zoom.node must be a system node in items"],
     ["zoom to an unknown view", d => (d.views[0].zoom.view = "zz"), "zoom.view must be the id of a container c4 view"],
     ["zoom to a context view", d => (d.views[0].zoom.view = "context"), "zoom.view must be the id of a container c4 view"],
@@ -601,7 +597,7 @@ describe("main", () => {
     return path;
   };
 
-  test("writes the HTML under TMPDIR and reports mismatches", () => {
+  test("writes the HTML under TMPDIR and reports mismatches", async () => {
     const out = join(tmp, "out");
     const d = base();
     d.nodes[0].ref.excerpt = "function g() {";
@@ -610,7 +606,7 @@ describe("main", () => {
     const prev = process.env.TMPDIR;
     process.env.TMPDIR = out;
     try {
-      expect(main([json, "--root", repo], m => logs.push(m), () => {})).toBe(0);
+      expect(await main([json, "--root", repo], m => logs.push(m), () => {})).toBe(0);
     } finally {
       restoreTmpdir(prev);
     }
@@ -621,65 +617,65 @@ describe("main", () => {
     expect(logs).toContain("MISMATCH a src/a.ts:2");
   });
 
-  test("--out writes to the given path and creates its directory", () => {
+  test("--out writes to the given path and creates its directory", async () => {
     const target = join(tmp, "custom", "deep", "page.html");
     const logs: string[] = [];
-    expect(main([write("d2.json", base()), "--root", repo, "--out", target], m => logs.push(m), () => {})).toBe(0);
+    expect(await main([write("d2.json", base()), "--root", repo, "--out", target], m => logs.push(m), () => {})).toBe(0);
     expect(logs[0]).toBe(target);
     expect(readFileSync(target, "utf8")).toContain("<title>t</title>");
   });
 
-  test("without refs there is no refs line and --root is not consulted", () => {
+  test("without refs there is no refs line and --root is not consulted", async () => {
     const target = join(tmp, "norefs.html");
     const logs: string[] = [];
     const noRefs = full();
     delete noRefs.nodes[0].ref;
-    const code = main([write("ex.json", noRefs), "--root", join(tmp, "no-such-dir"), "--out", target], m => logs.push(m), () => {});
+    const code = await main([write("ex.json", noRefs), "--root", join(tmp, "no-such-dir"), "--out", target], m => logs.push(m), () => {});
     expect(code).toBe(0);
     expect(logs).toEqual([target]);
   });
 
-  test("options: extra validation, default mode and output dir name", () => {
+  test("options: extra validation, default mode and output dir name", async () => {
     const target = join(tmp, "opts.html");
     const d = base();
     d.nodes[0].deepDive = { category: "secrets", why: "w" };
     const json = write("opts.json", d);
 
-    expect(main([json, "--root", repo, "--out", target], () => {}, () => {})).toBe(1);
+    expect(await main([json, "--root", repo, "--out", target], () => {}, () => {})).toBe(1);
     expect(existsSync(target)).toBe(false);
 
     const opts = { defaultMode: "plan" as const };
-    expect(main([json, "--root", repo, "--out", target], () => {}, () => {}, opts)).toBe(0);
+    expect(await main([json, "--root", repo, "--out", target], () => {}, () => {}, opts)).toBe(0);
     expect(readFileSync(target, "utf8")).toContain('"mode":"plan"');
 
     const failures: string[] = [];
     const veto = { extraValidate: (_: unknown, errors: string[]) => void errors.push("vetoed") };
-    expect(main([json, "--root", repo, "--out", join(tmp, "veto.html")], () => {}, m => failures.push(m), { ...opts, ...veto })).toBe(1);
+    expect(await main([json, "--root", repo, "--out", join(tmp, "veto.html")], () => {}, m => failures.push(m), { ...opts, ...veto })).toBe(1);
     expect(failures[0]).toContain("- vetoed");
     expect(existsSync(join(tmp, "veto.html"))).toBe(false);
 
     expect(outputPath("s", { TMPDIR: "/x" }, "explain-plan")).toBe("/x/explain-plan/s/index.html");
   });
 
-  test("writes no HTML for broken JSON or an invalid diagram", () => {
+  test("writes no HTML for broken JSON or an invalid diagram", async () => {
     const out = join(tmp, "out-bad");
     const prev = process.env.TMPDIR;
     process.env.TMPDIR = out;
     try {
       const broken = join(tmp, "broken.json");
       writeFileSync(broken, "{");
-      expect(main([broken, "--root", repo], () => {}, () => {})).toBe(1);
-      expect(main([write("invalid.json", { ...base(), version: 1 }), "--root", repo], () => {}, () => {})).toBe(1);
+      expect(await main([broken, "--root", repo], () => {}, () => {})).toBe(1);
+      expect(await main([write("invalid.json", { ...base(), version: 1 }), "--root", repo], () => {}, () => {})).toBe(1);
     } finally {
       restoreTmpdir(prev);
     }
     expect(existsSync(out)).toBe(false);
   });
 
-  test("usage errors exit 2", () => {
-    expect(main([], () => {}, () => {})).toBe(2);
-    expect(main(["a.json", "--root"], () => {}, () => {})).toBe(2);
-    expect(main(["a.json", "--out"], () => {}, () => {})).toBe(2);
-    expect(main(["a.json", "b.json"], () => {}, () => {})).toBe(2);
+  test("usage errors exit 2", async () => {
+    expect(await main([], () => {}, () => {})).toBe(2);
+    expect(await main(["a.json", "--root"], () => {}, () => {})).toBe(2);
+    expect(await main(["a.json", "--out"], () => {}, () => {})).toBe(2);
+    expect(await main(["a.json", "b.json"], () => {}, () => {})).toBe(2);
   });
 });

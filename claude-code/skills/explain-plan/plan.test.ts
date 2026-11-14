@@ -92,25 +92,25 @@ describe("validatePlan", () => {
 });
 
 describe("main with the plan options", () => {
-  test("renders a plan, defaulting the mode to plan", () => {
+  test("renders a plan, defaulting the mode to plan", async () => {
     const d = base();
     delete d.mode;
     const json = join(tmp, "plan.json");
     writeFileSync(json, JSON.stringify(d));
     const target = join(tmp, "plan.html");
-    expect(main([json, "--root", repo, "--out", target], () => {}, () => {}, planOptions())).toBe(0);
+    expect(await main([json, "--root", repo, "--out", target], () => {}, () => {}, planOptions())).toBe(0);
     const html = readFileSync(target, "utf8");
     expect(html).toContain('"mode":"plan"');
   });
 
-  test("a plan without a ref on an existing node writes nothing", () => {
+  test("a plan without a ref on an existing node writes nothing", async () => {
     const d = base();
     delete d.nodes[0].ref;
     const json = join(tmp, "noref.json");
     writeFileSync(json, JSON.stringify(d));
     const target = join(tmp, "noref.html");
     const failures: string[] = [];
-    expect(main([json, "--root", repo, "--out", target], () => {}, m => failures.push(m), planOptions())).toBe(1);
+    expect(await main([json, "--root", repo, "--out", target], () => {}, m => failures.push(m), planOptions())).toBe(1);
     expect(failures[0]).toContain("plan mode requires a ref");
     expect(existsSync(target)).toBe(false);
   });

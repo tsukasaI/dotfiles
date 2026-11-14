@@ -223,9 +223,8 @@
 <script type="application/json" id="data">__DATA__</script>
 <script>
 "use strict";
-const { diagram: D, checks } = JSON.parse(document.getElementById("data").textContent);
+const { diagram: D, checks, layouts } = JSON.parse(document.getElementById("data").textContent);
 const SVG = "http://www.w3.org/2000/svg";
-const PAD = 30, TOP = 40, COL = 250, ROW = 100;
 const CATEGORY = {
   "input-validation": "外部入力の検証", auth: "認証・権限", secrets: "秘密情報", "process-exec": "シェル・プロセス実行",
   "guard-sandbox": "ガード・サンドボックス", crypto: "暗号", destructive: "破壊的操作",
@@ -431,95 +430,70 @@ function paint(e, st) {
   if (e.line) e.line.setAttribute("marker-end", `url(#${e.mk}-${tint})`);
 }
 
-// kind: the C4 "[Container: Go]" line; passing it also makes the label bold.
-function addNodeText(g, n, cx, top, H, perLine, maxLines, subPx, kind) {
-  const extra = (n.sub ? 1 : 0) + (kind ? 1 : 0);
-  const lines = wrap(n.label, perLine, Math.max(1, maxLines - extra));
-  const rows = lines.length + extra;
+function addNodeText(g, n, cx, top, H, perLine, maxLines, subPx) {
+  const lines = wrap(n.label, perLine, n.sub ? maxLines - 1 : maxLines);
+  const rows = lines.length + (n.sub ? 1 : 0);
   const rowY = i => top + H / 2 + (i - (rows - 1) / 2) * 14 + 4;
   lines.forEach((line, i) => {
     const t = svgEl("text", { x: cx, y: rowY(i), "text-anchor": "middle" });
-    if (kind) t.setAttribute("font-weight", "600");
     t.textContent = line;
     g.append(t);
   });
-  let at = lines.length;
-  for (const text of [kind, n.sub]) {
-    if (!text) continue;
-    const t = svgEl("text", { x: cx, y: rowY(at++), "text-anchor": "middle", class: "sub" });
-    t.textContent = fit(text, subPx);
+  if (n.sub) {
+    const t = svgEl("text", { x: cx, y: rowY(lines.length), "text-anchor": "middle", class: "sub" });
+    t.textContent = fit(n.sub, subPx);
     g.append(t);
   }
 }
 
-// col runs across on desktop and down on phones (the grid is transposed there); headers label the cols.
-// tall: C4 boxes carry three text rows, so they are higher and spaced further apart.
-function gridLayout(avail, { nCols, nRows, headers, tall }) {
-  if (!mq.matches) {
-    const W = 200, H = tall ? 84 : 60, step = tall ? 120 : ROW, top = headers.length > 0 ? TOP : PAD;
-    return {
-      W, H, perLine: 15, maxLines: tall ? 4 : 3,
-      pos: (col, row) => ({ x: PAD + col * COL, y: top + row * step }),
-      width: PAD * 2 + nCols * COL - (COL - W),
-      height: top + nRows * step + PAD,
-      labels: headers.map((text, i) => ({ x: PAD + i * COL + W / 2, y: 20, anchor: "middle", text })),
-    };
-  }
-  const M = 10, G = 8, H = tall ? 96 : 64, ROWH = H + 64, top = headers.length > 0 ? 28 : M;
-  const W = Math.max(64, Math.floor((avail - 2 * M - G * (nRows - 1)) / nRows));
-  return {
-    W, H, perLine: Math.max(3, Math.floor(W / 12)), maxLines: tall ? 5 : 4,
-    pos: (col, row) => ({ x: M + row * (W + G), y: top + col * ROWH }),
-    width: M * 2 + nRows * W + (nRows - 1) * G,
-    height: top + nCols * ROWH,
-    labels: headers.map((text, i) => ({ x: M, y: top - 10 + i * ROWH, anchor: "start", text })),
-  };
+// Text for a laid-out box: wrapping was done by layout.ts, which sized the box from the same lines.
+function addBoxText(g, b, cx, top, h) {
+  const bold = b.kind.length > 0;
+  const rows = [...b.lines.map(t => [t, false]), ...b.kind.map(t => [t, true]), ...b.sub.map(t => [t, true])];
+  const rowY = i => top + h / 2 + (i - (rows.length - 1) / 2) * 14 + 4;
+  rows.forEach(([text, muted], i) => {
+    const t = svgEl("text", { x: cx, y: rowY(i), "text-anchor": "middle" });
+    if (muted) t.setAttribute("class", "sub");
+    else if (bold) t.setAttribute("font-weight", "600");
+    t.textContent = text;
+    g.append(t);
+  });
 }
 
-// spec: L (gridLayout result), cells (node id -> {col, row}; only these nodes and the edges between them are
-// drawn), drawNode(g, n, x, y), under(svg) for a layer beneath the edges.
-function buildGrid(view, spec) {
-  const { L, cells, drawNode, under, showTech } = spec;
-  const { W, H } = L;
+// Coordinates come from layout.ts (ELK), computed once per width class: phones get their own layout, so a
+// resize only redraws when the breakpoint is crossed.
+function buildLaid(view, drawNode, under) {
+  const both = layouts[view.def.id];
+  const L = mq.matches ? both.phone : both.desktop;
   const mk = `arrow-${view.def.id}`;
   const svg = svgEl("svg", { width: L.width, height: L.height });
   addMarkers(svg, mk);
-  for (const l of L.labels) {
-    const t = svgEl("text", { x: l.x, y: l.y, "text-anchor": l.anchor, "font-weight": 600 });
-    t.textContent = l.text;
+  for (const h of L.headers) {
+    const t = svgEl("text", { x: h.x, y: h.y, "font-weight": 600 });
+    t.textContent = h.text;
     svg.append(t);
   }
-  const clip = (cx, cy, tx, ty) => {
-    const dx = tx - cx, dy = ty - cy;
-    if (dx === 0 && dy === 0) return [cx, cy];
-    const s = Math.min(Math.abs((W / 2) / (dx || 1e-9)), Math.abs((H / 2) / (dy || 1e-9)));
-    return [cx + dx * s, cy + dy * s];
-  };
   const shapes = new Map();
   const edgeLayer = svgEl("g");
   const nodeLayer = svgEl("g");
-  if (under) under(svg);
+  if (under) under(svg, L);
   svg.append(edgeLayer, nodeLayer);
 
   for (const e of edges) {
-    if (!cells.has(e.from) || !cells.has(e.to)) continue;
-    const a = L.pos(cells.get(e.from).col, cells.get(e.from).row), b = L.pos(cells.get(e.to).col, cells.get(e.to).row);
-    const [x1, y1] = clip(a.x + W / 2, a.y + H / 2, b.x + W / 2, b.y + H / 2);
-    const [x2, y2] = clip(b.x + W / 2, b.y + H / 2, a.x + W / 2, a.y + H / 2);
-    const len = Math.hypot(x2 - x1, y2 - y1) || 1;
-    const mx = (x1 + x2) / 2 - ((y2 - y1) / len) * 18, my = (y1 + y2) / 2 + ((x2 - x1) / len) * 18;
-    const d = `M${x1},${y1} Q${mx},${my} ${x2},${y2}`;
+    if (!Object.hasOwn(L.edges, e.id)) continue;
+    const route = L.edges[e.id];
+    const d = route.points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
     const g = svgEl("g", { class: `edge ${e.kind}` });
     const line = svgEl("path", { d, class: "line" });
-    const label = svgEl("text", { x: mx, y: my, "text-anchor": "middle" });
-    label.textContent = e.data;
     const title = svgEl("title");
     title.textContent = e.data;
-    g.append(title, line, svgEl("path", { d, class: "hit" }), label);
-    if (showTech && e.tech) {
-      const techLine = svgEl("text", { x: mx, y: my + 13, "text-anchor": "middle" });
-      techLine.textContent = `[${e.tech}]`;
-      g.append(techLine);
+    g.append(title, line, svgEl("path", { d, class: "hit" }));
+    if (route.label) {
+      route.label.lines.forEach((text, i) => {
+        const t = svgEl("text", { x: route.label.x + route.label.w / 2, y: route.label.y + 11 + i * 14, "text-anchor": "middle" });
+        t.textContent = text;
+        g.append(t);
+      });
     }
     g.addEventListener("click", () => select(e.id));
     edgeLayer.append(g);
@@ -527,14 +501,14 @@ function buildGrid(view, spec) {
   }
 
   for (const n of D.nodes) {
-    if (!cells.has(n.id)) continue;
-    const { x, y } = L.pos(cells.get(n.id).col, cells.get(n.id).row);
+    if (!Object.hasOwn(L.nodes, n.id)) continue;
+    const b = L.nodes[n.id];
     const g = svgEl("g", { class: `node ${n.kind}${n.deepDive ? " deep" : ""}` });
     const title = svgEl("title");
     title.textContent = n.label;
     g.append(title);
-    drawNode(g, n, x, y);
-    addBadge(g, n.id, x + W, y);
+    drawNode(g, n, b);
+    addBadge(g, n.id, b.x + b.w, b.y);
     g.addEventListener("click", () => select(n.id));
     nodeLayer.append(g);
     addShape(shapes, n.id, { g });
@@ -544,54 +518,29 @@ function buildGrid(view, spec) {
 }
 
 function buildStructure(view) {
-  const laneIndex = new Map(D.lanes.map((l, i) => [l.id, i]));
-  const cells = new Map(D.nodes.map(n => [n.id, { col: laneIndex.get(n.lane), row: n.order }]));
-  const L = gridLayout(canvas.clientWidth || 360, {
-    nCols: D.lanes.length,
-    nRows: Math.max(...D.nodes.map(n => n.order)) + 1,
-    headers: D.lanes.map(l => l.label),
-    tall: false,
-  });
-  buildGrid(view, {
-    L,
-    cells,
-    drawNode: (g, n, x, y) => {
-      g.append(svgEl("rect", { x, y, width: L.W, height: L.H, rx: 6 }));
-      addNodeText(g, n, x + L.W / 2, y, L.H, L.perLine, L.maxLines, L.W - 12);
-    },
+  buildLaid(view, (g, n, b) => {
+    g.append(svgEl("rect", { x: b.x, y: b.y, width: b.w, height: b.h, rx: 6 }));
+    addBoxText(g, b, b.x + b.w / 2, b.y, b.h);
   });
 }
 
-const C4_KIND = { person: "Person", system: "Software System", external: "External System", container: "Container", database: "Container", queue: "Container" };
-const kindLine = c4 => `[${C4_KIND[c4.type]}${c4.tech ? `: ${c4.tech}` : ""}]`;
-
 function buildC4(view) {
-  const { items, boundary, zoom } = view.def;
-  const cells = new Map(items.map(it => [it.node, { col: it.col, row: it.row }]));
-  const L = gridLayout(canvas.clientWidth || 360, {
-    nCols: Math.max(...items.map(it => it.col)) + 1,
-    nRows: Math.max(...items.map(it => it.row)) + 1,
-    headers: [],
-    tall: true,
-  });
-  const { W, H } = L;
-  const under = svg => {
+  const { boundary, zoom } = view.def;
+  const under = (svg, L) => {
     if (!boundary) return;
-    const at = boundary.nodes.map(id => L.pos(cells.get(id).col, cells.get(id).row));
-    const pad = mq.matches ? 6 : 14;
-    const x1 = Math.min(...at.map(p => p.x)) - pad, y1 = Math.min(...at.map(p => p.y)) - pad;
-    const x2 = Math.max(...at.map(p => p.x)) + W + pad, y2 = Math.max(...at.map(p => p.y)) + H + pad + 18;
-    svg.append(svgEl("rect", { x: x1, y: y1, width: x2 - x1, height: y2 - y1, rx: 10, class: "boundary" }));
-    const t = svgEl("text", { x: x1 + 8, y: y2 - 6, class: "boundary-label" });
+    const r = L.boundary;
+    svg.append(svgEl("rect", { x: r.x, y: r.y, width: r.w, height: r.h, rx: 10, class: "boundary" }));
+    const t = svgEl("text", { x: r.x + 8, y: r.y + r.h - 8, class: "boundary-label" });
     t.textContent = `${boundary.label} [Software System]`;
     svg.append(t);
   };
-  const drawNode = (g, n, x, y) => {
+  const drawNode = (g, n, b) => {
     const type = n.c4.type;
     g.classList.add(type === "external" ? "c4-ext" : "c4-int");
+    const { x, y, w: W, h: H } = b;
     const cx = x + W / 2;
     const shape = (tag, attrs) => g.append(svgEl(tag, { ...attrs, class: "shape" }));
-    let top = y, h = H, textPx = W - 16;
+    let top = y, h = H;
     if (type === "database") {
       const r = 8;
       shape("path", { d: `M${x},${y + r} v${H - 2 * r} a${W / 2},${r} 0 0 0 ${W},0 v${-(H - 2 * r)}` });
@@ -602,7 +551,6 @@ function buildC4(view) {
       const r = 10;
       shape("path", { d: `M${x + r},${y} h${W - 2 * r} a${r},${H / 2} 0 0 1 0,${H} h${-(W - 2 * r)} a${r},${H / 2} 0 0 1 0,${-H} z` });
       shape("ellipse", { cx: x + W - r, cy: y + H / 2, rx: r, ry: H / 2 });
-      textPx = W - 2 * r - 12;
     } else if (type === "person") {
       const head = 10;
       shape("rect", { x, y: y + head, width: W, height: H - head, rx: 6 });
@@ -610,8 +558,9 @@ function buildC4(view) {
       top = y + head;
       h = H - head;
     } else shape("rect", { x, y, width: W, height: H, rx: 6 });
-    addNodeText(g, n, cx, top, h, L.perLine, L.maxLines, textPx, kindLine(n.c4));
-    if (zoom && zoom.node === n.id) {
+    const zoomHere = zoom && zoom.node === n.id;
+    addBoxText(g, b, cx, top, zoomHere ? h - 14 : h);
+    if (zoomHere) {
       const t = svgEl("text", { x: x + W - 8, y: y + H - 6, "text-anchor": "end", class: "zoom" });
       t.textContent = "⤢ 中を見る";
       g.append(t);
@@ -621,7 +570,7 @@ function buildC4(view) {
       });
     }
   };
-  buildGrid(view, { L, cells, drawNode, under, showTech: true });
+  buildLaid(view, drawNode, under);
 }
 
 function buildSequence(view) {
@@ -1054,7 +1003,10 @@ window.addEventListener("resize", () => {
     laidOutWidth = canvas.clientWidth;
     const crossed = mq.matches !== laidOutMobile;
     laidOutMobile = mq.matches;
-    for (const view of views) if (["structure", "sequence", "c4"].includes(view.def.type)) BUILDERS[view.def.type](view);
+    for (const view of views) {
+      const laid = view.def.type === "structure" || view.def.type === "c4";
+      if (view.def.type === "sequence" || (laid && crossed)) BUILDERS[view.def.type](view);
+    }
     paintViews();
     if (crossed) {
       sheet.hidden = true;

@@ -34,8 +34,9 @@ The types and limits are in `render.ts`.
   events), not every function or class. Every edge's `data` names what flows.
 - `views` (1-4) pick the forms that fit the subject; every view shares the
   same nodes, cards and steps. Offer only the views the subject needs:
-  - `structure`: where things live. `lanes` are columns, `order` the row,
-    one node per cell; never give coordinates. System design starts here.
+  - `structure`: where things live. Placement is automatic (ELK); never give
+    coordinates. `lanes` group nodes into columns (rows on a phone) and
+    `order` hints the order inside a lane. System design starts here.
     `lanes`, `lane` and `order` are needed only with this view.
   - `sequence`: who calls whom, in time order. Pair it with `structure` when
     a new component's timing matters (an outbox: who writes it in which
@@ -101,11 +102,11 @@ The types and limits are in `render.ts`.
   `c4: { type, tech? }` (`person`, `system`, `external`, `container`,
   `database`, `queue`) and a `sub` saying what it is; containers, databases
   and queues carry `tech`. A view is `{ type: "c4", level: "context" |
-  "container", items: [{ node, col, row }] }`, placed on a grid (col 0-5,
-  row 0-7, one item per cell, no coordinates). `context` allows person,
+  "container", items: [{ node }] }`; placement is automatic, so list the
+  items in reading order and give no coordinates. `context` allows person,
   system and external; `container` allows person, container, database, queue
   and external, and needs `boundary: { label, nodes }` (the system's own
-  containers; no outside item may sit inside their bounding box). A context
+  containers; the layout draws the frame around exactly those). A context
   view's `zoom: { node, view }` opens the container view from the system.
   Only edges whose two ends are both items are drawn, so define the context
   edges (person to system) and the container edges (person to SPA)

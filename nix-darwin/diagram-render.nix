@@ -6,6 +6,9 @@ stdenvNoCC.mkDerivation {
     root = ../claude-code/skills;
     fileset = lib.fileset.unions [
       ../claude-code/skills/diagram-explain/render.ts
+      ../claude-code/skills/diagram-explain/layout.ts
+      ../claude-code/skills/diagram-explain/vendor/elk.bundled.js
+      ../claude-code/skills/diagram-explain/vendor/elk.bundled.d.ts
       ../claude-code/skills/diagram-explain/template.html
       ../claude-code/skills/explain-plan/plan.ts
     ];

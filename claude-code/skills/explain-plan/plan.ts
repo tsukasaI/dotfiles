@@ -44,4 +44,4 @@ export function planOptions(): MainOptions {
   };
 }
 
-if (import.meta.main) process.exit(main(process.argv.slice(2), console.log, console.error, planOptions()));
+if (import.meta.main) process.exit(await main(process.argv.slice(2), console.log, console.error, planOptions()));

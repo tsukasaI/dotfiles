@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "path";
 // Not read at run time next to import.meta.url: in the `bun build --compile` binary that is the
 // virtual /$bunfs root, so the files must be embedded.
 import template from "./template.html" with { type: "text" };
+import { layoutViews, type Layouts } from "./layout.ts";
 
 const CHANGES = ["added", "changed", "removed"] as const;
 
@@ -48,7 +49,7 @@ export type View = { id: string; type: (typeof VIEW_TYPES)[number]; title?: stri
   | {
       type: "c4";
       level: "context" | "container";
-      items: { node: string; col: number; row: number }[];
+      items: { node: string }[];
       boundary?: { label: string; nodes: string[] };
       zoom?: { node: string; view: string };
     }
@@ -315,8 +316,7 @@ function checkC4(
   const level = v.level === "context" || v.level === "container" ? v.level : undefined;
   if (level === undefined) errors.push(`${where}: level must be context or container`);
 
-  const cells = new Set<string>();
-  const placed = new Map<string, { col: number; row: number }>();
+  const placed = new Set<string>();
   if (!Array.isArray(v.items) || v.items.length < 1 || v.items.length > 20) errors.push(`${where}: items must be an array of 1-20`);
   else
     v.items.forEach((it, i) => {
@@ -328,11 +328,7 @@ function checkC4(
       else if (level !== undefined && !C4_LEVEL_TYPES[level].includes(type)) {
         errors.push(`${at}: type ${type} is not allowed in a ${level} view`);
       }
-      if (!isInt(it.col, 0, 5) || !isInt(it.row, 0, 7)) return void errors.push(`${at}: col must be 0-5 and row 0-7`);
-      const cell = `${it.col}/${it.row}`;
-      if (cells.has(cell)) errors.push(`${at}: another item already sits at col ${it.col} row ${it.row}`);
-      cells.add(cell);
-      placed.set(it.node, { col: it.col, row: it.row });
+      placed.add(it.node);
     });
 
   if (v.boundary === undefined) {
@@ -343,22 +339,8 @@ function checkC4(
     if (!isObj(b) || !isText(b.label, 60) || !Array.isArray(b.nodes) || b.nodes.length < 1) {
       errors.push(`${where}: boundary needs a label (<=60 chars) and a non-empty nodes array`);
     } else {
-      const members = new Set<string>();
       for (const id of b.nodes) {
         if (typeof id !== "string" || !placed.has(id)) errors.push(`${where}: boundary node ${String(id)} is not in items`);
-        else members.add(id);
-      }
-      const at = [...members].map(id => placed.get(id)!);
-      if (at.length > 0) {
-        const box = {
-          col: [Math.min(...at.map(p => p.col)), Math.max(...at.map(p => p.col))],
-          row: [Math.min(...at.map(p => p.row)), Math.max(...at.map(p => p.row))],
-        };
-        for (const [id, p] of placed) {
-          if (!members.has(id) && p.col >= box.col[0] && p.col <= box.col[1] && p.row >= box.row[0] && p.row <= box.row[1]) {
-            errors.push(`${where}: ${id} sits inside the boundary box but is not one of its nodes`);
-          }
-        }
       }
     }
   }
@@ -728,12 +710,12 @@ export function embedJson(value: unknown): string {
 const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
-export function renderHtml(diagram: Diagram, checks: RefCheck[], template: string): string {
+export function renderHtml(diagram: Diagram, checks: RefCheck[], template: string, layouts: Layouts = {}): string {
   for (const marker of ["__DATA__", "__TITLE__"]) {
     if (template.split(marker).length !== 2) throw new Error(`template must contain ${marker} exactly once`);
   }
   const fill: Record<string, string> = {
-    __DATA__: embedJson({ diagram, checks }),
+    __DATA__: embedJson({ diagram, checks, layouts }),
     __TITLE__: escapeHtml(diagram.title),
   };
   // One pass with a function replacer: a string replacement would expand $& and $' found in the
@@ -768,7 +750,7 @@ function takeFlag(args: string[], name: string): string | undefined | null {
   return value;
 }
 
-export function main(argv: string[], log = console.log, fail = console.error, opts: MainOptions = {}): number {
+export async function main(argv: string[], log = console.log, fail = console.error, opts: MainOptions = {}): Promise<number> {
   const args = [...argv];
   const root = takeFlag(args, "--root");
   const outFlag = takeFlag(args, "--out");
@@ -800,7 +782,13 @@ export function main(argv: string[], log = console.log, fail = console.error, op
       return fail(`cannot read repo root ${rootDir}: ${String(err)}`), 1;
     }
   }
-  const html = renderHtml(diagram, checks, template);
+  let layouts: Layouts;
+  try {
+    layouts = await layoutViews(diagram);
+  } catch (err) {
+    return fail(`cannot lay out the diagram: ${String(err)}`), 1;
+  }
+  const html = renderHtml(diagram, checks, template, layouts);
   const out = outFlag ?? outputPath(diagram.slug, process.env, opts.outDirName);
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, html);
@@ -814,4 +802,4 @@ export function main(argv: string[], log = console.log, fail = console.error, op
   return 0;
 }
 
-if (import.meta.main) process.exit(main(process.argv.slice(2)));
+if (import.meta.main) process.exit(await main(process.argv.slice(2)));

@@ -10,10 +10,10 @@
       "level": "context",
       "title": "C1 Context",
       "items": [
-        { "node": "customer", "col": 0, "row": 1 },
-        { "node": "shop", "col": 1, "row": 1 },
-        { "node": "payment", "col": 2, "row": 0 },
-        { "node": "mail", "col": 2, "row": 2 }
+        { "node": "customer" },
+        { "node": "shop" },
+        { "node": "payment" },
+        { "node": "mail" }
       ],
       "zoom": { "node": "shop", "view": "container" }
     },
@@ -23,14 +23,14 @@
       "level": "container",
       "title": "C2 Container",
       "items": [
-        { "node": "customer", "col": 0, "row": 0 },
-        { "node": "spa", "col": 1, "row": 0 },
-        { "node": "api", "col": 2, "row": 0 },
-        { "node": "db", "col": 2, "row": 1 },
-        { "node": "queue", "col": 3, "row": 1 },
-        { "node": "worker", "col": 3, "row": 2 },
-        { "node": "payment", "col": 4, "row": 0 },
-        { "node": "mail", "col": 4, "row": 2 }
+        { "node": "customer" },
+        { "node": "spa" },
+        { "node": "api" },
+        { "node": "db" },
+        { "node": "queue" },
+        { "node": "worker" },
+        { "node": "payment" },
+        { "node": "mail" }
       ],
       "boundary": { "label": "ネットショップ", "nodes": ["spa", "api", "db", "queue", "worker"] }
     }
