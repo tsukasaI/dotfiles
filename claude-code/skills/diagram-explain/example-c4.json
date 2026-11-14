@@ -1,0 +1,206 @@
+{
+  "version": 2,
+  "slug": "c4-online-shop",
+  "title": "ネットショップの全体像（C4: Context / Container）",
+  "summary": "顧客がネットショップで注文を確定するまでを、C4 の 2 つの粒度で見る。最初のタブはシステムと外部の関係（Context）、2 つ目はショップの中身（Container）。Context のショップシステムをクリックすると Container に移る。",
+  "views": [
+    {
+      "id": "context",
+      "type": "c4",
+      "level": "context",
+      "title": "C1 Context",
+      "items": [
+        { "node": "customer", "col": 0, "row": 1 },
+        { "node": "shop", "col": 1, "row": 1 },
+        { "node": "payment", "col": 2, "row": 0 },
+        { "node": "mail", "col": 2, "row": 2 }
+      ],
+      "zoom": { "node": "shop", "view": "container" }
+    },
+    {
+      "id": "container",
+      "type": "c4",
+      "level": "container",
+      "title": "C2 Container",
+      "items": [
+        { "node": "customer", "col": 0, "row": 0 },
+        { "node": "spa", "col": 1, "row": 0 },
+        { "node": "api", "col": 2, "row": 0 },
+        { "node": "db", "col": 2, "row": 1 },
+        { "node": "queue", "col": 3, "row": 1 },
+        { "node": "worker", "col": 3, "row": 2 },
+        { "node": "payment", "col": 4, "row": 0 },
+        { "node": "mail", "col": 4, "row": 2 }
+      ],
+      "boundary": { "label": "ネットショップ", "nodes": ["spa", "api", "db", "queue", "worker"] }
+    }
+  ],
+  "nodes": [
+    {
+      "id": "customer",
+      "label": "顧客",
+      "sub": "商品を買う個人",
+      "c4": { "type": "person" },
+      "card": {
+        "role": "ショップで商品を選び、注文を確定する利用者。",
+        "actor": "自分のブラウザ（PC またはスマホ）から使う。",
+        "trigger": "欲しい商品があって、購入するとき。",
+        "failure": "注文に失敗すると、画面のエラー表示で気づき、もう一度試すか購入をあきらめる。"
+      }
+    },
+    {
+      "id": "shop",
+      "label": "ネットショップ",
+      "sub": "注文を受けて処理する",
+      "c4": { "type": "system" },
+      "card": {
+        "role": "商品の閲覧、カート、注文確定を提供する自社のシステム。決済とメール送信は外部に任せる。",
+        "actor": "自社のクラウド環境で動く。中身は Container の図で見る。",
+        "trigger": "顧客がブラウザからアクセスしたとき。",
+        "failure": "決済が失敗すると注文は確定せず、顧客に失敗を伝える。メールが送れなくても注文は確定したままで、後で再送する。"
+      }
+    },
+    {
+      "id": "payment",
+      "label": "決済サービス",
+      "sub": "カード決済を代行する",
+      "c4": { "type": "external" },
+      "card": {
+        "role": "カードの与信と決済を代行する外部サービス。カード番号はショップ側で持たない。",
+        "actor": "決済事業者が運営する外部のサービス。API から HTTPS で呼ぶ。",
+        "trigger": "API が注文確定時に決済を依頼したとき。",
+        "failure": "応答がないか拒否されたとき、API は注文を確定せず、顧客にエラーを返す。事業者側の障害は事業者のステータスページで気づく。"
+      }
+    },
+    {
+      "id": "mail",
+      "label": "メール配信",
+      "sub": "メールを送る外部サービス",
+      "c4": { "type": "external" },
+      "card": {
+        "role": "注文確認メールを顧客に届ける外部サービス。",
+        "actor": "メール事業者が運営する外部のサービス。通知ワーカーから HTTPS で呼ぶ。",
+        "trigger": "通知ワーカーが送信を依頼したとき。",
+        "failure": "送信依頼に失敗したら、ワーカーがイベントをキューに戻して後で再試行する。顧客への到着が遅れるが、注文には影響しない。"
+      }
+    },
+    {
+      "id": "spa",
+      "label": "Web 画面",
+      "sub": "顧客が操作する画面",
+      "c4": { "type": "container", "tech": "React" },
+      "card": {
+        "role": "商品一覧、カート、注文確定の画面を表示し、操作を API に送る。",
+        "actor": "顧客のブラウザの中で動く。静的ファイルは CDN から配信される。",
+        "trigger": "顧客が画面を開いたとき、ボタンを押したとき。",
+        "failure": "API が失敗したら、画面にエラーを出して再試行を促す。ブラウザ内の入力内容は残る。"
+      }
+    },
+    {
+      "id": "api",
+      "label": "注文 API",
+      "sub": "注文の受付と決済の呼び出し",
+      "c4": { "type": "container", "tech": "Go" },
+      "card": {
+        "role": "注文を受け付けて DB に保存し、決済を依頼し、確定したらイベントをキューに積む。",
+        "actor": "自社のクラウドで動く API サーバー。複数台を負荷分散して動かす。",
+        "trigger": "Web 画面から注文確定のリクエストが届いたとき。",
+        "failure": "決済が拒否されたら注文を未確定のままにしてエラーを返す。DB が落ちたら受け付けられず、エラーを返して運用者に通知する。"
+      }
+    },
+    {
+      "id": "db",
+      "label": "注文 DB",
+      "sub": "注文の正本",
+      "c4": { "type": "database", "tech": "PostgreSQL" },
+      "card": {
+        "role": "注文と注文明細を保存する。状態（支払い待ち、確定）もここで持つ。",
+        "actor": "マネージドの PostgreSQL。API だけが接続する。",
+        "trigger": "API が注文を保存、更新するとき。",
+        "failure": "書き込みに失敗したら API がエラーを返し、注文は残らない。障害はヘルスチェックの警告で運用者が気づく。"
+      }
+    },
+    {
+      "id": "queue",
+      "label": "注文イベントキュー",
+      "sub": "確定した注文を知らせる",
+      "c4": { "type": "queue", "tech": "Amazon SQS" },
+      "card": {
+        "role": "注文確定イベントを一時的に保持し、通知ワーカーが取りに来るまで待たせる。",
+        "actor": "AWS のマネージドキュー。API が積み、ワーカーが取り出す。",
+        "trigger": "API が注文を確定したとき、イベントを積む。",
+        "failure": "取り出されないイベントは一定時間後にキューに戻り、再び取り出される。長く滞留したらアラームで運用者が気づく。"
+      }
+    },
+    {
+      "id": "worker",
+      "label": "通知ワーカー",
+      "sub": "確認メールの送信を依頼",
+      "c4": { "type": "container", "tech": "Go" },
+      "card": {
+        "role": "キューのイベントを取り出し、注文確認メールの送信をメール配信に依頼する。",
+        "actor": "自社のクラウドで動く常駐プロセス。API とは別に動く。",
+        "trigger": "キューを常にポーリングし、イベントが届いたとき。",
+        "failure": "メール配信が失敗したらイベントを削除せず、キューに戻して再試行する。繰り返し失敗したものは失敗用キューに移り、運用者が確認する。"
+      }
+    }
+  ],
+  "edges": [
+    { "id": "c1-order", "from": "customer", "to": "shop", "data": "商品を選んで注文する", "tech": "HTTPS" },
+    { "id": "c1-pay", "from": "shop", "to": "payment", "data": "カード決済を依頼する", "tech": "HTTPS/JSON" },
+    { "id": "c1-mail", "from": "shop", "to": "mail", "data": "注文確認メールの送信を依頼する", "tech": "HTTPS/JSON" },
+    { "id": "c2-use", "from": "customer", "to": "spa", "data": "注文内容を入力して確定する", "tech": "HTTPS" },
+    { "id": "c2-api", "from": "spa", "to": "api", "data": "注文確定のリクエストを送る", "tech": "HTTPS/JSON" },
+    { "id": "c2-db", "from": "api", "to": "db", "data": "注文を保存する", "tech": "SQL/TCP" },
+    { "id": "c2-pay", "from": "api", "to": "payment", "data": "カード決済を依頼する", "tech": "HTTPS/JSON" },
+    { "id": "c2-q", "from": "api", "to": "queue", "data": "注文確定イベントを積む", "tech": "AWS SDK/HTTPS" },
+    { "id": "c2-worker", "from": "worker", "to": "queue", "data": "確定イベントを取り出す", "tech": "AWS SDK/HTTPS" },
+    { "id": "c2-mail", "from": "worker", "to": "mail", "data": "注文確認メールの送信を依頼する", "tech": "HTTPS/JSON" }
+  ],
+  "state": [
+    { "key": "order", "label": "注文の状態" },
+    { "key": "payment", "label": "決済" },
+    { "key": "mail", "label": "確認メール" }
+  ],
+  "scenarios": [
+    {
+      "id": "confirm",
+      "title": "注文確定",
+      "summary": "顧客が確定ボタンを押してから、確認メールの送信が依頼されるまで。Container のタブで見ると、矢印が順に光る。",
+      "initial": { "order": "未確定", "payment": "未決済", "mail": "未送信" },
+      "trace": [
+        {
+          "text": "顧客が確定ボタンを押し、Web 画面が注文内容を API に送る。",
+          "active": ["customer", "c2-use", "spa", "c2-api"]
+        },
+        {
+          "text": "API が注文を DB に保存する。状態は支払い待ち。",
+          "active": ["api", "c2-db", "db"],
+          "state": { "order": "支払い待ち" }
+        },
+        {
+          "text": "API が決済サービスにカード決済を依頼し、承認される。注文は確定になる。",
+          "active": ["c2-pay", "payment"],
+          "state": { "payment": "承認済み", "order": "確定" }
+        },
+        {
+          "text": "API が注文確定イベントをキューに積み、顧客に完了を返す。",
+          "active": ["api", "c2-q", "queue"],
+          "state": { "mail": "送信待ち" }
+        },
+        {
+          "text": "通知ワーカーがキューから確定イベントを取り出す。",
+          "active": ["c2-worker", "worker"]
+        },
+        {
+          "text": "ワーカーがメール配信に確認メールの送信を依頼する。",
+          "active": ["c2-mail", "mail"],
+          "state": { "mail": "送信依頼済み" }
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    { "term": "ポーリング", "definition": "一定間隔で、取りに行って届いているかを確かめ続けるやり方。" }
+  ]
+}

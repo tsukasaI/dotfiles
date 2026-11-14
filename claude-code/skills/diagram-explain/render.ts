@@ -19,7 +19,12 @@ type Kind = "existing" | "proposed";
 export type Mode = "explain" | "plan";
 export type Ref = { file: string; line: number; excerpt: string };
 const CARD_FIELDS = ["role", "actor", "trigger", "failure"] as const;
-const VIEW_TYPES = ["structure", "calltree", "sequence", "dataflow"] as const;
+const VIEW_TYPES = ["structure", "calltree", "sequence", "dataflow", "c4"] as const;
+const C4_TYPES = ["person", "system", "external", "container", "database", "queue"] as const;
+const C4_LEVEL_TYPES: Record<string, readonly string[]> = {
+  context: ["person", "system", "external"],
+  container: ["person", "container", "database", "queue", "external"],
+};
 
 export type CardField = string | { na: string };
 export type Card = Record<(typeof CARD_FIELDS)[number], CardField>;
@@ -28,6 +33,8 @@ export type DiagramNode = {
   lane?: string;
   order?: number;
   label: string;
+  sub?: string;
+  c4?: { type: (typeof C4_TYPES)[number]; tech?: string };
   kind: Kind;
   card: Card;
   ref?: Ref;
@@ -38,18 +45,39 @@ export type View = { id: string; type: (typeof VIEW_TYPES)[number]; title?: stri
   | { type: "calltree"; items: { node: string; parent?: string }[] }
   | { type: "sequence"; participants: string[]; messages: string[] }
   | { type: "dataflow"; items: { node: string; value: string }[] }
+  | {
+      type: "c4";
+      level: "context" | "container";
+      items: { node: string; col: number; row: number }[];
+      boundary?: { label: string; nodes: string[] };
+      zoom?: { node: string; view: string };
+    }
 );
 export type Check = {
   node: string;
   question: string;
   choices: { text: string; correct?: true; why: string }[];
 };
-export type DiagramEdge = { id: string; from: string; to: string; data: string; kind: Kind; ref?: Ref };
+export type DiagramEdge = { id: string; from: string; to: string; data: string; tech?: string; kind: Kind; ref?: Ref };
 export type Step = {
   title: string;
   description: string;
   changes: Record<string, (typeof CHANGES)[number]>;
   predict?: { question: string; hint?: string };
+};
+export type TraceStep = {
+  text: string;
+  active: string[];
+  state?: Record<string, string>;
+  tone?: "error";
+};
+export type Scenario = {
+  id: string;
+  title: string;
+  summary?: string;
+  uses?: string[];
+  initial?: Record<string, string>;
+  trace: TraceStep[];
 };
 export type Diagram = {
   version: 2;
@@ -62,6 +90,8 @@ export type Diagram = {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   steps: Step[];
+  scenarios: Scenario[];
+  state: { key: string; label?: string }[];
   boundaries: { label: string; reason: string }[];
   recall: { question: string; answer: string }[];
   glossary: { term: string; definition: string }[];
@@ -106,6 +136,7 @@ function checkSteps(
   steps: unknown[],
   kinds: Map<string, Kind>,
   endpoints: Map<string, [string, string]>,
+  usedByScenario: Set<string>,
   errors: string[],
 ): void {
   const present = new Map([...kinds].map(([id, kind]) => [id, kind === "existing"]));
@@ -150,8 +181,88 @@ function checkSteps(
     }
   });
   for (const [id, kind] of kinds) {
-    if (kind === "proposed" && !added.has(id)) errors.push(`proposed ${id} is never added in a step`);
+    if (kind === "proposed" && !added.has(id) && !usedByScenario.has(id)) errors.push(`proposed ${id} is never added in a step`);
   }
+}
+
+function checkState(raw: unknown, errors: string[]): Set<string> {
+  const keys = new Set<string>();
+  checkList(raw, "state", 8, errors, (s, where) => {
+    if (!isObj(s) || typeof s.key !== "string" || !ID.test(s.key) || (s.label !== undefined && !isText(s.label, 40))) {
+      return void errors.push(`${where}: key (matching ${ID.source}) and an optional label (<=40 chars) required`);
+    }
+    if (keys.has(s.key)) errors.push(`${where}: duplicate key ${s.key}`);
+    keys.add(s.key);
+  });
+  if (Array.isArray(raw) && raw.length === 0) errors.push("state: 1-8 entries required");
+  return keys;
+}
+
+function checkStateValues(x: unknown, where: string, keys: Set<string>, errors: string[]): void {
+  if (!isObj(x)) return void errors.push(`${where}: must be an object of state key to text`);
+  for (const [k, v] of Object.entries(x)) {
+    if (!keys.has(k)) errors.push(`${where}: undeclared state key ${k}`);
+    else if (!isText(v, 120)) errors.push(`${where}.${k}: value must be text (<=120 chars)`);
+  }
+}
+
+// Returns the proposed ids some scenario shows, so checkSteps does not report them as never added.
+function checkScenarios(
+  raw: unknown,
+  kinds: Map<string, Kind>,
+  endpoints: Map<string, [string, string]>,
+  stateKeys: Set<string>,
+  errors: string[],
+): Set<string> {
+  const used = new Set<string>();
+  const ids = new Set<string>();
+  checkList(raw, "scenarios", 4, errors, (s, where) => {
+    if (!isObj(s)) return void errors.push(`${where}: must be an object`);
+    if (typeof s.id !== "string" || !ID.test(s.id)) errors.push(`${where}: id must match ${ID.source}`);
+    else if (ids.has(s.id)) errors.push(`${where}: duplicate id ${s.id}`);
+    else ids.add(s.id);
+    if (!isText(s.title, 40)) errors.push(`${where}: title required (<=40 chars)`);
+    if (s.summary !== undefined && !isText(s.summary, 300)) errors.push(`${where}: summary must be text (<=300 chars)`);
+
+    const present = new Set([...kinds].filter(([, kind]) => kind === "existing").map(([id]) => id));
+    if (s.uses !== undefined) {
+      if (!Array.isArray(s.uses)) errors.push(`${where}: uses must be an array of proposed element ids`);
+      else
+        for (const id of s.uses) {
+          if (typeof id !== "string" || kinds.get(id) !== "proposed") errors.push(`${where}: uses ${String(id)} is not a proposed element`);
+          else {
+            present.add(id);
+            used.add(id);
+          }
+        }
+    }
+    for (const [edge, [from, to]] of endpoints) {
+      if (present.has(edge) && (!present.has(from) || !present.has(to))) {
+        errors.push(`${where}: edge ${edge} is shown while an endpoint is absent`);
+      }
+    }
+    if (s.initial !== undefined) checkStateValues(s.initial, `${where}.initial`, stateKeys, errors);
+
+    if (!Array.isArray(s.trace) || s.trace.length < 1 || s.trace.length > 20) {
+      return void errors.push(`${where}: trace must be an array of 1-20`);
+    }
+    s.trace.forEach((t, i) => {
+      const at = `${where}.trace[${i}]`;
+      if (!isObj(t)) return void errors.push(`${at}: must be an object`);
+      if (!isText(t.text, 200)) errors.push(`${at}: text required (<=200 chars)`);
+      if (t.tone !== undefined && t.tone !== "error") errors.push(`${at}: tone must be "error"`);
+      if (t.state !== undefined) checkStateValues(t.state, `${at}.state`, stateKeys, errors);
+      if (!Array.isArray(t.active) || t.active.length < 1 || t.active.length > 6) {
+        return void errors.push(`${at}: active must be an array of 1-6 element ids`);
+      }
+      for (const a of t.active) {
+        if (typeof a !== "string" || !kinds.has(a)) errors.push(`${at}: unknown id ${String(a)}`);
+        else if (!present.has(a)) errors.push(`${at}: active ${a} is not shown in this scenario`);
+      }
+    });
+  });
+  if (Array.isArray(raw) && raw.length === 0) errors.push("scenarios: 1-4 scenarios required");
+  return used;
 }
 
 function checkCard(card: unknown, where: string, errors: string[]): void {
@@ -193,14 +304,86 @@ function checkCalltree(items: unknown, where: string, nodeIds: Set<string>, erro
   }
 }
 
+function checkC4(
+  v: Obj,
+  where: string,
+  nodeIds: Set<string>,
+  c4Types: Map<string, string>,
+  zooms: { where: string; view: string }[],
+  errors: string[],
+): void {
+  const level = v.level === "context" || v.level === "container" ? v.level : undefined;
+  if (level === undefined) errors.push(`${where}: level must be context or container`);
+
+  const cells = new Set<string>();
+  const placed = new Map<string, { col: number; row: number }>();
+  if (!Array.isArray(v.items) || v.items.length < 1 || v.items.length > 20) errors.push(`${where}: items must be an array of 1-20`);
+  else
+    v.items.forEach((it, i) => {
+      const at = `${where}.items[${i}]`;
+      if (!isObj(it) || typeof it.node !== "string" || !nodeIds.has(it.node)) return void errors.push(`${at}: unknown node`);
+      if (placed.has(it.node)) errors.push(`${at}: node ${it.node} appears twice`);
+      const type = c4Types.get(it.node);
+      if (type === undefined) errors.push(`${at}: node ${it.node} needs a c4 type`);
+      else if (level !== undefined && !C4_LEVEL_TYPES[level].includes(type)) {
+        errors.push(`${at}: type ${type} is not allowed in a ${level} view`);
+      }
+      if (!isInt(it.col, 0, 5) || !isInt(it.row, 0, 7)) return void errors.push(`${at}: col must be 0-5 and row 0-7`);
+      const cell = `${it.col}/${it.row}`;
+      if (cells.has(cell)) errors.push(`${at}: another item already sits at col ${it.col} row ${it.row}`);
+      cells.add(cell);
+      placed.set(it.node, { col: it.col, row: it.row });
+    });
+
+  if (v.boundary === undefined) {
+    if (level === "container") errors.push(`${where}: boundary required in a container view`);
+  } else if (level === "context") errors.push(`${where}: boundary is not allowed in a context view`);
+  else {
+    const b = v.boundary;
+    if (!isObj(b) || !isText(b.label, 60) || !Array.isArray(b.nodes) || b.nodes.length < 1) {
+      errors.push(`${where}: boundary needs a label (<=60 chars) and a non-empty nodes array`);
+    } else {
+      const members = new Set<string>();
+      for (const id of b.nodes) {
+        if (typeof id !== "string" || !placed.has(id)) errors.push(`${where}: boundary node ${String(id)} is not in items`);
+        else members.add(id);
+      }
+      const at = [...members].map(id => placed.get(id)!);
+      if (at.length > 0) {
+        const box = {
+          col: [Math.min(...at.map(p => p.col)), Math.max(...at.map(p => p.col))],
+          row: [Math.min(...at.map(p => p.row)), Math.max(...at.map(p => p.row))],
+        };
+        for (const [id, p] of placed) {
+          if (!members.has(id) && p.col >= box.col[0] && p.col <= box.col[1] && p.row >= box.row[0] && p.row <= box.row[1]) {
+            errors.push(`${where}: ${id} sits inside the boundary box but is not one of its nodes`);
+          }
+        }
+      }
+    }
+  }
+
+  if (v.zoom !== undefined) {
+    const z = v.zoom;
+    if (!isObj(z) || typeof z.node !== "string" || typeof z.view !== "string") errors.push(`${where}: zoom needs a node and a view`);
+    else {
+      if (c4Types.get(z.node) !== "system" || !placed.has(z.node)) errors.push(`${where}: zoom.node must be a system node in items`);
+      zooms.push({ where, view: z.view });
+    }
+  }
+}
+
 function checkViews(
   views: unknown,
   nodeIds: Set<string>,
   endpoints: Map<string, [string, string]>,
+  c4Types: Map<string, string>,
   errors: string[],
 ): void {
   if (!Array.isArray(views) || views.length < 1 || views.length > 4) return void errors.push("views: 1-4 views required");
   const ids = new Set<string>();
+  const c4Levels = new Map<string, unknown>();
+  const zooms: { where: string; view: string }[] = [];
   views.forEach((v, i) => {
     const where = `views[${i}]`;
     if (!isObj(v)) return void errors.push(`${where}: must be an object`);
@@ -248,10 +431,17 @@ function checkViews(
           }
         });
         break;
+      case "c4":
+        checkC4(v, where, nodeIds, c4Types, zooms, errors);
+        if (typeof v.id === "string") c4Levels.set(v.id, v.level);
+        break;
       default:
         errors.push(`${where}: type must be one of ${VIEW_TYPES.join(", ")}`);
     }
   });
+  for (const z of zooms) {
+    if (c4Levels.get(z.view) !== "container") errors.push(`${z.where}: zoom.view must be the id of a container c4 view`);
+  }
 }
 
 function checkList(x: unknown, name: string, max: number, errors: string[], each: (item: unknown, where: string) => void): void {
@@ -354,6 +544,7 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
   };
 
   const cells = new Set<string>();
+  const c4Types = new Map<string, string>();
   if (!Array.isArray(raw.nodes) || raw.nodes.length < 1 || raw.nodes.length > 60) errors.push("nodes: 1-60 nodes required");
   else
     raw.nodes.forEach((n, i) => {
@@ -369,6 +560,13 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
         cells.add(cell);
       }
       if (!isText(n.label, 120)) errors.push(`${where}: label required (<=120 chars)`);
+      if (n.sub !== undefined && !isText(n.sub, 24)) errors.push(`${where}: sub must be text (<=24 chars)`);
+      if (n.c4 !== undefined) {
+        const c = n.c4;
+        if (!isObj(c) || !C4_TYPES.includes(c.type as never) || (c.tech !== undefined && !isText(c.tech, 40))) {
+          errors.push(`${where}: c4 needs a type (${C4_TYPES.join(", ")}) and an optional tech (<=40 chars)`);
+        } else if (typeof n.id === "string") c4Types.set(n.id, c.type as string);
+      }
       checkCard(n.card, typeof n.id === "string" ? `${where} (${n.id})` : where, errors);
       if (n.deepDive !== undefined) {
         const dd = n.deepDive;
@@ -394,6 +592,7 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
       if (typeof e.to !== "string" || !nodeIds.has(e.to)) errors.push(`${where}: unknown to`);
       if (e.from === e.to) errors.push(`${where}: from and to must differ`);
       if (!isText(e.data, 80)) errors.push(`${where}: data label required (<=80 chars)`);
+      if (e.tech !== undefined && !isText(e.tech, 40)) errors.push(`${where}: tech must be text (<=40 chars)`);
       const kind = checkElement(e, where, errors);
       if (ok && kind) {
         kinds.set(e.id as string, kind);
@@ -422,12 +621,20 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
       });
   }
 
-  checkViews(raw.views, nodeIds, endpoints, errors);
+  checkViews(raw.views, nodeIds, endpoints, c4Types, errors);
   checkExtras(raw, nodeIds, errors);
+
+  if (raw.scenarios !== undefined) {
+    if (isPlan) errors.push('scenarios: not allowed in mode "plan"');
+    if (Array.isArray(raw.steps) && raw.steps.length > 0) errors.push("scenarios: cannot be combined with steps");
+  }
+  if (raw.state !== undefined && raw.scenarios === undefined) errors.push("state: requires scenarios");
+  const stateKeys = checkState(raw.state, errors);
+  const usedByScenario = checkScenarios(raw.scenarios, kinds, endpoints, stateKeys, errors);
 
   // An invalid steps value skips the replay: its "never added" noise would only bury the real error.
   if (raw.steps !== undefined && (!Array.isArray(raw.steps) || raw.steps.length > 30)) errors.push("steps: at most 30 steps");
-  else checkSteps((raw.steps as unknown[]) ?? [], kinds, endpoints, errors);
+  else checkSteps((raw.steps as unknown[]) ?? [], kinds, endpoints, usedByScenario, errors);
 
   if (errors.length > 0) return { errors };
   const withKind = (x: unknown) => ({ ...(x as Obj), kind: (x as Obj).kind ?? "existing" });
@@ -440,6 +647,8 @@ export function validate(raw: unknown): { diagram: Diagram } | { errors: string[
       nodes: (raw.nodes as unknown[]).map(withKind),
       edges: ((raw.edges as unknown[]) ?? []).map(withKind),
       steps: raw.steps ?? [],
+      scenarios: raw.scenarios ?? [],
+      state: raw.state ?? [],
       boundaries: raw.boundaries ?? [],
       recall: raw.recall ?? [],
       glossary: raw.glossary ?? [],

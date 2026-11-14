@@ -10,18 +10,21 @@
     --bg: #fff; --surface: #fff; --ink: #1f2328; --muted: #656d76; --line: #d0d7de; --code-bg: #f6f8fa;
     --added: #1a7f37; --changed: #b08800; --removed: #cf222e; --base: #8c959f;
     --added-bg: #dafbe1; --changed-bg: #fff8c5; --removed-bg: #ffebe9; --focus: #0969da; --on-badge: #fff;
+    --c4-int: #1168bd; --c4-int-bg: #dbeafe; --c4-ext-bg: #eaeef2;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #0d1117; --surface: #161b22; --ink: #e6edf3; --muted: #8b949e; --line: #30363d; --code-bg: #161b22;
       --added: #3fb950; --changed: #d29922; --removed: #f85149; --base: #8b949e;
       --added-bg: #12261e; --changed-bg: #272115; --removed-bg: #2d1618; --focus: #58a6ff; --on-badge: #0d1117;
+      --c4-int: #58a6ff; --c4-int-bg: #12233a; --c4-ext-bg: #21262d;
     }
   }
   :root[data-theme="dark"] {
     --bg: #0d1117; --surface: #161b22; --ink: #e6edf3; --muted: #8b949e; --line: #30363d; --code-bg: #161b22;
     --added: #3fb950; --changed: #d29922; --removed: #f85149; --base: #8b949e;
     --added-bg: #12261e; --changed-bg: #272115; --removed-bg: #2d1618; --focus: #58a6ff; --on-badge: #0d1117;
+    --c4-int: #58a6ff; --c4-int-bg: #12233a; --c4-ext-bg: #21262d;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -35,7 +38,8 @@
   .muted { color: var(--muted); }
   #banner { display: none; border: 2px solid var(--removed); background: var(--removed-bg); padding: 8px 12px; margin: 8px 20px; border-radius: 6px; }
   #banner ul { margin: 4px 0 0; padding-left: 20px; }
-  #tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  #tabs, #scenario-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  #scenario-summary { margin-bottom: 8px; }
   .tab { padding: 4px 14px; }
   .tab[aria-selected="true"] { border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); font-weight: 600; }
   #stage { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; }
@@ -46,7 +50,19 @@
   #frame-title { font-weight: 600; }
   #legend span { display: inline-block; margin-right: 12px; }
   #legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 4px; }
-  #panel { border: 1px solid var(--line); border-radius: 6px; padding: 12px; align-self: start; position: sticky; top: 8px; max-height: 95vh; overflow: auto; }
+  #side { display: flex; flex-direction: column; gap: 8px; align-self: start; position: sticky; top: 8px; max-height: 95vh; overflow: auto; }
+  #panel { border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+  #statepanel { border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; }
+  #statepanel h2 { margin: 0 0 4px; }
+  .state-row { display: flex; gap: 8px; align-items: baseline; padding: 4px 6px; border-radius: 4px; }
+  .state-row.changed { background: var(--changed-bg); }
+  .state-key { flex: 0 0 6em; font-size: 12px; color: var(--muted); }
+  .state-val { font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: pre-wrap; }
+  #log { list-style: none; margin: 8px 0 0; padding: 0; }
+  .logrow { display: flex; gap: 8px; width: 100%; min-height: 36px; padding: 4px 8px; text-align: left; align-items: center; border: 0; border-left: 3px solid transparent; border-radius: 0; background: none; }
+  .logrow.now { border-left-color: var(--focus); font-weight: 600; }
+  .logrow.now.err { border-left-color: var(--removed); }
+  .logrow .n { flex: 0 0 2em; color: var(--muted); font-weight: 400; }
   pre { background: var(--code-bg); padding: 8px; overflow: auto; font-size: 12px; white-space: pre; }
   .status-ok { color: var(--added); } .status-bad { color: var(--removed); font-weight: 600; }
   .field { margin: 6px 0; }
@@ -55,20 +71,37 @@
   .term-def { display: inline; background: var(--code-bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; margin: 0 2px; font-size: 13px; }
   svg text { font-size: 12px; pointer-events: none; fill: var(--ink); }
   .node rect { fill: var(--surface); stroke: var(--base); stroke-width: 1.5; cursor: pointer; }
-  .node.proposed rect { stroke-dasharray: 6 3; }
+  .node.proposed rect, .node.proposed .shape { stroke-dasharray: 6 3; }
   .node.deep rect { stroke-width: 4; }
   .node .life { stroke: var(--line); stroke-dasharray: 4 4; }
+  .node .shape { fill: var(--surface); stroke: var(--base); stroke-width: 1.5; cursor: pointer; }
+  .c4-int .shape { fill: var(--c4-int-bg); stroke: var(--c4-int); }
+  .c4-ext .shape { fill: var(--c4-ext-bg); }
+  .boundary { fill: none; stroke: var(--base); stroke-width: 1.5; stroke-dasharray: 8 4; }
+  svg text.boundary-label { font-size: 11px; fill: var(--muted); }
+  svg text.zoom { font-size: 10.5px; font-weight: 600; fill: var(--focus); }
+  #legend i.sw-int { background: var(--c4-int); }
+  #legend i.sw-ext { background: var(--base); }
   .edge path { fill: none; stroke: var(--base); stroke-width: 1.5; }
   .edge .hit { stroke: transparent; stroke-width: 12; cursor: pointer; }
   .edge .hitrect { fill: transparent; cursor: pointer; }
   .edge.proposed path.line { stroke-dasharray: 6 3; }
   .edge text { paint-order: stroke; stroke: var(--bg); stroke-width: 4px; fill: var(--muted); }
   .m-base { fill: var(--base); } .m-added { fill: var(--added); } .m-changed { fill: var(--changed); } .m-removed { fill: var(--removed); }
-  .c-added rect, .c-added path.line { stroke: var(--added); } .c-added rect { fill: var(--added-bg); }
-  .c-changed rect, .c-changed path.line { stroke: var(--changed); } .c-changed rect { fill: var(--changed-bg); }
-  .c-removed rect, .c-removed path.line { stroke: var(--removed); } .c-removed rect { fill: var(--removed-bg); }
+  .c-added rect, .c-added .shape, .c-added path.line { stroke: var(--added); } .c-added rect, .c-added .shape { fill: var(--added-bg); }
+  .c-changed rect, .c-changed .shape, .c-changed path.line { stroke: var(--changed); } .c-changed rect, .c-changed .shape { fill: var(--changed-bg); }
+  .c-removed rect, .c-removed .shape, .c-removed path.line { stroke: var(--removed); } .c-removed rect, .c-removed .shape { fill: var(--removed-bg); }
   .c-removed { opacity: 0.85; }
-  .selected rect, .selected path.line { filter: drop-shadow(0 0 3px var(--focus)); }
+  .selected rect, .selected .shape, .selected path.line { filter: drop-shadow(0 0 3px var(--focus)); }
+  .dim { opacity: 0.35; }
+  .node.act rect, .node.act .shape, .edge.act path.line { stroke: var(--focus); stroke-width: 3; }
+  .node.act.err rect, .node.act.err .shape, .edge.act.err path.line { stroke: var(--removed); }
+  .m-focus { fill: var(--focus); }
+  svg text.sub { font-size: 10.5px; fill: var(--muted); }
+  .nodebtn .nsub { margin-left: 6px; font-size: 12px; color: var(--muted); }
+  .flow-sub { display: block; font-size: 12px; color: var(--muted); }
+  .nodebtn.act { border-color: var(--focus); box-shadow: 0 0 0 2px var(--focus); }
+  .nodebtn.act.err { border-color: var(--removed); box-shadow: 0 0 0 2px var(--removed); }
   .badge { fill: var(--removed); } .badge-text { fill: var(--on-badge); font-weight: 700; }
   .nodebtn { padding: 4px 10px; text-align: left; border-color: var(--base); }
   .nodebtn.proposed { border-style: dashed; }
@@ -122,6 +155,7 @@
     #banner { margin: 8px 16px; }
     #stage { grid-template-columns: minmax(0, 1fr); }
     #panel { display: none; }
+    #side { position: static; max-height: none; overflow: visible; }
   }
 </style>
 </head>
@@ -133,9 +167,12 @@
 <div id="banner"><strong>図の参照がコードと一致しない箇所があります。図を信用する前に確認してください。</strong><ul id="banner-list"></ul></div>
 <main>
   <div id="tabs" role="tablist"></div>
+  <div id="scenario-tabs" role="tablist"></div>
+  <div id="scenario-summary" class="muted" hidden></div>
   <div id="controls">
     <button id="prev" type="button">← 前へ</button>
     <button id="next" type="button">次へ →</button>
+    <button id="play" type="button" aria-label="自動再生" hidden>▷</button>
     <span id="counter" class="muted"></span>
     <span id="frame-title"></span>
     <button id="reveal" type="button" hidden>表示</button>
@@ -151,13 +188,22 @@
       <span><i style="background:var(--removed)"></i>削除</span>
     </span>
     <span><i style="background:var(--base)"></i>既存</span>
+    <span id="leg-scenario" hidden>
+      <span><i style="background:var(--focus)"></i>強調</span>
+      <span><i style="background:var(--removed)"></i>障害パス</span>
+    </span>
     <span id="leg-proposed" hidden>破線 = 提案（未実装）</span>
     <span id="leg-deep" hidden>太枠 = 深掘り</span>
+    <span id="leg-c4" hidden></span>
   </div>
   <div id="stage">
     <div id="canvas"></div>
-    <aside id="panel"><span class="muted">図の要素をクリックすると、詳細を表示します。</span></aside>
+    <div id="side">
+      <div id="statepanel" hidden></div>
+      <aside id="panel"><span class="muted">図の要素をクリックすると、詳細を表示します。</span></aside>
+    </div>
   </div>
+  <ol id="log" aria-label="ステップログ" hidden></ol>
 </main>
 <section id="recall-sec" hidden>
   <h2>思い出す問い</h2>
@@ -188,7 +234,8 @@ const STATUS = {
   ok: "照合OK", moved: "行ずれ", mismatch: "不一致: 抜粋がファイル内に見つからない",
   missing: "ファイルがない、または読めない", outside: "repo 外のパス（照合を拒否）",
 };
-const VIEW_LABEL = { structure: "構成図", calltree: "呼び出しツリー", sequence: "シーケンス", dataflow: "データ変形" };
+const VIEW_LABEL = { structure: "構成図", calltree: "呼び出しツリー", sequence: "シーケンス", dataflow: "データ変形", c4: "C4 図" };
+const C4_LABEL = { person: "人", system: "システム", external: "外部システム", container: "コンテナ", database: "DB", queue: "キュー" };
 const FIELDS = [["role", "役割"], ["actor", "誰が・どこで"], ["trigger", "いつ"], ["failure", "失敗時"]];
 const IS_PLAN = D.mode === "plan";
 const checkById = new Map(checks.map(c => [c.id, c]));
@@ -196,6 +243,9 @@ const nodeById = new Map(D.nodes.map(n => [n.id, n]));
 const edges = D.edges || [];
 const edgeById = new Map(edges.map(e => [e.id, e]));
 const steps = D.steps || [];
+const scenarios = D.scenarios || [];
+const stateDefs = D.state || [];
+const scenarioMode = scenarios.length > 0;
 const glossary = D.glossary || [];
 const hasAnyRef = [...D.nodes, ...edges].some(x => x.ref);
 const mq = matchMedia("(max-width: 719px)");
@@ -268,21 +318,23 @@ if (bad.length > 0) {
   }
 }
 
-const animated = steps.length > 0;
+const animated = steps.length > 0 || scenarioMode;
 if (!animated) {
   for (const id of ["controls", "frame-desc", "leg-changes"]) document.getElementById(id).hidden = true;
 }
+if (scenarioMode) {
+  document.getElementById("leg-changes").hidden = true;
+  document.getElementById("leg-scenario").hidden = false;
+}
 document.getElementById("leg-proposed").hidden = ![...D.nodes, ...edges].some(x => x.kind === "proposed");
 document.getElementById("leg-deep").hidden = !D.nodes.some(n => n.deepDive);
+const legC4 = document.getElementById("leg-c4");
 
-const frames = animated
-  ? [{ title: "現状", description: D.summary || "変更前の状態", changes: {} }, ...steps]
-  : [{ title: "全体像", description: D.summary || "", changes: {} }];
 const allIds = [...D.nodes, ...edges].map(x => x.id);
 const kindOf = new Map([...D.nodes, ...edges].map(x => [x.id, x.kind]));
-const frameStates = (() => {
+function replay(list) {
   const present = new Map(allIds.map(id => [id, kindOf.get(id) === "existing"]));
-  return frames.map(f => {
+  return list.map(f => {
     const snap = new Map();
     for (const id of allIds) {
       // hasOwn, not f.changes[id]: an id such as "constructor" would read Object.prototype.
@@ -294,7 +346,35 @@ const frameStates = (() => {
     }
     return snap;
   });
-})();
+}
+
+// frameMeta is scenario-only: the state values at each step and which keys that step changed.
+let frames, frameStates, frameMeta = [];
+function loadFrames(sc) {
+  if (!sc) {
+    frames = steps.length > 0
+      ? [{ title: "現状", description: D.summary || "変更前の状態", changes: {} }, ...steps]
+      : [{ title: "全体像", description: D.summary || "", changes: {} }];
+    frameStates = replay(frames);
+    return;
+  }
+  const uses = new Set(sc.uses || []);
+  let state = { ...(sc.initial || {}) };
+  frameMeta = sc.trace.map(t => {
+    state = { ...state, ...(t.state || {}) };
+    return { state, changed: new Set(Object.keys(t.state || {})), tone: t.tone };
+  });
+  frames = sc.trace.map(t => ({ title: "", description: t.text }));
+  frameStates = sc.trace.map(t => {
+    const active = new Set(t.active);
+    return new Map(allIds.map(id => {
+      const visible = kindOf.get(id) === "existing" || uses.has(id);
+      const on = active.has(id);
+      return [id, { visible, change: null, active: on, tone: t.tone, dim: visible && !on }];
+    }));
+  });
+}
+loadFrames(scenarioMode ? scenarios[0] : undefined);
 
 function wrap(text, perLine, maxLines) {
   const chars = [...text];
@@ -318,7 +398,7 @@ function fit(text, px) {
 // Markers are per view: a marker inside a display:none SVG does not render when another SVG references it.
 function addMarkers(svg, prefix) {
   const defs = svgEl("defs");
-  for (const name of ["base", "added", "changed", "removed"]) {
+  for (const name of ["base", "added", "changed", "removed", "focus"]) {
     const m = svgEl("marker", { id: `${prefix}-${name}`, viewBox: "0 0 10 10", refX: 10, refY: 5, markerWidth: 8, markerHeight: 8, orient: "auto-start-reverse" });
     m.append(svgEl("path", { d: "M0,0 L10,5 L0,10 z", class: `m-${name}` }));
     defs.append(m);
@@ -344,36 +424,62 @@ function paint(e, st) {
   if (!e.manual) (e.box || e.g).style.display = st.visible ? "" : "none";
   e.g.classList.remove("c-added", "c-changed", "c-removed");
   if (st.change) e.g.classList.add(`c-${st.change}`);
-  if (e.line) e.line.setAttribute("marker-end", `url(#${e.mk}-${st.change || "base"})`);
+  e.g.classList.toggle("act", Boolean(st.active));
+  e.g.classList.toggle("err", Boolean(st.active) && st.tone === "error");
+  e.g.classList.toggle("dim", Boolean(st.dim));
+  const tint = st.change || (st.active ? (st.tone === "error" ? "removed" : "focus") : "base");
+  if (e.line) e.line.setAttribute("marker-end", `url(#${e.mk}-${tint})`);
 }
 
-function structureLayout(avail) {
-  const lanes = D.lanes;
-  const cols = Math.max(...D.nodes.map(n => n.order)) + 1;
-  const laneIndex = new Map(lanes.map((l, i) => [l.id, i]));
+// kind: the C4 "[Container: Go]" line; passing it also makes the label bold.
+function addNodeText(g, n, cx, top, H, perLine, maxLines, subPx, kind) {
+  const extra = (n.sub ? 1 : 0) + (kind ? 1 : 0);
+  const lines = wrap(n.label, perLine, Math.max(1, maxLines - extra));
+  const rows = lines.length + extra;
+  const rowY = i => top + H / 2 + (i - (rows - 1) / 2) * 14 + 4;
+  lines.forEach((line, i) => {
+    const t = svgEl("text", { x: cx, y: rowY(i), "text-anchor": "middle" });
+    if (kind) t.setAttribute("font-weight", "600");
+    t.textContent = line;
+    g.append(t);
+  });
+  let at = lines.length;
+  for (const text of [kind, n.sub]) {
+    if (!text) continue;
+    const t = svgEl("text", { x: cx, y: rowY(at++), "text-anchor": "middle", class: "sub" });
+    t.textContent = fit(text, subPx);
+    g.append(t);
+  }
+}
+
+// col runs across on desktop and down on phones (the grid is transposed there); headers label the cols.
+// tall: C4 boxes carry three text rows, so they are higher and spaced further apart.
+function gridLayout(avail, { nCols, nRows, headers, tall }) {
   if (!mq.matches) {
-    const W = 200;
+    const W = 200, H = tall ? 84 : 60, step = tall ? 120 : ROW, top = headers.length > 0 ? TOP : PAD;
     return {
-      W, H: 60, perLine: 15, maxLines: 3,
-      pos: n => ({ x: PAD + laneIndex.get(n.lane) * COL, y: TOP + n.order * ROW }),
-      width: PAD * 2 + lanes.length * COL - (COL - W),
-      height: TOP + cols * ROW + PAD,
-      labels: lanes.map((l, i) => ({ x: PAD + i * COL + W / 2, y: 20, anchor: "middle", text: l.label })),
+      W, H, perLine: 15, maxLines: tall ? 4 : 3,
+      pos: (col, row) => ({ x: PAD + col * COL, y: top + row * step }),
+      width: PAD * 2 + nCols * COL - (COL - W),
+      height: top + nRows * step + PAD,
+      labels: headers.map((text, i) => ({ x: PAD + i * COL + W / 2, y: 20, anchor: "middle", text })),
     };
   }
-  const M = 10, G = 8, H = 64, ROWH = H + 64;
-  const W = Math.max(64, Math.floor((avail - 2 * M - G * (cols - 1)) / cols));
+  const M = 10, G = 8, H = tall ? 96 : 64, ROWH = H + 64, top = headers.length > 0 ? 28 : M;
+  const W = Math.max(64, Math.floor((avail - 2 * M - G * (nRows - 1)) / nRows));
   return {
-    W, H, perLine: Math.max(3, Math.floor(W / 12)), maxLines: 4,
-    pos: n => ({ x: M + n.order * (W + G), y: 28 + laneIndex.get(n.lane) * ROWH }),
-    width: M * 2 + cols * W + (cols - 1) * G,
-    height: 28 + lanes.length * ROWH,
-    labels: lanes.map((l, i) => ({ x: M, y: 18 + i * ROWH, anchor: "start", text: l.label })),
+    W, H, perLine: Math.max(3, Math.floor(W / 12)), maxLines: tall ? 5 : 4,
+    pos: (col, row) => ({ x: M + row * (W + G), y: top + col * ROWH }),
+    width: M * 2 + nRows * W + (nRows - 1) * G,
+    height: top + nCols * ROWH,
+    labels: headers.map((text, i) => ({ x: M, y: top - 10 + i * ROWH, anchor: "start", text })),
   };
 }
 
-function buildStructure(view) {
-  const L = structureLayout(canvas.clientWidth || 360);
+// spec: L (gridLayout result), cells (node id -> {col, row}; only these nodes and the edges between them are
+// drawn), drawNode(g, n, x, y), under(svg) for a layer beneath the edges.
+function buildGrid(view, spec) {
+  const { L, cells, drawNode, under, showTech } = spec;
   const { W, H } = L;
   const mk = `arrow-${view.def.id}`;
   const svg = svgEl("svg", { width: L.width, height: L.height });
@@ -392,10 +498,12 @@ function buildStructure(view) {
   const shapes = new Map();
   const edgeLayer = svgEl("g");
   const nodeLayer = svgEl("g");
+  if (under) under(svg);
   svg.append(edgeLayer, nodeLayer);
 
   for (const e of edges) {
-    const a = L.pos(nodeById.get(e.from)), b = L.pos(nodeById.get(e.to));
+    if (!cells.has(e.from) || !cells.has(e.to)) continue;
+    const a = L.pos(cells.get(e.from).col, cells.get(e.from).row), b = L.pos(cells.get(e.to).col, cells.get(e.to).row);
     const [x1, y1] = clip(a.x + W / 2, a.y + H / 2, b.x + W / 2, b.y + H / 2);
     const [x2, y2] = clip(b.x + W / 2, b.y + H / 2, a.x + W / 2, a.y + H / 2);
     const len = Math.hypot(x2 - x1, y2 - y1) || 1;
@@ -408,23 +516,24 @@ function buildStructure(view) {
     const title = svgEl("title");
     title.textContent = e.data;
     g.append(title, line, svgEl("path", { d, class: "hit" }), label);
+    if (showTech && e.tech) {
+      const techLine = svgEl("text", { x: mx, y: my + 13, "text-anchor": "middle" });
+      techLine.textContent = `[${e.tech}]`;
+      g.append(techLine);
+    }
     g.addEventListener("click", () => select(e.id));
     edgeLayer.append(g);
     addShape(shapes, e.id, { g, line, mk });
   }
 
   for (const n of D.nodes) {
-    const { x, y } = L.pos(n);
+    if (!cells.has(n.id)) continue;
+    const { x, y } = L.pos(cells.get(n.id).col, cells.get(n.id).row);
     const g = svgEl("g", { class: `node ${n.kind}${n.deepDive ? " deep" : ""}` });
     const title = svgEl("title");
     title.textContent = n.label;
-    g.append(title, svgEl("rect", { x, y, width: W, height: H, rx: 6 }));
-    const lines = wrap(n.label, L.perLine, L.maxLines);
-    lines.forEach((line, i) => {
-      const t = svgEl("text", { x: x + W / 2, y: y + H / 2 + (i - (lines.length - 1) / 2) * 14 + 4, "text-anchor": "middle" });
-      t.textContent = line;
-      g.append(t);
-    });
+    g.append(title);
+    drawNode(g, n, x, y);
     addBadge(g, n.id, x + W, y);
     g.addEventListener("click", () => select(n.id));
     nodeLayer.append(g);
@@ -432,6 +541,87 @@ function buildStructure(view) {
   }
   view.host.replaceChildren(svg);
   view.shapes = shapes;
+}
+
+function buildStructure(view) {
+  const laneIndex = new Map(D.lanes.map((l, i) => [l.id, i]));
+  const cells = new Map(D.nodes.map(n => [n.id, { col: laneIndex.get(n.lane), row: n.order }]));
+  const L = gridLayout(canvas.clientWidth || 360, {
+    nCols: D.lanes.length,
+    nRows: Math.max(...D.nodes.map(n => n.order)) + 1,
+    headers: D.lanes.map(l => l.label),
+    tall: false,
+  });
+  buildGrid(view, {
+    L,
+    cells,
+    drawNode: (g, n, x, y) => {
+      g.append(svgEl("rect", { x, y, width: L.W, height: L.H, rx: 6 }));
+      addNodeText(g, n, x + L.W / 2, y, L.H, L.perLine, L.maxLines, L.W - 12);
+    },
+  });
+}
+
+const C4_KIND = { person: "Person", system: "Software System", external: "External System", container: "Container", database: "Container", queue: "Container" };
+const kindLine = c4 => `[${C4_KIND[c4.type]}${c4.tech ? `: ${c4.tech}` : ""}]`;
+
+function buildC4(view) {
+  const { items, boundary, zoom } = view.def;
+  const cells = new Map(items.map(it => [it.node, { col: it.col, row: it.row }]));
+  const L = gridLayout(canvas.clientWidth || 360, {
+    nCols: Math.max(...items.map(it => it.col)) + 1,
+    nRows: Math.max(...items.map(it => it.row)) + 1,
+    headers: [],
+    tall: true,
+  });
+  const { W, H } = L;
+  const under = svg => {
+    if (!boundary) return;
+    const at = boundary.nodes.map(id => L.pos(cells.get(id).col, cells.get(id).row));
+    const pad = mq.matches ? 6 : 14;
+    const x1 = Math.min(...at.map(p => p.x)) - pad, y1 = Math.min(...at.map(p => p.y)) - pad;
+    const x2 = Math.max(...at.map(p => p.x)) + W + pad, y2 = Math.max(...at.map(p => p.y)) + H + pad + 18;
+    svg.append(svgEl("rect", { x: x1, y: y1, width: x2 - x1, height: y2 - y1, rx: 10, class: "boundary" }));
+    const t = svgEl("text", { x: x1 + 8, y: y2 - 6, class: "boundary-label" });
+    t.textContent = `${boundary.label} [Software System]`;
+    svg.append(t);
+  };
+  const drawNode = (g, n, x, y) => {
+    const type = n.c4.type;
+    g.classList.add(type === "external" ? "c4-ext" : "c4-int");
+    const cx = x + W / 2;
+    const shape = (tag, attrs) => g.append(svgEl(tag, { ...attrs, class: "shape" }));
+    let top = y, h = H, textPx = W - 16;
+    if (type === "database") {
+      const r = 8;
+      shape("path", { d: `M${x},${y + r} v${H - 2 * r} a${W / 2},${r} 0 0 0 ${W},0 v${-(H - 2 * r)}` });
+      shape("ellipse", { cx, cy: y + r, rx: W / 2, ry: r });
+      top = y + r;
+      h = H - r;
+    } else if (type === "queue") {
+      const r = 10;
+      shape("path", { d: `M${x + r},${y} h${W - 2 * r} a${r},${H / 2} 0 0 1 0,${H} h${-(W - 2 * r)} a${r},${H / 2} 0 0 1 0,${-H} z` });
+      shape("ellipse", { cx: x + W - r, cy: y + H / 2, rx: r, ry: H / 2 });
+      textPx = W - 2 * r - 12;
+    } else if (type === "person") {
+      const head = 10;
+      shape("rect", { x, y: y + head, width: W, height: H - head, rx: 6 });
+      shape("circle", { cx, cy: y + head, r: head });
+      top = y + head;
+      h = H - head;
+    } else shape("rect", { x, y, width: W, height: H, rx: 6 });
+    addNodeText(g, n, cx, top, h, L.perLine, L.maxLines, textPx, kindLine(n.c4));
+    if (zoom && zoom.node === n.id) {
+      const t = svgEl("text", { x: x + W - 8, y: y + H - 6, "text-anchor": "end", class: "zoom" });
+      t.textContent = "⤢ 中を見る";
+      g.append(t);
+      g.addEventListener("click", () => {
+        const i = views.findIndex(v => v.def.id === zoom.view);
+        if (i >= 0) activate(i);
+      });
+    }
+  };
+  buildGrid(view, { L, cells, drawNode, under, showTech: true });
 }
 
 function buildSequence(view) {
@@ -455,12 +645,7 @@ function buildSequence(view) {
     title.textContent = node.label;
     g.append(title, svgEl("line", { x1: x, y1: HEAD, x2: x, y2: height, class: "life" }));
     g.append(svgEl("rect", { x: x - (colW - 8) / 2, y: 4, width: colW - 8, height: HEAD - 8, rx: 6 }));
-    const lines = wrap(node.label, Math.max(3, Math.floor((colW - 12) / 12)), 3);
-    lines.forEach((line, i) => {
-      const t = svgEl("text", { x, y: 4 + (HEAD - 8) / 2 + (i - (lines.length - 1) / 2) * 14 + 4, "text-anchor": "middle" });
-      t.textContent = line;
-      g.append(t);
-    });
+    addNodeText(g, node, x, 4, HEAD - 8, Math.max(3, Math.floor((colW - 12) / 12)), 3, colW - 16);
     addBadge(g, id, x + (colW - 8) / 2, 4);
     g.addEventListener("click", () => select(id));
     svg.append(g);
@@ -499,6 +684,7 @@ function buildCalltree(view) {
   const make = id => {
     const node = nodeById.get(id);
     const btn = el("button", { type: "button", class: `nodebtn ${node.kind}${node.deepDive ? " deep" : ""}` }, node.label);
+    if (node.sub) btn.append(el("span", { class: "nsub" }, node.sub));
     const c = checkById.get(id);
     if (c && c.status !== "ok") btn.append(el("span", { class: "bang" }, " !"));
     btn.addEventListener("click", ev => {
@@ -550,7 +736,9 @@ function buildDataflow(view) {
     const box = el("div");
     if (i > 0) box.append(el("div", { class: "flow-arrow", "aria-hidden": "true" }, "↓"));
     const card = el("button", { type: "button", class: `flowcard nodebtn ${node.kind}${node.deepDive ? " deep" : ""}` });
-    card.append(el("span", { class: "flow-label" }, node.label), el("span", { class: "flow-value" }, it.value));
+    card.append(el("span", { class: "flow-label" }, node.label));
+    if (node.sub) card.append(el("span", { class: "flow-sub" }, node.sub));
+    card.append(el("span", { class: "flow-value" }, it.value));
     card.addEventListener("click", () => select(it.node));
     box.append(card);
     flow.append(box);
@@ -560,7 +748,7 @@ function buildDataflow(view) {
   view.shapes = shapes;
 }
 
-const BUILDERS = { structure: buildStructure, calltree: buildCalltree, sequence: buildSequence, dataflow: buildDataflow };
+const BUILDERS = { structure: buildStructure, calltree: buildCalltree, sequence: buildSequence, dataflow: buildDataflow, c4: buildC4 };
 const views = D.views.map(def => ({ def, host: el("div", { class: "view" }), shapes: new Map(), after: null }));
 for (const view of views) {
   BUILDERS[view.def.type](view);
@@ -582,7 +770,12 @@ function markSelected() {
 function paintViews() {
   const snap = frameStates[current];
   for (const view of views) {
-    for (const [id, list] of view.shapes) for (const e of list) paint(e, snap.get(id));
+    // A view with nothing lit (the C4 context tab during a container-level scenario) would otherwise dim entirely.
+    const lit = [...view.shapes.keys()].some(id => snap.get(id).active);
+    for (const [id, list] of view.shapes) {
+      const st = snap.get(id);
+      for (const e of list) paint(e, st.dim && !lit ? { ...st, dim: false } : st);
+    }
     if (view.after) view.after(snap);
   }
   markSelected();
@@ -594,12 +787,30 @@ function activate(i) {
     view.host.hidden = k !== i;
   });
   [...document.getElementById("tabs").children].forEach((b, k) => b.setAttribute("aria-selected", String(k === i)));
+  updateLegend();
+}
+
+function updateLegend() {
+  const view = views[activeView];
+  legC4.hidden = view.def.type !== "c4";
+  if (legC4.hidden) return;
+  const used = new Set(view.def.items.map(it => nodeById.get(it.node).c4.type));
+  legC4.replaceChildren(
+    ...Object.keys(C4_LABEL).filter(t => used.has(t)).map(t => {
+      const s = el("span");
+      s.append(el("i", { class: t === "external" ? "sw-ext" : "sw-int" }), C4_LABEL[t]);
+      return s;
+    }),
+  );
 }
 const tabs = document.getElementById("tabs");
 if (views.length >= 2) {
   views.forEach((view, i) => {
     const b = el("button", { type: "button", role: "tab", class: "tab", "aria-selected": "false" }, view.def.title || VIEW_LABEL[view.def.type]);
-    b.addEventListener("click", () => activate(i));
+    b.addEventListener("click", () => {
+      stopPlay();
+      activate(i);
+    });
     tabs.append(b);
   });
 } else tabs.hidden = true;
@@ -618,6 +829,11 @@ function show(i) {
   setRich(document.getElementById("frame-desc"), frames[current].description);
   document.getElementById("prev").disabled = current === 0;
   document.getElementById("next").disabled = current === frames.length - 1;
+  if (scenarioMode) {
+    reached = Math.max(reached, current);
+    renderState();
+    renderLog();
+  }
 }
 
 const predictBox = document.getElementById("predict");
@@ -639,7 +855,7 @@ function predict(k) {
 }
 function forward() {
   if (pending !== null) return show(pending);
-  if (predictBox.checked && current < frames.length - 1) return predict(current + 1);
+  if (!scenarioMode && predictBox.checked && current < frames.length - 1) return predict(current + 1);
   show(current + 1);
 }
 function back() {
@@ -716,8 +932,14 @@ async function copyText(text, button) {
 }
 
 document.getElementById("sheet-close").addEventListener("click", closeSheet);
-document.getElementById("prev").addEventListener("click", back);
-document.getElementById("next").addEventListener("click", forward);
+document.getElementById("prev").addEventListener("click", () => {
+  stopPlay();
+  back();
+});
+document.getElementById("next").addEventListener("click", () => {
+  stopPlay();
+  forward();
+});
 document.getElementById("reveal").addEventListener("click", () => show(pending));
 document.getElementById("hint").addEventListener("click", ev => {
   const h = frames[pending].predict.hint;
@@ -732,9 +954,93 @@ predictBox.addEventListener("change", () => {
 });
 document.addEventListener("keydown", ev => {
   if (ev.key === "Escape" && !sheet.hidden) closeSheet();
-  if (ev.key === "ArrowLeft") back();
-  if (ev.key === "ArrowRight") forward();
+  if (ev.key === "ArrowLeft") {
+    stopPlay();
+    back();
+  }
+  if (ev.key === "ArrowRight") {
+    stopPlay();
+    forward();
+  }
 });
+
+const statePanel = document.getElementById("statepanel");
+const logEl = document.getElementById("log");
+const playBtn = document.getElementById("play");
+const scenarioTabs = document.getElementById("scenario-tabs");
+const scenarioSummary = document.getElementById("scenario-summary");
+const PLAY_MS = 1600;
+let reached = 0;
+let timer = null;
+
+function stopPlay() {
+  if (timer !== null) clearInterval(timer);
+  timer = null;
+  playBtn.textContent = "▷";
+  playBtn.setAttribute("aria-label", "自動再生");
+}
+
+function startPlay() {
+  if (current >= frames.length - 1) show(0);
+  playBtn.textContent = "❚❚";
+  playBtn.setAttribute("aria-label", "一時停止");
+  timer = setInterval(() => {
+    show(current + 1);
+    if (current >= frames.length - 1) stopPlay();
+  }, PLAY_MS);
+}
+
+function renderState() {
+  statePanel.replaceChildren(el("h2", {}, "状態"));
+  const meta = frameMeta[current];
+  for (const d of stateDefs) {
+    const row = el("div", { class: `state-row${meta.changed.has(d.key) ? " changed" : ""}` });
+    const value = Object.hasOwn(meta.state, d.key) ? meta.state[d.key] : "—";
+    row.append(el("span", { class: "state-key" }, d.label || d.key), el("span", { class: "state-val" }, value));
+    statePanel.append(row);
+  }
+}
+
+function renderLog() {
+  logEl.replaceChildren();
+  frames.slice(0, reached + 1).forEach((f, i) => {
+    const row = el("button", { type: "button", class: `logrow${i === current ? " now" : ""}${frameMeta[i].tone === "error" ? " err" : ""}` });
+    row.append(el("span", { class: "n" }, String(i + 1)), el("span", {}, f.description));
+    row.addEventListener("click", () => {
+      stopPlay();
+      show(i);
+    });
+    const li = el("li");
+    li.append(row);
+    logEl.append(li);
+  });
+}
+
+function selectScenario(i) {
+  stopPlay();
+  loadFrames(scenarios[i]);
+  reached = 0;
+  [...scenarioTabs.children].forEach((b, k) => b.setAttribute("aria-selected", String(k === i)));
+  const summary = scenarios[i].summary || "";
+  setRich(scenarioSummary, summary);
+  scenarioSummary.hidden = summary === "";
+  show(0);
+}
+
+playBtn.addEventListener("click", () => (timer === null ? startPlay() : stopPlay()));
+if (scenarioMode) {
+  predictBox.parentElement.hidden = true;
+  statePanel.hidden = stateDefs.length === 0;
+  logEl.hidden = false;
+  playBtn.hidden = false;
+}
+if (scenarios.length >= 2) {
+  scenarios.forEach((sc, i) => {
+    const b = el("button", { type: "button", role: "tab", class: "tab", "aria-selected": "false" }, sc.title);
+    b.addEventListener("click", () => selectScenario(i));
+    scenarioTabs.append(b);
+  });
+} else scenarioTabs.hidden = true;
 
 let laidOutWidth = canvas.clientWidth;
 let laidOutMobile = mq.matches;
@@ -748,7 +1054,7 @@ window.addEventListener("resize", () => {
     laidOutWidth = canvas.clientWidth;
     const crossed = mq.matches !== laidOutMobile;
     laidOutMobile = mq.matches;
-    for (const view of views) if (view.def.type === "structure" || view.def.type === "sequence") BUILDERS[view.def.type](view);
+    for (const view of views) if (["structure", "sequence", "c4"].includes(view.def.type)) BUILDERS[view.def.type](view);
     paintViews();
     if (crossed) {
       sheet.hidden = true;
@@ -908,7 +1214,8 @@ if (IS_PLAN) {
   if ((D.boundaries || []).length === 0) document.getElementById("boundaries").append(el("li", { class: "muted" }, "なし"));
 }
 
-show(0);
+if (scenarioMode) selectScenario(0);
+else show(0);
 </script>
 </body>
 </html>

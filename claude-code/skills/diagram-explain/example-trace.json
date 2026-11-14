@@ -1,0 +1,168 @@
+{
+  "version": 2,
+  "slug": "order-get-trace",
+  "title": "注文取得 API: 正常系と DB タイムアウト",
+  "summary": "GET /orders/{id} が、ハンドラー、サービス、キャッシュ、リポジトリ、DB をどう通るか。キャッシュミスの正常系と、DB が応答しない障害系を、同じ構成図の上で 1 ステップずつ追う。",
+  "lanes": [
+    { "id": "api", "label": "API 層" },
+    { "id": "app", "label": "アプリ層" },
+    { "id": "infra", "label": "インフラ層" }
+  ],
+  "views": [
+    { "id": "structure", "type": "structure" },
+    {
+      "id": "sequence",
+      "type": "sequence",
+      "participants": ["handler", "service", "cache", "repo", "db"],
+      "messages": ["e-req", "e-cache", "e-find", "e-sql"]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "handler",
+      "lane": "api",
+      "order": 0,
+      "label": "OrderHandler",
+      "sub": "HTTP ハンドラー",
+      "card": {
+        "role": "GET /orders/{id} を受け、注文 ID を取り出してサービスに渡し、結果を HTTP レスポンスに変換する。",
+        "actor": "API サーバーのプロセス内。リクエストごとに 1 つのゴルーチンで動く。",
+        "trigger": "ロードバランサーから GET /orders/{id} が届いたとき。",
+        "failure": "サービスがエラーを返したら 503 に変換して返す。変換後のエラーはアクセスログに残り、呼び出し元がリトライを判断する。"
+      }
+    },
+    {
+      "id": "service",
+      "lane": "app",
+      "order": 1,
+      "label": "OrderService",
+      "sub": "キャッシュ制御と取得",
+      "card": {
+        "role": "キャッシュを先に引き、なければリポジトリから取得してキャッシュに書き戻す。取得の順序を決める。",
+        "actor": "API サーバーのプロセス内。ハンドラーと同じゴルーチンで同期的に動く。",
+        "trigger": "ハンドラーが注文 ID を渡したとき。",
+        "failure": "リポジトリがエラーを返したらそのまま呼び出し元に返す。キャッシュへの書き戻しは行わず、次のリクエストが再び DB を引く。"
+      }
+    },
+    {
+      "id": "cache",
+      "lane": "infra",
+      "order": 1,
+      "label": "Redis キャッシュ",
+      "sub": "TTL 60 秒",
+      "card": {
+        "role": "注文の読み取り結果を 60 秒だけ保持し、DB への問い合わせを減らす。",
+        "actor": "別サーバーの Redis。サービスがネットワーク越しに引く。",
+        "trigger": "サービスが取得前に GET し、DB から取得できたあとに SET する。",
+        "failure": "Redis に繋がらないときは、ミスとして扱って DB に進む。キャッシュ障害でリクエストは失敗しないが、DB の負荷が上がる。"
+      }
+    },
+    {
+      "id": "repo",
+      "lane": "app",
+      "order": 2,
+      "label": "OrderRepository",
+      "sub": "DB 取得と再試行",
+      "card": {
+        "role": "注文を ID で SELECT し、DB のタイムアウトに限って 1 回だけ再試行する。",
+        "actor": "API サーバーのプロセス内。DB への接続はコネクションプールから借りる。",
+        "trigger": "サービスがキャッシュミスのあとに FindByID を呼んだとき。",
+        "failure": "再試行も失敗したらタイムアウトエラーを返す。呼び出し元（サービス）がそれを上に伝える。"
+      }
+    },
+    {
+      "id": "db",
+      "lane": "infra",
+      "order": 2,
+      "label": "PostgreSQL",
+      "sub": "orders テーブル",
+      "card": {
+        "role": "注文の正本を持ち、主キーの SELECT に答える。",
+        "actor": "別サーバーの PostgreSQL。リポジトリがプール経由で接続する。",
+        "trigger": "リポジトリが SELECT を発行したとき。クエリのタイムアウトは 2 秒。",
+        "failure": "負荷やロックで 2 秒以内に答えられないとき、リポジトリ側がタイムアウトとして扱う。DB 自体の障害はヘルスチェックで運用者が気づく。"
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e-req", "from": "handler", "to": "service", "data": "注文 ID" },
+    { "id": "e-cache", "from": "service", "to": "cache", "data": "GET order:{id}" },
+    { "id": "e-find", "from": "service", "to": "repo", "data": "FindByID(id)" },
+    { "id": "e-sql", "from": "repo", "to": "db", "data": "SELECT ... WHERE id = $1" }
+  ],
+  "state": [
+    { "key": "cache", "label": "キャッシュ" },
+    { "key": "attempt", "label": "DB 試行回数" },
+    { "key": "order", "label": "取得した注文" },
+    { "key": "status", "label": "HTTP ステータス" }
+  ],
+  "scenarios": [
+    {
+      "id": "normal",
+      "title": "正常系（キャッシュミス）",
+      "summary": "キャッシュにない注文を DB から取得し、キャッシュに保存して 200 を返す。",
+      "initial": { "cache": "未確認", "attempt": "0", "order": "なし", "status": "未返却" },
+      "trace": [
+        { "text": "GET /orders/42 を受け、ハンドラーがサービスに注文 ID 42 を渡す。", "active": ["handler", "e-req"] },
+        {
+          "text": "サービスが Redis を引く。order:42 はなく、ミスになる。",
+          "active": ["service", "e-cache", "cache"],
+          "state": { "cache": "ミス" }
+        },
+        { "text": "サービスがリポジトリに DB からの取得を頼む。", "active": ["e-find", "repo"] },
+        {
+          "text": "リポジトリが SELECT を実行し、DB が 1 行を返す。",
+          "active": ["e-sql", "db"],
+          "state": { "attempt": "1", "order": "注文 42" }
+        },
+        {
+          "text": "サービスが結果をキャッシュに保存し、ハンドラーが 200 を返す。",
+          "active": ["service", "handler"],
+          "state": { "cache": "保存済み（60 秒）", "status": "200 OK" }
+        }
+      ]
+    },
+    {
+      "id": "timeout",
+      "title": "障害系（DB タイムアウト）",
+      "summary": "DB が 2 秒以内に答えず、リポジトリが 1 回再試行して失敗し、503 を返す。",
+      "initial": { "cache": "未確認", "attempt": "0", "order": "なし", "status": "未返却" },
+      "trace": [
+        { "text": "GET /orders/42 を受け、ハンドラーがサービスに注文 ID 42 を渡す。", "active": ["handler", "e-req"] },
+        {
+          "text": "サービスが Redis を引く。order:42 はなく、ミスになる。",
+          "active": ["service", "e-cache", "cache"],
+          "state": { "cache": "ミス" }
+        },
+        { "text": "サービスがリポジトリに DB からの取得を頼む。", "active": ["e-find", "repo"] },
+        {
+          "text": "SELECT を発行したが、DB が 2 秒以内に答えず、タイムアウトになる。",
+          "active": ["e-sql", "db"],
+          "state": { "attempt": "1（失敗）" },
+          "tone": "error"
+        },
+        {
+          "text": "リポジトリが 1 回だけ再試行する。これも 2 秒以内に答えない。",
+          "active": ["repo", "e-sql"],
+          "state": { "attempt": "2（失敗）" },
+          "tone": "error"
+        },
+        {
+          "text": "リポジトリがタイムアウトを返し、サービスはキャッシュに書かずに上へ伝え、ハンドラーが 503 に変換する。",
+          "active": ["service", "handler"],
+          "state": { "status": "503 Service Unavailable" },
+          "tone": "error"
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    { "term": "キャッシュミス", "definition": "キャッシュに探している値がなく、元のデータ源（ここでは DB）まで取りに行く必要がある状態。" }
+  ],
+  "recall": [
+    {
+      "question": "DB タイムアウトのとき、サービスはなぜキャッシュに書き込まないのか。",
+      "answer": "書き込む値がないから。失敗した取得の結果を保存すると、エラーや空の値を TTL の間返し続けることになる。次のリクエストが再び DB を引き、回復していれば取得できる。"
+    }
+  ]
+}

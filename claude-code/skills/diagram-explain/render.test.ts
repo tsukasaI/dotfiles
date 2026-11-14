@@ -356,6 +356,156 @@ describe("step predict", () => {
   });
 });
 
+describe("scenarios", () => {
+  function withScenarios(): Record<string, any> {
+    const d = base();
+    delete d.steps;
+    d.state = [{ key: "k", label: "K" }, { key: "m" }];
+    d.scenarios = [
+      {
+        id: "s1",
+        title: "normal",
+        uses: ["b", "ab"],
+        initial: { k: "0" },
+        trace: [
+          { text: "t1", active: ["a"] },
+          { text: "t2", active: ["ab", "b"], state: { k: "1" } },
+        ],
+      },
+      { id: "s2", title: "fail", trace: [{ text: "t", active: ["a"], tone: "error" }] },
+    ];
+    return d;
+  }
+  const mutate = (fn: (d: Record<string, any>) => void) => {
+    const d = withScenarios();
+    fn(d);
+    return errorsOf(d);
+  };
+
+  test("a valid diagram is accepted and a proposed element used by a scenario is not 'never added'", () => {
+    expect(errorsOf(withScenarios())).toEqual([]);
+    const d = diagramOf(withScenarios());
+    expect(d.scenarios).toHaveLength(2);
+    expect(d.state).toHaveLength(2);
+    expect(d.steps).toEqual([]);
+  });
+
+  test("scenarios and state are normalized to [] when absent", () => {
+    expect(diagramOf(bare())).toMatchObject({ scenarios: [], state: [] });
+  });
+
+  test("an empty steps array may sit beside scenarios", () => {
+    const d = withScenarios();
+    d.steps = [];
+    expect(errorsOf(d)).toEqual([]);
+  });
+
+  test("sub is accepted up to 24 chars", () => {
+    const d = withScenarios();
+    d.nodes[0].sub = "x".repeat(24);
+    expect(errorsOf(d)).toEqual([]);
+  });
+
+  test.each<[string, (d: Record<string, any>) => void, string]>([
+    ["steps beside scenarios", d => (d.steps = base().steps), "scenarios: cannot be combined with steps"],
+    ["mode plan", d => (d.mode = "plan"), 'scenarios: not allowed in mode "plan"'],
+    ["state without scenarios", d => delete d.scenarios, "state: requires scenarios"],
+    ["no scenarios", d => (d.scenarios = []), "scenarios: 1-4 scenarios required"],
+    ["five scenarios", d => (d.scenarios = Array.from({ length: 5 }, (_, i) => ({ ...d.scenarios[1], id: `s${i}` }))), "scenarios: must be an array of at most 4"],
+    ["duplicate scenario id", d => (d.scenarios[1].id = "s1"), "scenarios[1]: duplicate id s1"],
+    ["oversize scenario title", d => (d.scenarios[0].title = "x".repeat(41)), "scenarios[0]: title required (<=40 chars)"],
+    ["oversize scenario summary", d => (d.scenarios[0].summary = "x".repeat(301)), "scenarios[0]: summary must be text (<=300 chars)"],
+    ["unknown active id", d => (d.scenarios[0].trace[0].active = ["zz"]), "scenarios[0].trace[0]: unknown id zz"],
+    ["active proposed element outside uses", d => (d.scenarios[1].trace[0].active = ["b"]), "scenarios[1].trace[0]: active b is not shown in this scenario"],
+    ["empty active", d => (d.scenarios[0].trace[0].active = []), "active must be an array of 1-6"],
+    ["seven active ids", d => (d.scenarios[0].trace[0].active = Array(7).fill("a")), "active must be an array of 1-6"],
+    ["undeclared state key in a trace step", d => (d.scenarios[0].trace[1].state = { zz: "1" }), "scenarios[0].trace[1].state: undeclared state key zz"],
+    ["undeclared state key in initial", d => (d.scenarios[0].initial = { zz: "1" }), "scenarios[0].initial: undeclared state key zz"],
+    ["oversize state value", d => (d.scenarios[0].initial = { k: "x".repeat(121) }), "scenarios[0].initial.k: value must be text (<=120 chars)"],
+    ["21 trace steps", d => (d.scenarios[0].trace = Array(21).fill(d.scenarios[0].trace[0])), "scenarios[0]: trace must be an array of 1-20"],
+    ["no trace", d => (d.scenarios[0].trace = []), "scenarios[0]: trace must be an array of 1-20"],
+    ["oversize trace text", d => (d.scenarios[0].trace[0].text = "x".repeat(201)), "scenarios[0].trace[0]: text required (<=200 chars)"],
+    ["unknown tone", d => (d.scenarios[0].trace[0].tone = "warn"), 'tone must be "error"'],
+    ["uses an existing element", d => (d.scenarios[0].uses = ["a"]), "scenarios[0]: uses a is not a proposed element"],
+    ["uses an unknown id", d => (d.scenarios[0].uses = ["zz"]), "scenarios[0]: uses zz is not a proposed element"],
+    ["uses an edge without its endpoint", d => (d.scenarios[0].uses = ["ab"]), "scenarios[0]: edge ab is shown while an endpoint is absent"],
+    ["proposed element in no scenario", d => (d.scenarios[0].uses = []), "proposed b is never added in a step"],
+    ["undeclared state key beside no declaration", d => delete d.state, "undeclared state key k"],
+    ["duplicate state key", d => d.state.push({ key: "k" }), "state[2]: duplicate key k"],
+    ["bad state key", d => (d.state[0].key = "a b"), "state[0]: key"],
+    ["oversize state label", d => (d.state[0].label = "x".repeat(41)), "state[0]: key"],
+    ["nine state entries", d => (d.state = Array.from({ length: 9 }, (_, i) => ({ key: `k${i}` }))), "state: must be an array of at most 8"],
+    ["empty state", d => (d.state = []), "state: 1-8 entries required"],
+    ["oversize sub", d => (d.nodes[0].sub = "x".repeat(25)), "nodes[0]: sub must be text (<=24 chars)"],
+    ["blank sub", d => (d.nodes[0].sub = " "), "nodes[0]: sub must be text (<=24 chars)"],
+  ])("rejects %s", (_, fn, expected) => {
+    expect(mutate(fn).some(e => e.includes(expected))).toBe(true);
+  });
+
+  test("accepts the bundled trace example", () => {
+    const raw = JSON.parse(readFileSync(join(HERE, "example-trace.json"), "utf8"));
+    expect(errorsOf(raw)).toEqual([]);
+    const d = diagramOf(raw);
+    expect(d.scenarios.map(s => s.id)).toEqual(["normal", "timeout"]);
+    expect(d.scenarios[1].trace.some(t => t.tone === "error")).toBe(true);
+    expect(d.nodes.every(n => n.sub)).toBe(true);
+  });
+});
+
+describe("c4 views", () => {
+  const example = () => JSON.parse(readFileSync(join(HERE, "example-c4.json"), "utf8")) as Record<string, any>;
+  const mutate = (fn: (d: Record<string, any>) => void) => {
+    const d = example();
+    fn(d);
+    return errorsOf(d);
+  };
+  const node = (d: Record<string, any>, id: string) => d.nodes.find((n: any) => n.id === id);
+
+  test("accepts the bundled c4 example and renders it", () => {
+    const raw = example();
+    expect(errorsOf(raw)).toEqual([]);
+    const d = diagramOf(raw);
+    expect(d.views.map(v => v.type)).toEqual(["c4", "c4"]);
+    expect(d.nodes.every(n => n.sub && n.c4)).toBe(true);
+    const html = renderHtml(d, [], readFileSync(join(HERE, "template.html"), "utf8"));
+    expect(html).toContain('id="leg-c4"');
+  });
+
+  test("c4 is optional: nodes without it and edges without tech still validate", () => {
+    expect(errorsOf(base())).toEqual([]);
+    const d = example();
+    delete d.edges[0].tech;
+    delete node(d, "spa").c4.tech;
+    expect(errorsOf(d)).toEqual([]);
+  });
+
+  test.each<[string, (d: Record<string, any>) => void, string]>([
+    ["unknown c4 type", d => (node(d, "spa").c4.type = "service"), "nodes[4]: c4 needs a type"],
+    ["oversize c4 tech", d => (node(d, "spa").c4.tech = "x".repeat(41)), "c4 needs a type"],
+    ["oversize edge tech", d => (d.edges[0].tech = "x".repeat(41)), "edges[0]: tech must be text (<=40 chars)"],
+    ["system in a container view", d => (d.views[1].items[1].node = "shop"), "type system is not allowed in a container view"],
+    ["container in a context view", d => d.views[0].items.push({ node: "spa", col: 3, row: 0 }), "type container is not allowed in a context view"],
+    ["item node without c4", d => delete node(d, "customer").c4, "node customer needs a c4 type"],
+    ["unknown item node", d => (d.views[0].items[0].node = "zz"), "views[0].items[0]: unknown node"],
+    ["node listed twice", d => d.views[0].items.push({ node: "shop", col: 3, row: 3 }), "node shop appears twice"],
+    ["two items in one cell", d => (d.views[0].items[1].col = 0), "another item already sits at col 0 row 1"],
+    ["col out of range", d => (d.views[0].items[0].col = 6), "col must be 0-5 and row 0-7"],
+    ["row out of range", d => (d.views[0].items[0].row = 8), "col must be 0-5 and row 0-7"],
+    ["no items", d => (d.views[0].items = []), "items must be an array of 1-20"],
+    ["bad level", d => (d.views[0].level = "component"), "level must be context or container"],
+    ["container view without boundary", d => delete d.views[1].boundary, "boundary required in a container view"],
+    ["context view with boundary", d => (d.views[0].boundary = { label: "b", nodes: ["shop"] }), "boundary is not allowed in a context view"],
+    ["boundary node not in items", d => d.views[1].boundary.nodes.push("shop"), "boundary node shop is not in items"],
+    ["boundary without label", d => (d.views[1].boundary.label = " "), "boundary needs a label"],
+    ["non-member inside the boundary box", d => (d.views[1].items[0].col = 3), "views[1]: customer sits inside the boundary box but is not one of its nodes"],
+    ["zoom on a non-system node", d => (d.views[0].zoom.node = "customer"), "zoom.node must be a system node in items"],
+    ["zoom to an unknown view", d => (d.views[0].zoom.view = "zz"), "zoom.view must be the id of a container c4 view"],
+    ["zoom to a context view", d => (d.views[0].zoom.view = "context"), "zoom.view must be the id of a container c4 view"],
+  ])("rejects %s", (_, fn, expected) => {
+    expect(mutate(fn).some(e => e.includes(expected))).toBe(true);
+  });
+});
+
 describe("checkRefs", () => {
   const withRef = (file: string, line: number, excerpt: string): Diagram => {
     const d = base();
@@ -400,6 +550,13 @@ describe("renderHtml", () => {
     expect(html).toContain('id="predict"');
     expect(html).toContain('id="hint"');
     expect(html).toContain('id="predict-hint"');
+  });
+
+  test("the template carries the scenario controls and renders the trace example", () => {
+    const raw = JSON.parse(readFileSync(join(HERE, "example-trace.json"), "utf8"));
+    const html = renderHtml(diagramOf(raw), [], template);
+    for (const id of ["scenario-tabs", "play", "statepanel", "log"]) expect(html).toContain(`id="${id}"`);
+    expect(html).toContain('"scenarios"');
   });
 
   test("an excerpt cannot close the data script or inject markup", () => {
