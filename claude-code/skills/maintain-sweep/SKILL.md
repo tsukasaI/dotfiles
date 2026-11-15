@@ -32,10 +32,8 @@ Launch argument: $ARGUMENTS
 
 Split by context, not by problem type: each agent reads one slice of the
 code once and applies several related lenses to it, instead of ten agents
-each re-reading the same code for one lens. On the fini 10/12 snapshot the
-5-agent split re-found as many known-good issues (5/10) as the former
-10-agent split, with about 21% fewer output tokens; each run caught issues
-the other missed, so a single sweep is a sample, not a full audit.
+each re-reading the same code for one lens. A single sweep is a sample,
+not a full audit: separate runs catch different issues.
 
 | Name | Lenses (the `routine` tag on each finding) |
 |---|---|

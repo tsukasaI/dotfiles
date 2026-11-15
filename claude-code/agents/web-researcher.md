@@ -17,4 +17,3 @@ Guidelines:
   ~18 months, or two sources disagreeing where one is clearly older. State the date
   (or "undated") next to the claim instead of omitting the caveat.
   - Example: a 2022-dated post describing a library's API → "as of 2022; verify against current docs."
-  - NG: an undated evergreen reference (e.g. a language spec) — no flag needed.

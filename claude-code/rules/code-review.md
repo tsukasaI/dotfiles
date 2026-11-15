@@ -40,10 +40,5 @@ Source: distilled from [google/eng-practices](https://github.com/google/eng-prac
 - Refactoring is a separate PR from feature/bugfix changes — never combine them.
 - Exceptions: whole-file deletions, mechanical refactors from trusted tooling.
 
-## PR / commit description content
-(Format itself follows the Contextual Commits spec in CLAUDE.md.)
-- Subject line: imperative, complete sentence (`feat(rpc): delete the FizzBuzz RPC`, not `Deleting...` or `Deleted...`).
-- Vague subjects (`Fix bug`, `Update code`, `Move things`) are not acceptable.
-
 ## Reader confusion = code defect
 If you find yourself wanting to explain a change in chat or a PR comment to make it understandable, the diff or its comments are wrong. Fix the diff instead — chat explanations don't reach future readers.

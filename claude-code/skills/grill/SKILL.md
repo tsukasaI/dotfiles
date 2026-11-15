@@ -26,17 +26,12 @@ and a written record.
 
 ## Why this shape
 
-- **≤3 questions per round, one theme.** Working memory holds about 4 chunks
-  (Cowan 2001); a round on one theme keeps the user from juggling contexts.
+- **≤3 questions per round, one theme**, so the user never juggles contexts.
 - **Answer before recommendation on heavy questions.** A recommendation shown
-  first acts as a default/anchor and invites shallow agreement. Asking for the
-  user's own answer first, then showing the recommendation with the strongest
-  counter-argument ("consider the opposite", Mussweiler et al. 2000), keeps
-  the thinking theirs.
-- **"約N問", estimated high.** In a meta-analysis of 32 web-survey experiments
-  (Villar et al. 2013), constant progress indicators didn't reduce breakoff,
-  fast-to-slow reduced it, slow-to-fast increased it. So overestimate early
-  and never show the count as a deadline.
+  first anchors the user; ask for their answer, then show the recommendation
+  with its strongest counter-argument.
+- **"約N問", estimated high.** A count that shrinks faster than expected keeps
+  people going; one that grows makes them quit. Never show it as a deadline.
 - **State on screen, not in the user's head.** Decided items are re-shown
   every round so the user never has to remember earlier answers.
 
