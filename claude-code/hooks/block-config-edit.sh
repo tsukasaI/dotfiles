@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# PreToolUse hook: blocks Edit/Write to linter/formatter config files.
-# Prevents Claude from weakening tool configs instead of fixing code.
+# PreToolUse hook: blocks Edit/Write to the guardrail files, secret-scan
+# config, and package-manager lockfiles.
 # exit 0 -> allow, exit 2 -> block (stderr is fed back to the model as the reason)
 
 # -E: without it the ERR trap below does not fire inside functions, and a
@@ -37,39 +37,9 @@ case "$FILE_PATH/" in
   *//* | */./* | */../*) deny "PATH_FORM" "file_path must be normalized (no //, ./ or ../ segments) — failing closed" ;;
 esac
 
-# Case-insensitive throughout because APFS is: `.ESLINTRC` is the same file as
-# `.eslintrc`.
+# Case-insensitive throughout because APFS is: `.GITLEAKS.TOML` is the same
+# file as `.gitleaks.toml`.
 shopt -s nocasematch
-
-# Protected config file patterns
-PROTECTED=(
-  '.eslintrc'
-  '.eslintrc.*'
-  'eslint.config.*'
-  '.prettierrc'
-  '.prettierrc.*'
-  'prettier.config.*'
-  'biome.json'
-  'biome.jsonc'
-  '.oxlintrc.json'
-  '.oxlintrc.jsonc'
-  'oxlint.config.*'
-  '.oxfmtrc.json'
-  '.oxfmtrc.jsonc'
-  'oxfmt.config.*'
-  '.ruff.toml'
-  'ruff.toml'
-  '.golangci.yml'
-  '.golangci.yaml'
-  'golangci.yml'
-  '.editorconfig'
-  'rustfmt.toml'
-  '.rustfmt.toml'
-  'clippy.toml'
-  '.clippy.toml'
-  '.gitleaks.toml'
-  '.gitleaksignore'
-)
 
 # Package-manager lockfiles: tool-generated, hand-edits drift from what the
 # tool would produce and get silently clobbered on the next install —
@@ -85,7 +55,7 @@ LOCKFILES=(
 )
 
 check_path() {
-  local path=$1 basename pattern content
+  local path=$1 basename pattern
   basename=$(basename "$path")
 
   # Guardrail self-protection (#34, #70): the files that define these guardrails
@@ -129,15 +99,15 @@ check_path() {
       ;;
   esac
 
-  for pattern in "${PROTECTED[@]}"; do
-    # shellcheck disable=SC2254
-    case "$basename" in
-      $pattern)
-        printf '[BLOCKED: CONFIG_PROTECTION] Editing linter/formatter config "%s" is not allowed.\nFix the code to satisfy the tool, not the other way around.\n' "$basename" >&2
-        exit 2
-        ;;
-    esac
-  done
+  # Secret scanning in any project, plus the central config every lefthook
+  # passes with --config: an allowlist entry here hides a leaked credential.
+  case "$path" in
+    */.gitleaks.toml | */.gitleaksignore | \
+    */claude-code/gitleaks/* | */.config/gitleaks/*)
+      printf '[BLOCKED: SECRET_SCAN_PROTECTION] "%s" configures gitleaks and must not be edited by Claude.\nAsk the user to apply the change manually; a real leaked credential is rotated, never allowlisted.\n' "$basename" >&2
+      exit 2
+      ;;
+  esac
 
   for pattern in "${LOCKFILES[@]}"; do
     # shellcheck disable=SC2254
@@ -148,20 +118,6 @@ check_path() {
         ;;
     esac
   done
-
-  # pyproject.toml is ruff's most common config location, but it also holds
-  # unrelated project metadata (deps, build system, etc.) that legitimately
-  # needs editing (#20) — so only protect it when a [tool.ruff] section is
-  # actually present, not unconditionally like the dedicated ruff.toml files
-  # above. A pyproject.toml that doesn't exist yet (new file via Write) has no
-  # ruff config to protect, so it's allowed.
-  if [[ "$basename" == "pyproject.toml" && -f "$path" ]]; then
-    content=$(cat "$path" 2>/dev/null) || content=""
-    if [[ "$content" =~ \[tool\.ruff(\.|\]) ]]; then
-      printf '[BLOCKED: CONFIG_PROTECTION] "%s" contains a [tool.ruff] section; editing linter/formatter config is not allowed.\nFix the code to satisfy the tool, not the other way around.\n' "$basename" >&2
-      exit 2
-    fi
-  fi
 }
 
 # Resolve symlinks in the nearest existing ancestor and re-append the not-yet-

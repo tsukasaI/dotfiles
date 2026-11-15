@@ -87,8 +87,11 @@ environment's setup script installs the shared config instead. Details are in
 
 ## Pitfalls
 
-- **`block-config-edit.sh` hard-blocks Edit/Write** on linter/formatter
-  configs in any project, and on the guard files themselves.
+- **`block-config-edit.sh` hard-blocks Edit/Write** on gitleaks config
+  (`.gitleaks.toml`, `.gitleaksignore`, `claude-code/gitleaks/`) and
+  lockfiles in any project, and on the guard files themselves. Linter and
+  formatter configs are editable: loosening one is caught in review, not
+  here.
 - **Skills run live through the `~/.claude/skills` symlink**: an edit is in
   production immediately, committed or not. Check `git status` before assuming
   committed state equals running state.

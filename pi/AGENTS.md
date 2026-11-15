@@ -1,6 +1,6 @@
 # Global instructions (pi)
 
-<!-- distilled-from: claude-code/CLAUDE.md sha256:6b3c65049150b581451340c69bf29118fd0bbe0a0c7b5668bc1c3e83660a2769 -->
+<!-- distilled-from: claude-code/CLAUDE.md sha256:6b35b63b3552cff4269d2953eec7b1328ce81370773bcd17a4e6fe65649fb3a3 -->
 
 Source: `~/dotfiles/pi/AGENTS.md`, symlinked to `~/.pi/agent/AGENTS.md`.
 Distilled from `~/dotfiles/claude-code/CLAUDE.md`, keeping only the parts
@@ -15,7 +15,7 @@ prompt directly, so don't repeat their content in this file. A repo's own `AGENT
   not allow (no catalog row, unsupported syntax, or a rule hit such as `rm`
   or a secret read). The
   file-guard extension blocks reads of secret paths and writes to
-  linter/formatter configs, lockfiles, and guard files. Neither is a
+  gitleaks configs, lockfiles, and guard files. Neither is a
   sandbox. Act as if each command is final.
 - When a guard blocks a call, never retry with an equivalent command
   (`unlink` for `rm`, a different tool, piping around it). Show me the

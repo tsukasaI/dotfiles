@@ -14,6 +14,7 @@ Review for:
 - Security: hardcoded secrets, injection (SQL, XSS, command), insecure deserialization, path traversal
 - Quality: error handling gaps at boundaries, race conditions, resource leaks
 - Correctness: edge cases, off-by-one errors, nil/null handling
+- Weakened checks: a change that loosens lint, format, type-check or test configuration (a rule disabled, a severity lowered, paths excluded) is at least medium, kind behavior. No hook blocks these edits, so this review is the check; config-only PRs and dotfiles/ops get no review.
 
 What to report:
 - Every issue the change introduced or worsened, low severity and uncertain ones included. The caller sorts them; a dropped real bug costs more than a filtered note.

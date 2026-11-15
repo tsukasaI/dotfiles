@@ -136,8 +136,9 @@ describe("extension", () => {
 });
 
 describe("real block-config-edit.sh", () => {
-	test("blocks linter config and lockfiles, allows ordinary files", async () => {
-		expect((await checkWrite("/tmp/pi-fg-proj/.eslintrc.json"))?.reason).toContain("CONFIG_PROTECTION");
+	test("blocks secret-scan config and lockfiles, allows linter config and ordinary files", async () => {
+		expect((await checkWrite("/tmp/pi-fg-proj/.gitleaks.toml"))?.reason).toContain("SECRET_SCAN_PROTECTION");
+		expect(await checkWrite("/tmp/pi-fg-proj/.eslintrc.json")).toBeUndefined();
 		expect((await checkWrite("/tmp/pi-fg-proj/bun.lock"))?.reason).toContain("LOCKFILE_PROTECTION");
 		expect((await checkWrite(`${CLAUDE_SETTINGS}`))?.reason).toContain("GUARDRAIL_PROTECTION");
 		expect(await checkWrite("/tmp/pi-fg-proj/src/a.ts")).toBeUndefined();
