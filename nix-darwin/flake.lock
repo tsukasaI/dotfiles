@@ -212,16 +212,16 @@
     "shguard": {
       "flake": false,
       "locked": {
-        "lastModified": 1794321686,
-        "narHash": "sha256-LbeOhWAEEtvrO7lAnou9DzJTClEuoOlN3RsjgugrjkA=",
+        "lastModified": 1794711203,
+        "narHash": "sha256-+oViT6qez3vUQyLRl+Sd0XTvc0u0VL411ff5EKGGAQw=",
         "owner": "tsukasaI",
         "repo": "shguard",
-        "rev": "0276a1212882a836199fa22ba3a6c0b91915bdfb",
+        "rev": "07db2abcb32de2b371b6cef1b58375809c657cd9",
         "type": "github"
       },
       "original": {
         "owner": "tsukasaI",
-        "ref": "v0.12.0",
+        "ref": "v0.13.0",
         "repo": "shguard",
         "type": "github"
       }
