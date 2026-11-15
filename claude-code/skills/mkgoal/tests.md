@@ -16,7 +16,8 @@ and whenever the main-loop model changes tier.
   closed, commented on, or edited.
 - The skill never invokes `/goal`, other skills, or subagents.
 - Slot questions are asked via a single batched AskUserQuestion call (one
-  question per open slot), not plain-text messages; follow-up re-asks of a
+  question per open slot; with more than 4, further calls back to back),
+  not plain-text messages; follow-up re-asks of a
   single slot also use AskUserQuestion. Constraints and the turn cap are
   never asked about (test 6's re-ask of a given subjective constraint is
   the one exception).

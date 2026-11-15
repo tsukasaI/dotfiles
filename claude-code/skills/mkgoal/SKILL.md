@@ -7,7 +7,7 @@ allowed-tools: Read, Grep, Glob, AskUserQuestion, Bash, Write
 
 # /mkgoal — draft a verifiable /goal statement
 
-Produce ONE copy-pasteable `/goal` statement, then stop. This skill never runs
+Produce one copy-pasteable `/goal` statement, then stop. This skill never runs
 `/goal`, never executes the verification command, and never invokes other
 skills or subagents. Match the user's conversation language in all dialogue.
 Bash is scoped to two commands only: `gh issue view <N> --json
@@ -24,10 +24,10 @@ Launch argument: $ARGUMENTS
 
 ## Why the bars below exist (how /goal judges completion)
 
-- After each turn, a small evaluator model (Haiku by default) reads ONLY the
+- After each turn, a small evaluator model (Haiku by default) reads only the
   conversation transcript and answers yes/no: is the condition met? It cannot
   run tools — anything it must judge has to be visible in the transcript.
-- `/goal` has NO built-in turn cap. The cap only exists if written into the
+- `/goal` has no built-in turn cap. The cap only exists if written into the
   statement text itself ("or stop after N turns").
 - Setting a goal starts a turn immediately, with the condition itself as the
   directive — the statement is also Claude's first prompt, so it must say WHAT
@@ -42,7 +42,7 @@ Launch argument: $ARGUMENTS
 
 If the launch argument consists solely of one or more `#<digits>` tokens
 (space-separated, as `/triage`'s closing pointer suggests), this is issue
-mode: draft ONE combined `/goal` statement covering every listed issue, in
+mode: draft one combined `/goal` statement covering every listed issue, in
 the order given.
 
 **Batch size**: group sizing (up to about 30 issues per loop, a soft guide)
@@ -93,7 +93,8 @@ exactly as written.
 ## Slots (all four required)
 
 Fill silently from the launch argument; ask only about slots 1–2 when they
-are missing or not yet checkable. Slots 3–4 are never asked about, except
+are missing or not yet checkable. If the launch argument is empty, first
+ask what the user wants to achieve. Slots 3–4 are never asked about, except
 re-asking a given constraint that fails the objectivity gate.
 
 1. **Completion condition** — objective: a reader of the transcript can answer
@@ -101,7 +102,7 @@ re-asking a given constraint that fails the objectivity gate.
    metric + threshold, or artifact.
 2. **Verification command** — the exact command whose output proves the
    condition (e.g. `go test ./...`, `npm run lighthouse`).
-3. **Constraints** — change-specific only: what must NOT change for this
+3. **Constraints** — change-specific only: what must not change for this
    task beyond the standard constraints applied to every goal (Standing
    implementation pattern), e.g. "public API of `pkg/x` unchanged". Taken
    from the launch argument (or the Triage comment in issue mode); when
@@ -118,7 +119,7 @@ re-asking a given constraint that fails the objectivity gate.
 
 ### Objectivity gate for slots 1 and 3 (the most important check)
 
-Treat the condition as UNFILLED if it rests on judgment words with no measure:
+Treat the condition as unfilled if it rests on judgment words with no measure:
 clean, better, improved, refactored, readable, faster, more robust, nicer,
 きれいに, いい感じ, 改善. Ask the user to restate it as something checkable.
 The same gate applies to a given constraint ("without making it worse" is
@@ -155,8 +156,9 @@ Two more ways a condition or constraint fails the gate, even when objective:
 
 ## Dialogue rules
 
-- Ask about ALL missing or below-bar slots in ONE AskUserQuestion call — one
-  question per slot (per issue in issue mode), up to 4 per call. Put
+- Ask about all missing or below-bar slots in one AskUserQuestion call — one
+  question per slot (per issue in issue mode), up to 4 per call; with more
+  than 4, make further calls back to back until every question is asked. Put
   concrete candidates in the options, such as an objective proxy for a
   subjective condition. Free-form answers arrive through the built-in
   "Other" option. With slots 1–2 filled, ask nothing and go straight to
@@ -346,7 +348,7 @@ Rules:
   and list the rest as follow-up `/mkgoal #...` lines outside the final
   code block; or "Tighten further" with the user's guidance. Never present
   a statement that failed the check.
-- The turn cap MUST appear as the "or stop after <N> turns" clause. `/goal`
+- The turn cap must appear as the "or stop after <N> turns" clause. `/goal`
   has no separate cap setting.
 - Every condition must be judgeable from command output visible in the
   transcript. Multiple conditions: join with "and", each tied to a command.
@@ -361,7 +363,7 @@ Rules:
 - The standard-constraint, sonnet/reviewer/squash-merge, review-gate
   reference, needs-decision cap, stuck-rule, Unverified, final re-run
   (issue mode), and Follow-ups clauses from Standing implementation pattern above are always
-  included verbatim in intent. Never drop them for brevity. The one
+  included; their wording may be tightened, their content never dropped. The one
   exception is a `dotfiles` or `ops` target: those repos commit straight
   to main with no review gate, and their config/doc edits stay in the main
   loop (global CLAUDE.md, Workflow and Model behavior), so replace the
@@ -404,14 +406,3 @@ Rules:
 | "文が長いと格好悪いから要素を削ろう" | 4,000字まで許容される。短さより要素の完全性。ただし改行は入れない。 |
 | "コミットの分け方も完了条件に入れよう" | 入れない。マージ後は変えられず、満たせないままターン上限まで回る。既存テストは標準の assertion 数の制約が守る。 |
 | "目分量で4,000字以内だろう" | 必ず `wc -m` で数える。超過した statement は /goal に拒否される。 |
-
-## Hard limits
-
-- Never execute the verification command or any state-changing command.
-- Never invoke `/goal`, the Skill tool, or subagents.
-- If the launch argument is empty, first ask what the user wants to achieve,
-  then run slot filling as above.
-- Bash is limited to the Assemble length check (`wc -m` on the scratchpad
-  file, never a heredoc) and, in issue mode, `gh issue view <N> --json
-  title,body,url,comments`; never `close`/`comment`/`edit` an issue from
-  within this skill.
