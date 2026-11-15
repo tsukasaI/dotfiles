@@ -9,7 +9,7 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 | Script | Matcher | Description |
 |---|---|---|
 | (inline) `shguard` | `Bash` | Deny dangerous shell commands per `claude-code/shguard/config.toml`. Runs as `/run/current-system/sw/bin/shguard` with `args: []` and `onFailure: "block"` (a crash or timeout refuses the call); a config that fails to load denies every call; see `docs/shguard-migration-deltas.md` |
-| `block-config-edit.sh` | `Edit\|Write` | Block edits to gitleaks config in any project (.gitleaks.toml, .gitleaksignore, the central claude-code/gitleaks/and its~/.config/gitleaks/ link), package-manager lockfiles, and the guardrail files themselves (this hook, `claude-code/{hooks,lib}/`, the mod's guard modules, shguard `config.toml`, `settings.json`, lefthook config in any project). Basenames match case-insensitively and a symlinked path is also checked by its resolved target. Requires an absolute, normalized `file_path`; anything else fails closed. |
+| `block-config-edit.sh` | `Edit\|Write` | Block edits to gitleaks config in any project (`.gitleaks.toml`, `.gitleaksignore`, the central `claude-code/gitleaks/` and its `~/.config/gitleaks/` link), package-manager lockfiles, and the guardrail files themselves (this hook, `claude-code/{hooks,lib}/`, the mod's guard modules, shguard `config.toml`, `settings.json`, lefthook config in any project, and more; the full list is the script's `case`). Basenames match case-insensitively and a symlinked path is also checked by its resolved target. Requires an absolute, normalized `file_path`; anything else fails closed. |
 | `slop-guard.ts` | `Edit\|Write` | Deny prose edits (`.md`/`.mdx`/`.txt`) that newly introduce an em dash or a cliché phrase from `slop-phrases.conf`; only the net-new count vs. the pre-edit text is checked, never the whole file. `SLOP_GUARD_DISABLE=1` disables it. |
 | `agent-browser-guard.ts` | `mcp__agent-browser__.*` | Fail-closed argument guard for the unsandboxed agent-browser MCP: tool allowlist, forbidden launch/state keys, `path`/`output`/`baseline` confined to `/private/tmp/claude-501/`, http(s)/about:blank URLs only. |
 
@@ -29,7 +29,7 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 
 | Script | Matcher | Description |
 |---|---|---|
-| `~/.claude/hooks/herdr-agent-state.sh session` | `*` (timeout 10s) | Reports agent session state to `herdr`. **Not part of this repo** — self-installed by the `herdr` flake package outside `setup.sh`'s symlinks; see root `README.md` Prerequisites/Troubleshooting. |
+| `~/.claude/hooks/herdr-agent-state.sh session` | `*` (timeout 10s) | Reports agent session state to `herdr`. **Not part of this repo**: self-installed by the `herdr` flake package outside `setup.sh`'s symlinks; see root `README.md` Prerequisites/Troubleshooting. |
 
 ## Mod (`claude-code/mod/`)
 
