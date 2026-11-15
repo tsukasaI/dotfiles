@@ -38,21 +38,21 @@ narrow first, widen only on evidence.
    first (`Read`). A `[[row]]` allows a command shape: every row widens
    Allow, and the user owns it. A `[[rule]]` (outcome `block` or `ask`) can
    only raise a decision and has no reason text, so its `id` is the reason.
-   Heads like `find`, `sed`, `awk`, `bun`, `node`, `python*`, `sh`,
-   `env`, `xargs`, `sudo`, `ssh` have no row, and a user row cannot add
-   one: they are shguard's `INEXPRESSIBLE_HEADS`, so a row for them fails
-   to load unless it sets `runs_code = true`, which keeps every command
-   under it an Ask (a refusal here). A config that fails to load denies
-   every Bash call system-wide, so a draft row for such a head locks the
-   session out (tsukasaI/shguard#1277 asks for an opt-in). 0.11 added a
-   row for `fd`, so check upstream tsukasaI/shguard#1111 before assuming a
-   head can never get one. Match existing formatting and comments in the
+   Heads that run other code or have option syntax the grammar cannot
+   express (`find`, `sed`, `awk`, `bun`, `node`, `python*`, `sh`, `env`,
+   `xargs`, `sudo`, `ssh`, ...) have no catalog row. A user row for one
+   loads with a warning and makes shguard Allow commands under that head
+   (reason and log class `allow_user_code_row`); `runs_code = true` keeps
+   it an Ask (a refusal here). Treat such a row as a code-execution grant
+   and propose it only with the user's explicit decision. Run
+   `shguard check --deny-warnings --config <path>` on a candidate to see
+   the warnings. Match existing formatting and comments in the
    surrounding `# ─────` section.
 
 3. **Write the rule narrowly.** Prefer a specific command shape over a broad
    one. A new row widens what is allowed, and Allow is not a claim that the
-   command is safe. Since 0.11 a target matches a basename at any depth
-   (`cat sub/.env` is denied, tsukasaI/shguard#1113), so a bare name in a
+   command is safe. A target matches a basename at any depth
+   (`cat sub/.env` is denied), so a bare name in a
    rule also hits a search pattern that is a path word (`rg id_rsa`).
 
 4. **Present the diff, don't try to apply it.** `config.toml` refuses
@@ -83,12 +83,14 @@ narrow first, widen only on evidence.
      `> file`, `<`, heredocs, subshells, `&`) is denied ("outside the
      supported subset").
 
-   Verified working examples (re-run these, don't take them on faith):
+   Verified working examples (re-run these, don't take them on faith; run
+   the `rm` case first, before and after any edit: if it doesn't deny, the
+   guardrail itself is broken, so stop):
    ```
    echo '{"tool_input":{"command":"rm -rf foo"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard        # deny
    echo '{"tool_input":{"command":"rg foo"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard            # allow
    echo '{"tool_input":{"command":"git commit -m \"fix secret handling\""},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard  # allow (quoted "secret")
-   echo '{"tool_input":{"command":"cat foo/.env.local"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard  # deny (basename targets since 0.11; tsukasaI/shguard#1113)
+   echo '{"tool_input":{"command":"cat foo/.env.local"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard  # deny (basename target)
    ```
 
 6. **Run the full regression suite** before considering the change done.
@@ -129,8 +131,8 @@ matching row, unsupported syntax, an `ask` rule) into `deny`, in every
 this (a `[[rule]]` with outcome `ask` is still the right choice when a human
 might actually see the prompt); `ask_outcome` is a global floor applied after
 evaluation, not something each rule opts into individually. A config that
-fails to load (malformed TOML, unknown key, a 0.9-format file) denies every
-Bash call, so a broken edit locks the session out.
+fails to load denies every Bash call, so a broken edit locks the session
+out.
 
 ## History (why this is narrow-first, not a design opinion)
 
@@ -144,13 +146,3 @@ parser-based approach closes most of that class structurally (see
 found and resolved during the migration), but re-verify with the parity
 suite before trusting a change, the lesson (narrow rules, real regression
 tests, don't relitigate a fixed case) still applies.
-
-## Re-verify (run before trusting this file, and before/after any edit)
-
-```
-echo '{"tool_input":{"command":"rm -rf foo"},"tool_name":"Bash","hook_event_name":"PreToolUse"}' | shguard
-```
-The parity suite (`tests/shguard-parity-check.sh`) is the user's or
-pre-push's to run (step 6). If it fails, or the `rm` case doesn't deny, stop, the
-guardrail itself is broken and every subsequent Bash call in the session is
-affected.

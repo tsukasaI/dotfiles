@@ -37,8 +37,10 @@ description: The code-reviewer gate between `gh pr create` and `gh pr merge` in 
   - Auto-fix criteria, all must hold: stays within Scope (the issue's
     triage `Scope`, plus the files the PR touches, plus any doc or comment
     the PR made false); touches no public API/CLI flag, config schema,
-    dependency, or security boundary; deletes no test lines; estimated fix
-    ≤ 30 lines.
+    dependency, or security boundary; adds at least as many test assertion
+    lines as it deletes (`mkgoal`'s assertion-count constraint, so a
+    call-shape fix to an assertion still qualifies); estimated fix ≤ 30
+    lines.
   - `auto-fix`: fix it in the same PR the same way as a critical/high fix,
     re-review (below), and list it under `## Auto-fixed` in the PR body,
     one line per finding (summary, `file:line`, its `git diff --numstat`

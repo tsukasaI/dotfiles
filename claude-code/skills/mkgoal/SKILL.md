@@ -17,14 +17,14 @@ file). Write is scoped to that one scratchpad file. Never any other
 command, and never `gh issue
 close`/`comment`/`edit` (that is `/triage`'s job, not this skill's).
 
-Root quality: **checkable** — the evaluator model (Haiku by default) can answer yes/no from
+Root quality: **checkable** — the evaluator model can answer yes/no from
 transcript text alone, with zero judgment.
 
 Launch argument: $ARGUMENTS
 
 ## Why the bars below exist (how /goal judges completion)
 
-- After each turn, a small evaluator model (Haiku by default) reads only the
+- After each turn, a small evaluator model reads only the
   conversation transcript and answers yes/no: is the condition met? It cannot
   run tools — anything it must judge has to be visible in the transcript.
 - `/goal` has no built-in turn cap. The cap only exists if written into the

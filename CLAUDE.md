@@ -99,10 +99,11 @@ environment's setup script installs the shared config instead. Details are in
   chain into each repo's own lefthook config, but lefthook (and Python
   `pre-commit`) refuse to `install` while a global hooksPath is set — a
   structural conflict with normal `lefthook install` usage, not a one-off
-  bug. Every repo now carries its own `lefthook.yaml` with at least a gitleaks pre-commit check,
-  installed via `lefthook install` (see `setup.sh`). Don't reintroduce a
-  global `core.hooksPath` — it will silently break `lefthook install` in
-  every other repo on this machine again.
+  bug. Each repo carries its own lefthook config, installed via
+  `lefthook install` (see `setup.sh`); a gitleaks pre-commit is not in
+  every one yet (cc-go, my-go-template and oyasumi-ai lack it). Don't
+  reintroduce a global `core.hooksPath` — it will silently break
+  `lefthook install` in every other repo on this machine again.
 - **Trust files over docs.** When any doc — including this one — disagrees
   with reality, reality wins. Unlike the global report-only default
   (*Clarify before acting* in the global CLAUDE.md), fix the doc in the

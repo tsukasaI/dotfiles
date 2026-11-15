@@ -3,7 +3,8 @@
 shguard allows a Bash command only when it parsed the whole command and every
 simple command matches a catalog row; everything else is refused. Use the
 built-ins first (`Grep` for content, `Glob` for filenames). `find`, `sed`, and
-`awk` are refused outright (they can never get a catalog row), as are `curl`,
+`awk` are refused outright (they have no catalog row, and a user row for one
+would grant code execution), as are `curl`,
 non-GET `gh api`, and most other commands; `grep` ignores `.gitignore`, so
 prefer `rg`. `fd` works on a directory named relative to the working directory;
 its `-x` form and absolute paths under `/Users` are refused.

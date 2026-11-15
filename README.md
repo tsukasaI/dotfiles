@@ -95,6 +95,8 @@ claude-code/
 ├── CLAUDE.md            # Global instructions (→ ~/.claude/CLAUDE.md)
 ├── settings.json        # Permissions, hooks, model, status line
 ├── statusline.ts        # Powerline status line (Bun/TypeScript)
+├── cloud/               # Setup script and manifest for Claude Code on the web (see cloud/CLAUDE.md)
+├── gitleaks/            # Central gitleaks config (→ ~/.config/gitleaks/gitleaks.toml)
 ├── hooks/               # PreToolUse/PostToolUse/SessionEnd hooks (see hooks/README.md)
 ├── lib/                 # Shared code for the hooks (transcript parsing, redaction)
 ├── mod/                 # dotfiles-mod plugin (rule guards, $HOME rewrite, panes)
