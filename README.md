@@ -108,16 +108,8 @@ claude-code/
 
 ### How the hook works
 
-`claude-code/settings.json`'s `PreToolUse`/`Bash` hook runs the `shguard` binary directly
-(`/run/current-system/sw/bin/shguard`, `args: []` so no shell, no wrapper script) with
-`onFailure: "block"`, so a crash, timeout, or exit status other than 0/2 refuses the call.
-shguard 0.13.0 is built from source by `nix-darwin/shguard.nix`. It evaluates the command
-against `claude-code/shguard/config.toml` (resolved via the `~/.config/shguard/config.toml`
-symlink `setup.sh` creates) and its embedded catalog. A command is allowed only when the
-parser read all of it, every simple command matches a catalog row, and no rule hits;
-everything else is an Ask, which `ask_outcome = "deny"` turns into deny. A config that
-fails to load denies every Bash call
-(`docs/shguard-migration-deltas.md` gap #26).
+`claude-code/settings.json`'s `PreToolUse`/`Bash` hook runs the `shguard` binary. How it is
+wired and what it allows: the shguard row in `claude-code/hooks/README.md`.
 
 ### Managing the ruleset
 

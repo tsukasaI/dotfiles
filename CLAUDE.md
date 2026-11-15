@@ -125,21 +125,15 @@ environment's setup script installs the shared config instead. Details are in
   created with `security add-*`) without a prompt. `gh`'s keyring failure in
   the sandbox is a different mechanism. shguard denies the direct calls; a
   script file calling `security` is not caught.
-- **shguard is the PreToolUse Bash enforcer.** `claude-code/settings.json`
-  runs `/run/current-system/sw/bin/shguard` (installed by nix-darwin, built
-  from source by `nix-darwin/shguard.nix`) with `args: []` (no shell) and
-  `onFailure: "block"`, so a crash, timeout, or exit status other than 0/2
-  refuses the call (needs Claude Code 2.1.295+). It reads
-  `claude-code/shguard/config.toml`, with no separate wrapper script. In
-  0.10 and later a config that fails to load (malformed TOML, unknown key, a 0.9-format
-  file) denies every Bash call; that is built in, not an env setting.
-  Allow needs the whole command parsed and every simple command covered by a
-  catalog row, with no rule hit; everything else is Ask, and
-  `ask_outcome = "deny"` turns each Ask into deny. Allow is not a claim that
-  a command is safe. `config.toml` is Claude-edit-blocked like the other
-  guard files. `ask` verdicts are not a reliable control once a session runs
-  under `bypassPermissions` mode (see that doc's "Cutover caveat" section);
-  re-audit before switching.
+- **shguard is the PreToolUse Bash enforcer** (wiring:
+  `claude-code/hooks/README.md`). Allow needs the whole command parsed,
+  every simple command covered by a catalog row, and no rule hit; everything
+  else is denied (`ask_outcome = "deny"`), and so is every call when the
+  config fails to load. Allow is not a claim that a command is safe.
+  `config.toml` is Claude-edit-blocked like the other guard files. `ask`
+  verdicts are not a reliable control under `bypassPermissions` mode
+  (`docs/shguard-migration-deltas.md`, "Cutover caveat"); re-audit before
+  switching.
 - **flake.nix specifics**: the unfree allowlist contains only `terraform`
   (any other unfree package fails eval until added). Homebrew
   `cleanup = "zap"` uninstalls anything not declared in the flake;
