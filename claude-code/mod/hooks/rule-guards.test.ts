@@ -101,50 +101,52 @@ test('a bad message is denied before anything runs', async ($, on) => {
   expect(ran.deny).toMatch(/Conventional/)
 })
 
-const COMMIT_FORMS: Array<[string, string, string | undefined]> = [
-  ['newline-separated', "git add a.ts\ngit commit -m 'wip stuff'", 'wip stuff'],
-  ['git -c global option', "git -c a=b commit -m 'bad'", 'bad'],
-  ['git -C and --no-pager', "git --no-pager -C ../x commit -m 'bad'", 'bad'],
-  ['quoted -C path', `git -C "/p q" commit -m 'bad'`, 'bad'],
-  ['quoted -c value', `git -c "user.name=A B" commit -m 'bad'`, 'bad'],
-  ['--git-dir with a space', "git --git-dir .git commit -m 'bad'", 'bad'],
-  ['--work-tree with a space', "git --work-tree ../x commit -m 'bad'", 'bad'],
-  ['--namespace with a space', "git --namespace ns commit -m 'bad'", 'bad'],
-  ['-am combined flag', "git commit -am 'wip stuff'", 'wip stuff'],
-  ['-m"msg" attached', 'git commit -m"wip stuff"', 'wip stuff'],
-  ['-mwip unquoted attached', 'git commit -mwip', 'wip'],
-  ['single unquoted token', 'git commit -m wip', 'wip'],
-  ['unquoted --message', 'git commit --message wip', 'wip'],
-  ['--message=msg', "git commit --message='wip stuff'", 'wip stuff'],
-  ['--mess abbreviation', "git commit --mess 'wip stuff'", 'wip stuff'],
-  ['&& chain', "git add x && git commit -m 'wip'", 'wip'],
-  ['-F - heredoc', "git commit -F - <<'EOF'\nwip stuff\nEOF", 'wip stuff'],
-  ['--file=- heredoc', "git commit --file=- <<EOF\nwip stuff\nEOF", 'wip stuff'],
-  ['-F /dev/stdin heredoc', "git commit -F /dev/stdin <<'EOF'\nwip stuff\nEOF", 'wip stuff'],
-  ['--file=/dev/stdin heredoc', "git commit --file=/dev/stdin <<'EOF'\nwip stuff\nEOF", 'wip stuff'],
-  ['-F - with flags before the heredoc', "git commit -F - --signoff <<'EOF'\nwip stuff\nEOF", 'wip stuff'],
-  ['repeated -m', "git commit -m 'feat: x' -m 'more'", 'feat: x\n\nmore'],
-  ['scoped past an earlier flag', "ls -lm 'x' && git commit -m 'wip'", 'wip'],
+const COMMIT_FORMS: Array<[string, string, string | undefined, boolean]> = [
+  ['newline-separated', "git add a.ts\ngit commit -m 'wip stuff'", 'wip stuff', true],
+  ['git -c global option', "git -c a=b commit -m 'bad'", 'bad', true],
+  ['git -C and --no-pager', "git --no-pager -C ../x commit -m 'bad'", 'bad', true],
+  ['quoted -C path', `git -C "/p q" commit -m 'bad'`, 'bad', true],
+  ['quoted -c value', `git -c "user.name=A B" commit -m 'bad'`, 'bad', true],
+  ['--git-dir with a space', "git --git-dir .git commit -m 'bad'", 'bad', true],
+  ['--work-tree with a space', "git --work-tree ../x commit -m 'bad'", 'bad', true],
+  ['--namespace with a space', "git --namespace ns commit -m 'bad'", 'bad', true],
+  ['-am combined flag', "git commit -am 'wip stuff'", 'wip stuff', true],
+  ['-m"msg" attached', 'git commit -m"wip stuff"', 'wip stuff', true],
+  ['-mwip unquoted attached', 'git commit -mwip', 'wip', true],
+  ['single unquoted token', 'git commit -m wip', 'wip', true],
+  ['unquoted --message', 'git commit --message wip', 'wip', true],
+  ['--message=msg', "git commit --message='wip stuff'", 'wip stuff', true],
+  ['--mess abbreviation', "git commit --mess 'wip stuff'", 'wip stuff', true],
+  ['&& chain', "git add x && git commit -m 'wip'", 'wip', true],
+  ['-F - heredoc', "git commit -F - <<'EOF'\nwip stuff\nEOF", 'wip stuff', true],
+  ['--file=- heredoc', "git commit --file=- <<EOF\nwip stuff\nEOF", 'wip stuff', true],
+  ['-F /dev/stdin heredoc', "git commit -F /dev/stdin <<'EOF'\nwip stuff\nEOF", 'wip stuff', true],
+  ['--file=/dev/stdin heredoc', "git commit --file=/dev/stdin <<'EOF'\nwip stuff\nEOF", 'wip stuff', true],
+  ['-F - with flags before the heredoc', "git commit -F - --signoff <<'EOF'\nwip stuff\nEOF", 'wip stuff', true],
+  ['repeated -m', "git commit -m 'feat: x' -m 'more'", 'feat: x\n\nmore', false],
+  ['scoped past an earlier flag', "ls -lm 'x' && git commit -m 'wip'", 'wip', true],
   [
     'flag names inside the message',
     'git commit -m "docs: mention -m, -am, --message and -F -"',
     'docs: mention -m, -am, --message and -F -',
+    false,
   ],
-  ['-am inside the message', 'git commit -m "fix(mod): handle -am forms"', 'fix(mod): handle -am forms'],
-  ['-F - inside the message', 'git commit -m "feat: read -F - heredoc"', 'feat: read -F - heredoc'],
+  ['-am inside the message', 'git commit -m "fix(mod): handle -am forms"', 'fix(mod): handle -am forms', false],
+  ['-F - inside the message', 'git commit -m "feat: read -F - heredoc"', 'feat: read -F - heredoc', false],
   [
     'escaped backquotes in the message',
     'git commit -m "fix(mod): drop \\`-C\\` skip"',
     'fix(mod): drop \\`-C\\` skip',
+    false,
   ],
 ]
 
-for (const [name, command, message] of COMMIT_FORMS) {
+for (const [name, command, message, denied] of COMMIT_FORMS) {
   test(`commit form: ${name}`, async ($, on) => {
     expect(commitMessage(command)).toBe(message)
     stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
     const ran = await $.tool.call({ tool: 'Bash', command })
-    if (messageProblem(message ?? '') !== undefined) expect(ran.deny).toMatch(/Conventional/)
+    if (denied) expect(ran.deny).toMatch(/Conventional/)
     else expect(ran.deny).toBeUndefined()
   })
 }

@@ -13,16 +13,18 @@ const call = (tool: string, input: unknown) => ({
 
 let tmp: string | null = null;
 beforeAll(() => {
-  try {
-    mkdirSync(ROOT, { recursive: true });
-    tmp = mkdtempSync(join(ROOT, "abguard-test-"));
-  } catch {
-    tmp = null;
-  }
+  mkdirSync(ROOT, { recursive: true });
+  tmp = mkdtempSync(join(ROOT, "abguard-test-"));
 });
 afterAll(() => {
   if (tmp) rmSync(tmp, { recursive: true, force: true });
 });
+// Not `if (!tmp) return`: that turned these tests into silent passes when the
+// temp dir could not be created.
+const tmpDir = (): string => {
+  if (!tmp) throw new Error("temp dir under ROOT was not created");
+  return tmp;
+};
 
 describe("allows", () => {
   test("open https URL", () => expect(decide(call("open", { url: "https://example.com/a?b=1" }))).toBeNull());
@@ -36,12 +38,10 @@ describe("allows", () => {
   test.each(["work", "my-session_2", "A1"])("session name %s", (session) =>
     expect(decide(call("snapshot", { session }))).toBeNull());
   test("screenshot path under the allowed root", () => {
-    if (!tmp) return;
-    expect(decide(call("screenshot", { path: join(tmp, "x", "a.png") }))).toBeNull();
+    expect(decide(call("screenshot", { path: join(tmpDir(), "x", "a.png") }))).toBeNull();
   });
   test("screenshot path via /tmp spelling", () => {
-    if (!tmp) return;
-    expect(decide(call("screenshot", { path: join(tmp, "a.png").replace("/private", "") }))).toBeNull();
+    expect(decide(call("screenshot", { path: join(tmpDir(), "a.png").replace("/private", "") }))).toBeNull();
   });
 });
 
@@ -70,9 +70,8 @@ describe("denies", () => {
   test("non-string output", () => expect(decide(call("screenshot", { output: 5 }))).not.toBeNull());
   test("baseline outside root", () => expect(decide(call("diff_screenshot", { baseline: "/etc/passwd" }))).not.toBeNull());
   test("symlink escape", () => {
-    if (!tmp) return;
-    symlinkSync("/Users", join(tmp, "link"));
-    expect(decide(call("screenshot", { path: join(tmp, "link", "new", "a.png") }))).toContain("symlink");
+    symlinkSync("/Users", join(tmpDir(), "link"));
+    expect(decide(call("screenshot", { path: join(tmpDir(), "link", "new", "a.png") }))).toContain("symlink");
   });
   test("file: URL", () => expect(decide(call("open", { url: "file:///etc/passwd" }))).not.toBeNull());
   test("javascript: URL", () => expect(decide(call("open", { url: "javascript:alert(1)" }))).not.toBeNull());
