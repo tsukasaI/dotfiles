@@ -1,0 +1,26 @@
+# Central gitleaks config for every repo on this machine and in cloud sessions,
+# passed with --config so a repo's own .gitleaks.toml cannot weaken the scan.
+# Paths are repo-relative and apply to every repo; add an entry only for a
+# real false positive, never for a leaked credential (rotate it instead).
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fictional test fixtures (from slotfinder)"
+paths = ['''(^|/)test/fixtures/''']
+
+[[allowlists]]
+description = "Lock files and checksum files: high-entropy digests, not secrets (from staygreen)"
+paths = [
+  '''(^|/)pnpm-lock\.yaml$''',
+  '''(^|/)\.terraform\.lock\.hcl$''',
+  '''(^|/)db/migrations/atlas\.sum$''',
+]
+
+[[allowlists]]
+description = "Cloudflare D1 database_id and KV namespace id in staygreen's wrangler.jsonc: resource identifiers, useless without an API token"
+regexes = [
+  '''03de3891-a3d5-4454-a35e-7b94432f7880''',
+  '''70f829ecd0964e5abda499ba60ca1cd8''',
+]

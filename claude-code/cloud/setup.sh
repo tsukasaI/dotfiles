@@ -1,7 +1,8 @@
 #!/bin/bash
 # Installs the shared Claude Code config (CLAUDE.md + the cloud overlay,
 # rules/, skills/, agents/) into ~/.claude of a Claude Code cloud container,
-# whatever repo the session is for, and turns git commit/tag signing off.
+# whatever repo the session is for, installs the central gitleaks config and a
+# pass-through prepush-sandbox, and turns git commit/tag signing off.
 #
 #   setup.sh <commit-sha> <manifest-sha256>
 #
@@ -84,7 +85,7 @@ while read -r digest path; do
     die "unsafe path in manifest: $path"
   case $path in
     CLAUDE.md | cloud/CLAUDE.cloud.md | cloud/coding-guidelines.ref) ;;
-    cloud/coding-guidelines.sha256 | rules/* | skills/* | agents/*) ;;
+    cloud/coding-guidelines.sha256 | rules/* | skills/* | agents/* | gitleaks/gitleaks.toml) ;;
     *) die "path outside the installed set: $path" ;;
   esac
   paths+=("$path")
@@ -127,6 +128,11 @@ installed=()
 for path in "${paths[@]}"; do
   case $path in
     CLAUDE.md | cloud/*) ;;
+    # Not under ~/.claude: lefthook passes --config ~/.config/gitleaks/gitleaks.toml
+    # on the Mac too, where setup.sh links it there.
+    gitleaks/gitleaks.toml)
+      install -D -m 644 "$stage/files/$path" "$HOME/.config/gitleaks/gitleaks.toml" || die "install $path"
+      ;;
     *)
       install -D -m 644 "$stage/files/$path" "$CLAUDE_DIR/$path" || die "install $path"
       installed+=("$path")
@@ -158,6 +164,12 @@ warn() {
   log "WARN: $*"
   warnings=1
 }
+
+# Pass-through: on the Mac prepush-sandbox runs a repo's pre-push commands
+# under srt because git push runs outside Claude Code's sandbox; here the
+# container is the boundary, and lefthook calls the same name in both places.
+printf '#!/bin/sh\nexec "$@"\n' >"$TOOL_DIR/prepush-sandbox" && chmod 755 "$TOOL_DIR/prepush-sandbox" ||
+  warn "prepush-sandbox was not installed"
 
 { apt-get update -qq && apt-get install -y -qq sqlite3; } || warn "sqlite3 was not installed"
 

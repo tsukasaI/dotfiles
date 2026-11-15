@@ -5,7 +5,10 @@ Verification log: `docs/cloud-sessions.md`.
 - `claude-code/cloud/setup.sh` fetches `CLAUDE.md`, `rules/`, `skills/` and
   `agents/` from raw.githubusercontent.com at a pinned commit, verifies each
   file against `cloud/manifest.sha256`, appends `cloud/CLAUDE.cloud.md` (the
-  cloud-only deltas) to `~/.claude/CLAUDE.md`, turns git signing off, and
+  cloud-only deltas) to `~/.claude/CLAUDE.md`, installs `gitleaks/gitleaks.toml`
+  at `~/.config/gitleaks/gitleaks.toml` (the path lefthook passes to
+  `--config`) and a pass-through `prepush-sandbox` (on the Mac it runs pre-push
+  commands under srt; here the container is the boundary), turns git signing off, and
   installs sqlite3, gitleaks, atlas, cargo-deny and cargo-audit at the versions
   pinned in the script.
 - Two environments, split by network and secret boundary rather than by repo:

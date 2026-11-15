@@ -49,6 +49,10 @@ link_with_backup "$DOTFILES/git/gitconfig-oss" ~/.config/git/gitconfig-oss
 # relying on this symlink instead.
 mkdir -p ~/.config/shguard
 link_with_backup "$DOTFILES/claude-code/shguard/config.toml" ~/.config/shguard/config.toml
+# The --config path every repo's lefthook passes to gitleaks; cloud/setup.sh
+# installs the same file at the same path.
+mkdir -p ~/.config/gitleaks
+link_with_backup "$DOTFILES/claude-code/gitleaks/gitleaks.toml" ~/.config/gitleaks/gitleaks.toml
 
 # SSH (UseKeychain integration)
 mkdir -p ~/.ssh && chmod 700 ~/.ssh

@@ -9,8 +9,8 @@
 #   bash tests/cloud-manifest-sync.sh --write   regenerate the manifest
 #
 # Scope: claude-code/CLAUDE.md, the cloud overlay, the coding-guidelines pin
-# (cloud/coding-guidelines.{ref,sha256}), rules/, skills/, agents/,
-# minus the path prefixes in claude-code/cloud/exclude.txt.
+# (cloud/coding-guidelines.{ref,sha256}), rules/, skills/, agents/, the
+# central gitleaks config, minus the path prefixes in claude-code/cloud/exclude.txt.
 
 set -euo pipefail
 cd "$(dirname "$0")/../claude-code"
@@ -31,7 +31,7 @@ excluded() {
 expected() {
   local path
   git ls-files -- CLAUDE.md cloud/CLAUDE.cloud.md cloud/coding-guidelines.ref \
-    cloud/coding-guidelines.sha256 rules skills agents |
+    cloud/coding-guidelines.sha256 rules skills agents gitleaks/gitleaks.toml |
     LC_ALL=C sort |
     while IFS= read -r path; do
       excluded "$path" || sha256sum -- "$path"

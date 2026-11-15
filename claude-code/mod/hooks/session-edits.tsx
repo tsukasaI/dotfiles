@@ -27,6 +27,7 @@ const SYMLINKED: ReadonlyArray<readonly [link: string, target: string]> = [
   ['.config/git/ignore', 'git/ignore'],
   ['.config/git/gitconfig-oss', 'git/gitconfig-oss'],
   ['.config/shguard/config.toml', 'claude-code/shguard/config.toml'],
+  ['.config/gitleaks/gitleaks.toml', 'claude-code/gitleaks/gitleaks.toml'],
   ['.ssh/config', 'ssh/config'],
   ['.claude/skills', 'claude-code/skills'],
   ['.claude/rules', 'claude-code/rules'],
