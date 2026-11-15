@@ -137,20 +137,21 @@ incomplete — ask how it will be measured.
 
 Two more ways a condition or constraint fails the gate, even when objective:
 
-- **Not re-checkable**: it must be confirmable from the output of a command
-  the final turn can re-run. State the loop can no longer change once it
-  moves on (the commit layout of a merged PR, a closed issue's history)
-  fails: if it is unmet, no turn can fix it, and the stop hook loops
-  forever (shguard #1291, PR #1285).
-- **Commit layout of test changes**: in a repo whose pre-commit compiles
-  the tests (e.g. `cargo clippy --all-targets`) and whose PRs squash-merge,
-  never require test changes in a separate or dedicated commit. An API
-  change and the call-site fixes to existing tests it breaks cannot be
-  committed apart, and squash leaves one commit on main anyway. Write
-  instead: "existing test lines change only their call shape (no assertion
-  changes); new tests go in a separate commit". In issue mode, a Triage
-  comment carrying such a condition is re-asked for that issue, with this
-  rewrite as the "(Recommended)" option.
+- **Frozen state**: the condition must concern state a later turn can
+  still change. A condition on state fixed once the loop moves on (the
+  commit layout of a merged PR, a closed issue's history) fails even when
+  a command can show it: if unmet, no turn can fix it, and the loop burns
+  every turn up to the cap (shguard #1291, PR #1285).
+- **Commit layout**: never require changes to land in a separate or
+  dedicated commit, test changes included. A pre-commit that compiles the
+  tests (e.g. `cargo clippy --all-targets`) makes an API change and the
+  call-site fixes to the existing tests it breaks impossible to commit
+  apart, and the squash-merge leaves one commit on main anyway. The
+  standard assertion-count constraint (Standing implementation pattern)
+  already guards the existing tests; nothing else replaces the condition.
+  In issue mode, a Triage comment carrying such a condition is re-asked
+  for that issue, with "drop it; the assertion-count constraint applies"
+  as the "(Recommended)" option.
 
 ## Dialogue rules
 
@@ -162,7 +163,7 @@ Two more ways a condition or constraint fails the gate, even when objective:
   the approval gate.
 - An unanswered or unrelated reply is not consent to a proposed default — ask
   again and wait for an explicit answer before assembling.
-- If a slot answer is still subjective, re-ask that slot only with a follow-up
+- If a slot answer still fails the gate, re-ask that slot only with a follow-up
   AskUserQuestion, each time offering one concrete objective candidate the user
   can accept in a tap. After 3 failed attempts on the same slot, state that the
   condition cannot be made machine-checkable and exit the skill without
@@ -178,17 +179,25 @@ Every statement this skill drafts bakes in the same fixed agent/review
 pattern. This is not a slot, it is never asked about, and it is always
 included:
 
-- Standard constraints, shown via their command each turn: no deleted lines
-  under `<test glob>` (`git diff --numstat -- <test glob>`), which blocks
-  weakening tests to pass; and, when a Scope is known (Triage comments, or
+- Standard constraints, shown via their command each turn: under `<test
+  glob>`, the diff adds at least as many assertion lines as it deletes,
+  shown by `git diff -U0 -- '<test glob>' | rg -c '^-[^-].*(<assert
+  pattern>)'` (deleted) and the same with `'^\+[^+].*(<assert
+  pattern>)'` (added), no output counting as 0. This blocks weakening
+  tests to pass, while a call-shape fix to an existing assertion line
+  (one line deleted, one added) still holds; a plain no-deleted-lines
+  check would fail every API change that touches tests. Infer `<assert
+  pattern>` with Grep from the test files' own idiom (e.g. `assert` in
+  Rust or Python, `expect\(` in JS, `t\.(Error|Fatal)|require\.|assert\.`
+  in Go). And, when a Scope is known (Triage comments, or
   a scope stated in the launch argument), changes stay within it (`git diff
   --stat`), except doc or comment fixes listed under `## Auto-fixed`. That
   exception is self-attested, since `git diff --stat` cannot show why a
   file changed; it exists because a doc the change made false is in scope
   by `review-gate`. Infer `<test glob>` with Glob from the repo's own test-file
-  convention (e.g. `**/*_test.go`, `tests/`). If no convention is found,
-  drop that constraint and say so in the approval-gate summary; never
-  guess a glob.
+  convention (e.g. `**/*_test.go`, `tests/`). If no test convention or no
+  assertion idiom is found, drop that constraint and say so in the
+  approval-gate summary; never guess a glob or a pattern.
 
 - Delegate the implementation to a subagent launched with `model: sonnet`.
   `/goal` never switches the model, so naming the model only in prose would
@@ -259,15 +268,16 @@ Build the statement on a single line from this template:
     needs-decision issues without asking, at most 3, the rest as a
     checklist in one parent issue; once the reviewer approves (or the PR is
     docs-only), squash-merge via `gh pr merge --squash --delete-branch`
-    without asking; run `<verification command>`[, `git diff --numstat --
-    <test glob>`][, `git diff --stat`] and show their full output each
+    without asking; run `<verification command>`[, the two assertion-count
+    commands][, `git diff --stat`] and show their full output each
     turn; if the verification command fails the same way 3 turns in a
     row, file the remaining work as a needs-decision issue with that
     output; if a hook or the sandbox refuses it, file nothing, show `gh
     pr checks`, and merge only if that check passed in CI (Unverified
     either way); the goal is met when that output confirms <objective
     condition> (or the work was filed as stuck or is Unverified), while
-    [no line under <test glob> is deleted][, changes stay within <scope>
+    [the added assertion count under <test glob> is at least the deleted
+    count][, changes stay within <scope>
     except doc/comment fixes listed under `## Auto-fixed`][,
     <constraints>] holds, and the final turn shows a `## Follow-ups` block
     listing each auto-fixed finding (`file:line`, numstat line, PR URL),
@@ -291,7 +301,7 @@ decided designs once, and group the checks by command:
     squash-merge via `gh pr merge --squash --delete-branch` without
     asking. Checks (each must exit 0 unless a condition is given):
     `<command A>` for #<N1> #<N3> [...]; `<command B>` <condition B> for
-    #<N2>[; ...][; also run `git diff --numstat -- <test glob>`][ and
+    #<N2>[; ...][; also run the two assertion-count commands][ and
     `git diff --stat`], and show all of their full output each turn. If an
     issue's check fails the same way 3 turns in a row, file its remaining
     work as a needs-decision issue with that output and move on to the
@@ -300,7 +310,8 @@ decided designs once, and group the checks by command:
     on (Unverified either way). The goal is met when the final turn
     re-runs every check and its output confirms each issue's condition
     (issues filed as stuck or Unverified excepted, listed by URL), while
-    [no line under <test glob> is deleted][, changes stay within <union
+    [the added assertion count under <test glob> is at least the deleted
+    count][, changes stay within <union
     of scopes> except doc/comment fixes listed under `## Auto-fixed`][,
     for #<N>, <constraint>] holds, and the final turn shows a
     `## Follow-ups` block listing each auto-fixed finding (`file:line`,
@@ -339,7 +350,8 @@ Rules:
   has no separate cap setting.
 - Every condition must be judgeable from command output visible in the
   transcript. Multiple conditions: join with "and", each tied to a command.
-- Each bracketed part appears only when its input exists: test glob found,
+- Each bracketed part appears only when its input exists: test glob and
+  assert pattern found,
   Scope known, slot 3 filled. The standard constraints are always included
   when their input exists; drop the "while ... holds" clause only when all
   three are absent. A change-specific constraint with its own check names
@@ -366,7 +378,7 @@ Rules:
 
 1. Present the drafted statement in a fenced code block, preceded by a
    one-line-per-slot summary (the turn cap marked "auto" when not from the
-   argument, plus the inferred test glob and Scope, or that none was
+   argument, plus the inferred test glob, assert pattern, and Scope, or that none was
    found) and its `wc -m` count, and ask: approve as-is, or request
    changes?
 2. On requested changes: revise and re-present the same way, prefixed
@@ -384,13 +396,13 @@ Rules:
 
 | Rationalization | Reality |
 |---|---|
-| "ユーザーの言い方で十分客観的だ" | 「きれいに」「いい感じ」「改善」は unfilled。人間が yes/no で判定できるか自問する。 |
+| "ユーザーの言い方で十分客観的だ" | 「きれいに」「いい感じ」「改善」は unfilled。評価モデルがトランスクリプトだけで、判断なしに yes/no を出せるか自問する。 |
 | "検証コマンドを実行して動作確認しておこう" | 実行しない。ドラフトするだけ。実行は /goal の仕事。 |
 | "完了条件や検証コマンドは推測で埋めよう" | 埋めない。スロット1–2が欠けたら必ず聞く。沈黙は同意ではない。 |
 | "念のため制約やターン上限も聞いておこう" | 聞かない。標準制約と 15 × issue数は自動。個別制約は引数か Triage comment にある時だけ使う。変更は承認ゲートで受ける。 |
 | "follow-up issue をゼロにする条件を足そう" | 足さない。ゼロ要求は issue を閉じて数字を合わせる動機になる。残件は `## Follow-ups` で見せる。 |
 | "文が長いと格好悪いから要素を削ろう" | 4,000字まで許容される。短さより要素の完全性。ただし改行は入れない。 |
-| "コミットの分け方も完了条件に入れよう" | 入れない。マージ後は変えられず stop hook がループする。テスト行の中身（呼び出し形だけ、assertion 不変）で縛る。 |
+| "コミットの分け方も完了条件に入れよう" | 入れない。マージ後は変えられず、満たせないままターン上限まで回る。既存テストは標準の assertion 数の制約が守る。 |
 | "目分量で4,000字以内だろう" | 必ず `wc -m` で数える。超過した statement は /goal に拒否される。 |
 
 ## Hard limits

@@ -144,7 +144,8 @@ unchanged, one plain bug.)
 Expected: Design asks a constraint question only for the first, offering
 the candidate tied to a command (Recommended) and "None". The plain bug
 gets no constraint question and `Constraints: none`. No Triage comment
-records "no deleted tests" or "stay within Scope" as a constraint.
+records "no dropped assertions" or "stay within Scope" as a constraint,
+and none requires a separate or dedicated commit.
 
 ### 13. Severity backfill
 

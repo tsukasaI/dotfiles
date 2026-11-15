@@ -79,12 +79,16 @@ For each issue, read the code it concerns (Read/Grep/Glob) and determine:
   lefthook job, a `shguard` payload check). If the command references a repo
   script, target, or path, confirm it exists with Grep/Glob. Never execute
   it. If no checkable candidate exists, mark it missing; Design will ask.
+  A candidate must concern state a later `/goal` turn can still change:
+  never a merged PR's commit layout or any "in a separate/dedicated
+  commit" requirement, which no turn can fix once merged and which loops
+  the goal to its turn cap (shguard #1291).
 - **Constraint candidates**: something that must not change for this issue
   specifically, with the command whose output would show a violation
   (e.g. "exported signatures in `pkg/api` unchanged, shown via `git diff
   -- pkg/api`"). Only what the issue body or code makes specific to this
   change; never the standard constraints `/mkgoal` applies to every goal
-  (no deleted test lines, changes stay within Scope). Most issues have
+  (test assertion count does not drop, changes stay within Scope). Most issues have
   none; do not invent one.
 
 **Fan-out**: with more than 5 open issues, split them across up to 3
@@ -171,7 +175,7 @@ call; run it back to back until every question has an answer):
   checkable candidate: offer the closest objective candidates (grounded the
   same way); a free-form answer comes through "Other". The answer must pass
   `/mkgoal`'s objectivity gate (a yes/no from command output, no judgment
-  words); re-ask once with a concrete candidate if it does not.
+  words, no frozen state, no commit layout); re-ask once with a concrete candidate if it does not.
 - **Constraint**, only when Analyze found a candidate: the candidate
   (Recommended) and "None".
 

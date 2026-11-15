@@ -28,11 +28,12 @@ and whenever the main-loop model changes tier.
   clause (15, or 15 × issues, unless the argument names a cap) and
   instructs showing the verification command's full output each turn.
 - The assembled statement always contains the standard constraints whose
-  input exists: no deleted lines under the inferred test glob (with
-  `git diff --numstat -- <glob>` shown each turn) and, when a Scope is
-  known, changes within it except doc/comment fixes listed under
-  `## Auto-fixed` (with `git diff --stat`). The approval-gate summary names
-  the glob and Scope, or says none was found.
+  input exists: under the inferred test glob, the added assertion count is
+  at least the deleted count (both `git diff -U0 -- '<glob>' | rg -c ...`
+  commands shown each turn) and, when a Scope is known, changes within it
+  except doc/comment fixes listed under `## Auto-fixed` (with `git diff
+  --stat`). The approval-gate summary names the glob, assert pattern, and
+  Scope, or says none was found.
 - The assembled statement always contains the standing implementation
   pattern: delegate the implementation to a `model: sonnet` subagent and
   send review fixups back to that implementer via SendMessage, with no code
@@ -190,11 +191,12 @@ re-runs `wc -m`. If still over, one AskUserQuestion offers "Split
 Run test 2 twice: in a repo with a clear test-file convention (e.g. Go
 `*_test.go`), and in one with no test files.
 
-Expected: Glob is the only tool used to infer the glob. With a convention,
-the statement says "no line under `**/*_test.go` is deleted" and shows
-`git diff --numstat -- **/*_test.go` each turn, without asking. Without
+Expected: Glob infers the glob and Grep the assert pattern, without
+asking. With a convention, the statement requires the added assertion
+count under `**/*_test.go` to be at least the deleted count and shows both
+`git diff -U0 -- '**/*_test.go' | rg -c ...` commands each turn. Without
 one, that constraint is absent and the approval-gate summary says no test
-convention was found; no glob is guessed.
+convention was found; no glob or pattern is guessed.
 
 ### 15. dotfiles target
 
@@ -213,16 +215,16 @@ refused command for the user under `Unverified:`.
 and whose PRs squash-merge. #<a>'s Triage comment has `Completion
 condition: ... call-shape fixes to existing tests in a dedicated commit`.)
 
-Expected: one AskUserQuestion for #<a>'s condition, with "existing test
-lines change only their call shape (no assertion changes); new tests go in
-a separate commit" as the "(Recommended)" option. No statement contains a
-dedicated-commit requirement.
+Expected: one AskUserQuestion for #<a>'s condition, with "drop it; the
+assertion-count constraint applies" as the "(Recommended)" option. No
+statement contains any separate- or dedicated-commit requirement.
 
 ### 17. Condition on state frozen after merge
 
     /mkgoal PR #<n> has its src and test changes in two commits; verify with `gh pr view <n> --json commits`
 
-Expected: slot 1 fails the gate (not re-checkable once the PR is merged);
-one AskUserQuestion re-asks it with an objective candidate checkable by a
-command the final turn can re-run. No statement is drafted from the
-original condition.
+Expected: slot 1 fails the gate (frozen state: no later turn can change a
+merged PR's commits, though the command can still show them); one
+AskUserQuestion re-asks it with an objective candidate on state a later
+turn can still change. No statement is drafted from the original
+condition.
