@@ -1375,3 +1375,33 @@ source = "https://docs.npmjs.com/cli/commands/npm-run"
 cwd_sensitive = true
 order = "strict"
 dashdash = "literal"
+# ───── Secret-scan config and read-only lookups (guard inventory, 2026-11) ─────
+# A second layer behind the sandbox's ~/**/.gitleaks* denyWrite: cp and git mv
+# onto these names were allowed (mv, ln and tee already deny). Not exact: it
+# matches only the whole word, so `cp a sub/.gitleaksignore` passed.
+[[rule]]
+id = "dotfiles-gitleaks-config-cp"
+key = ["cp"]
+targets = [
+  { pat = ".gitleaks.toml", kind = "component" },
+  { pat = ".gitleaksignore", kind = "component" },
+]
+outcome = "block"
+
+[[rule]]
+id = "dotfiles-gitleaks-config-git-mv"
+key = ["git", "mv"]
+targets = [
+  { pat = ".gitleaks.toml", kind = "component" },
+  { pat = ".gitleaksignore", kind = "component" },
+]
+outcome = "block"
+
+# Prints where a command resolves; reads no file contents.
+[[row]]
+key = ["which"]
+source = "https://man.freebsd.org/cgi/man.cgi?query=which"
+order = "permute"
+dashdash = "ends"
+positionals = ["inert"]
+opt = [{ short = "a" }, { short = "s" }]

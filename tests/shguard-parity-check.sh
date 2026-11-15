@@ -428,6 +428,13 @@ case_ "gitleaks --report-path"           'gitleaks git --redact --report-path r.
 case_ "gitleaks -r"                      'gitleaks dir . --redact -r r.json'   deny "writes a file"
 case_ "gitleaks --config"                'gitleaks git --redact -c x.toml'     deny "reads another file"
 case_ "gitleaks detect"                  'gitleaks detect --redact'            deny "only git and dir have rows"
+case_ "cp onto gitleaks config"          'cp a .gitleaks.toml'                 deny "dotfiles-gitleaks-config-cp"
+case_ "cp onto nested gitleaksignore"    'cp a sub/.gitleaksignore'            deny "dotfiles-gitleaks-config-cp"
+case_ "git mv onto gitleaks config"      'git mv a .gitleaks.toml'             deny "dotfiles-gitleaks-config-git-mv"
+case_ "cp a toml lookalike"              'cp a gitleaks.toml'                  allow "only the dot-prefixed names are blocked"
+case_ "git mv an ordinary file"          'git mv a b'                          allow
+case_ "which"                            'which -a sandbox-exec'               allow
+case_ "which unknown option"             'which --skip-alias ls'               deny "the row lists only -a and -s"
 case_ "jq filter on a file"            "jq -r '.name' package.json"          allow
 case_ "jq in a pipeline"                 'cat package.json | jq .name'         allow
 case_ "jq -f"                            'jq -f prog.jq x.json'                deny
