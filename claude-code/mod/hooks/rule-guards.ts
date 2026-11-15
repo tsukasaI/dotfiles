@@ -25,6 +25,9 @@ const MESSAGE_FLAG = /(?:^|\s)(?:-[a-zA-Z]*m|--m(?:e(?:s(?:s(?:a(?:g(?:e)?)?)?)?
 const FILE_STDIN = /(?:^|\s)(?:-F\s*(?:-|\/dev\/stdin)|--file(?:=|\s+)(?:-|\/dev\/stdin))(?=\s|$)/g
 const MESSAGE_VALUE =
   /(?:^|\s)(?:-[a-zA-Z]*m\s*|--m(?:e(?:s(?:s(?:a(?:g(?:e)?)?)?)?)?)?(?:=|\s+))(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|([^\s"'`$;&|()<>\\]+))/g
+// Not one /^---[\s\S]*?^model:/m over the whole file: that also matched a `model:` line in the
+// body after the closing `---`, so an unpinned agent passed.
+const FRONTMATTER = /^---\n([\s\S]*?)\n---(?:\n|$)/
 
 /** Blanks heredoc bodies (same length) so text inside them can't look like commands or flags. */
 function blankHeredocBodies(text: string): string {
@@ -110,7 +113,9 @@ async function hasModelFrontmatter($: EngineInterface, type: string): Promise<bo
   if (!home || !/^[A-Za-z0-9_-]+$/.test(type)) return false
   try {
     const text = await $.fs.read(`${home}/.claude/agents/${type}.md`)
-    return typeof text === 'string' && /^---\n[\s\S]*?^model:\s*\S/m.test(text)
+    if (typeof text !== 'string') return false
+    const frontmatter = FRONTMATTER.exec(text)?.[1]
+    return frontmatter !== undefined && /^model:\s*\S/m.test(frontmatter)
   } catch {
     return false
   }

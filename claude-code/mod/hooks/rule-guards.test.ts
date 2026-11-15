@@ -58,6 +58,32 @@ test('Agent whose definition pins a model runs without one', async ($, on) => {
   expect(ran.deny).toBeUndefined()
 })
 
+test('Agent whose definition file is missing is denied', async ($, on) => {
+  mock.env(on, { HOME: '/Users/me' })
+  on('fs.read', () => {
+    throw new Error('ENOENT')
+  })
+  on('tool.call', () => ({ result: { ok: true } }))
+  const ran = await $.tool.call({ tool: 'Agent', description: 'd', prompt: 'p', subagent_type: 'ghost' })
+  expect(ran.deny).toMatch(/model/)
+})
+
+test('Agent whose definition has no model frontmatter is denied', async ($, on) => {
+  mock.env(on, { HOME: '/Users/me' })
+  on('fs.read', () => ({ value: '---\nname: code-reviewer\n---\nmodel: fable in the body only' }))
+  on('tool.call', () => ({ result: { ok: true } }))
+  const ran = await $.tool.call({ tool: 'Agent', description: 'd', prompt: 'p', subagent_type: 'code-reviewer' })
+  expect(ran.deny).toMatch(/model/)
+})
+
+test('Agent with an invalid subagent_type name is denied even when a definition would pin a model', async ($, on) => {
+  mock.env(on, { HOME: '/Users/me' })
+  on('fs.read', () => ({ value: '---\nname: x\nmodel: fable\n---\nbody' }))
+  on('tool.call', () => ({ result: { ok: true } }))
+  const ran = await $.tool.call({ tool: 'Agent', description: 'd', prompt: 'p', subagent_type: '../x' })
+  expect(ran.deny).toMatch(/model/)
+})
+
 test('commit on main outside dotfiles/ops is denied', async ($, on) => {
   stubGit(on, 'main', 'git@github.com:tsukasaI/app.git')
   const ran = await $.tool.call({ tool: 'Bash', command: 'git commit -m "feat: x"' })

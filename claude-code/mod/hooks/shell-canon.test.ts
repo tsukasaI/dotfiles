@@ -52,6 +52,22 @@ test('rewrites only the variables it knows', async () => {
   expect(canonicalize('ls $TMPDIR $HOME', { HOME: '/Users/me' })).toBe('ls $TMPDIR /Users/me')
 })
 
+test('canonicalize edge inputs with HOME=/h', async () => {
+  const cases: [string, string][] = [
+    ['', ''],
+    ['ls $HOME', 'ls /h'],
+    ['ls ${HOME}x', 'ls /hx'],
+    ['ls ${HOME:-x}', 'ls ${HOME:-x}'],
+    ['ls $HOMEx', 'ls $HOMEx'],
+  ]
+  for (const [input, want] of cases) expect(canonicalize(input, { HOME: '/h' })).toBe(want)
+})
+
+test('canonicalize returns a ~200KB command without a variable identical', async () => {
+  const input = `echo ${'a'.repeat(200_000)}`
+  expect(canonicalize(input, { HOME: '/h' })).toBe(input)
+})
+
 test('reaches shguard (beneath the plugin) rewritten', async ($, on) => {
   mock.env(on, { HOME: '/Users/me' })
   on('process.run', () => ({

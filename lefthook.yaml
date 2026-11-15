@@ -43,8 +43,11 @@ pre-push:
         - "nix-darwin/shguard.nix"
       run: bash tests/shguard-parity-check.sh
     bun-test:
-      glob: "claude-code/{hooks,lib}/*.ts"
-      run: bun test claude-code/hooks claude-code/lib
+      glob:
+        - "claude-code/{hooks,lib,scripts/harness-metrics}/*.ts"
+        - "claude-code/hooks/block-config-edit.sh"
+        - "tests/*.ts"
+      run: bun test claude-code/hooks claude-code/lib claude-code/scripts/harness-metrics ./tests
     skill-test:
       glob: "claude-code/skills/**/*.ts"
       run: bun test claude-code/skills
