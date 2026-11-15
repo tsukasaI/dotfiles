@@ -1,6 +1,6 @@
 ---
 name: review-gate
-description: The code-reviewer gate between `gh pr create` and `gh pr merge` in branch+PR repos. Covers reviewer model choice, what counts as approval, how critical/high and medium/low findings are settled (auto-fix, note, or needs-decision), the decision-note and Not filed formats, re-review, and the docs-only and unverified-check merge rules. Use right after opening a PR for a non-trivial implementation (same bar as plan mode), and whenever settling a code-reviewer's findings or deciding whether a PR may merge. Not for dotfiles/ops (they never get a code-reviewer pass) or mechanical changes (config, dependency/SHA bumps, docs, formatting).
+description: The code-reviewer gate between `gh pr create` and `gh pr merge` in branch+PR repos: reviewer choice, approval, how findings are settled, and the merge rules. Use right after opening a PR for a non-trivial implementation (same bar as plan mode), and whenever settling a code-reviewer's findings or deciding whether a PR may merge. Not for dotfiles/ops or mechanical changes (config, dependency/SHA bumps, docs, formatting).
 ---
 
 # Review gate

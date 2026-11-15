@@ -1,6 +1,6 @@
 ---
 name: handover
-description: Produces a copy-pasteable handover document summarizing this session's goal, progress, decisions, and next step, so a fresh agent session (Claude Code or pi; no memory of this conversation) can resume without re-discovery. Output goes to chat only, as one fenced markdown block — never written to a file. User-invoked via /handover (/skill:handover in pi); the agent may also proactively suggest running it when context looks degraded (long session, heavy compaction, many independent subtasks) — surface the suggestion in one line and wait for explicit go-ahead before invoking, never invoke silently.
+description: Produces a copy-pasteable handover document (goal, progress, decisions, next step) so a fresh Claude Code or pi session can resume without re-discovery; output goes to chat as one fenced block, never a file. User-invoked via /handover (/skill:handover in pi); Claude may suggest it in one line when context looks degraded (long session, heavy compaction), and invokes it only after the user agrees.
 argument-hint: [追加で残したいメモ (optional)]
 allowed-tools: Bash, Read, Grep, Glob
 ---
