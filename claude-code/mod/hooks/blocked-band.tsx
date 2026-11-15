@@ -2,6 +2,8 @@ import { atom, read } from 'claude-code'
 import type { On } from 'claude-code'
 
 // Written by review-state.ts; read here so one hook draws the whole band.
+// Declared again, not imported: the hooks loader rejects a read() whose
+// atom is not made by atom() in this file.
 const prs = atom({ plugin: 'dotfiles-mod', key: 'prs' } as const, [])
 
 const REVIEW_LABEL = {
