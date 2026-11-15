@@ -135,6 +135,23 @@ filled).
 A numeric condition with no verification command (slot 2 empty) is still
 incomplete — ask how it will be measured.
 
+Two more ways a condition or constraint fails the gate, even when objective:
+
+- **Not re-checkable**: it must be confirmable from the output of a command
+  the final turn can re-run. State the loop can no longer change once it
+  moves on (the commit layout of a merged PR, a closed issue's history)
+  fails: if it is unmet, no turn can fix it, and the stop hook loops
+  forever (shguard #1291, PR #1285).
+- **Commit layout of test changes**: in a repo whose pre-commit compiles
+  the tests (e.g. `cargo clippy --all-targets`) and whose PRs squash-merge,
+  never require test changes in a separate or dedicated commit. An API
+  change and the call-site fixes to existing tests it breaks cannot be
+  committed apart, and squash leaves one commit on main anyway. Write
+  instead: "existing test lines change only their call shape (no assertion
+  changes); new tests go in a separate commit". In issue mode, a Triage
+  comment carrying such a condition is re-asked for that issue, with this
+  rewrite as the "(Recommended)" option.
+
 ## Dialogue rules
 
 - Ask about ALL missing or below-bar slots in ONE AskUserQuestion call — one
@@ -373,6 +390,7 @@ Rules:
 | "念のため制約やターン上限も聞いておこう" | 聞かない。標準制約と 15 × issue数は自動。個別制約は引数か Triage comment にある時だけ使う。変更は承認ゲートで受ける。 |
 | "follow-up issue をゼロにする条件を足そう" | 足さない。ゼロ要求は issue を閉じて数字を合わせる動機になる。残件は `## Follow-ups` で見せる。 |
 | "文が長いと格好悪いから要素を削ろう" | 4,000字まで許容される。短さより要素の完全性。ただし改行は入れない。 |
+| "コミットの分け方も完了条件に入れよう" | 入れない。マージ後は変えられず stop hook がループする。テスト行の中身（呼び出し形だけ、assertion 不変）で縛る。 |
 | "目分量で4,000字以内だろう" | 必ず `wc -m` で数える。超過した statement は /goal に拒否される。 |
 
 ## Hard limits

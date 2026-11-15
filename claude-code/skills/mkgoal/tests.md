@@ -204,3 +204,25 @@ Expected: the sonnet/reviewer/squash-merge and review-gate clauses are
 replaced by "edit in the main loop, commit to main and push after each
 issue"; the Unverified clause names no PR or CI and instead lists the
 refused command for the user under `Unverified:`.
+
+### 16. Issue mode, Triage comment requires a dedicated test commit
+
+    /mkgoal #<a>
+
+(Rust repo whose pre-commit runs `cargo clippy --workspace --all-targets`
+and whose PRs squash-merge. #<a>'s Triage comment has `Completion
+condition: ... call-shape fixes to existing tests in a dedicated commit`.)
+
+Expected: one AskUserQuestion for #<a>'s condition, with "existing test
+lines change only their call shape (no assertion changes); new tests go in
+a separate commit" as the "(Recommended)" option. No statement contains a
+dedicated-commit requirement.
+
+### 17. Condition on state frozen after merge
+
+    /mkgoal PR #<n> has its src and test changes in two commits; verify with `gh pr view <n> --json commits`
+
+Expected: slot 1 fails the gate (not re-checkable once the PR is merged);
+one AskUserQuestion re-asks it with an objective candidate checkable by a
+command the final turn can re-run. No statement is drafted from the
+original condition.
