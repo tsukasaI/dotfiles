@@ -1,0 +1,31 @@
+name: Monthly Harness Review
+
+on:
+  schedule:
+    # 1st of every month, morning JST (00:23 UTC; off the top of the hour to
+    # avoid GitHub's scheduler congestion)
+    - cron: '23 0 1 * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  create-review-issue:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Create review issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          month="$(TZ='Asia/Tokyo' date +'%Y-%m')"
+          gh issue create \
+            --title "Harness Review - ${month}" \
+            --body-file .github/harness-review.md \
+            --assignee "${GITHUB_REPOSITORY_OWNER}"
