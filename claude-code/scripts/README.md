@@ -127,3 +127,15 @@ turso db tokens invalidate cc-logs
 
 > `turso db tokens invalidate` はその DB の既存トークンをすべて失効させます。CLI セッションを
 > 含む可能性があるため、失効後は `turso auth login` で再認証してください。
+
+## 評価フレームワークの集計（harness-metrics.ts）
+
+`docs/harness-evaluation.md` の指標を、`logs.db` と `~/.claude/projects` の transcript から集計します。
+
+```bash
+bun claude-code/scripts/harness-metrics/main.ts --month 2026-11
+```
+
+- 本人が自分のシェル（`!`）で実行する。Claude は `logs.db` も `~/.claude/projects` も読めない。
+- `--month` を省くと前月（JST）。データ源が読めない項目は警告を出して `N/A` になり、実行は止まらない。
+- 出力は「公開用」と「ローカル用」の2節。公開 Issue に貼るのは**公開用だけ**。ローカル用にはリポジトリ名・プロンプト・コマンドが入る。

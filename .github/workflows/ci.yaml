@@ -134,6 +134,8 @@ jobs:
         run: bun test claude-code/hooks claude-code/lib
       - name: skills
         run: bun test claude-code/skills
+      - name: harness metrics
+        run: bun test claude-code/scripts/harness-metrics
       - name: pi
         run: bun test pi/tests
 
