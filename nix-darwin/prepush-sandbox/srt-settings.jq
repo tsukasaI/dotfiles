@@ -22,7 +22,9 @@
       "/private/tmp/pnpm-store-operation-locks-\($uid)",
       # Not a * for the version: the glob form was still denied in a test run.
       "~/Library/pnpm/package-manager-store/v11/tmp/engine-locks",
-      "~/Library/Preferences/.wrangler/logs"
+      "~/Library/Preferences/.wrangler/logs",
+      # cargo's lock and cache-tracking files; ~/.cargo/registry stays read-only.
+      "~/.cargo/.package-cache", "~/.cargo/.package-cache-mutate", "~/.cargo/.global-cache"
     ],
     # The files that decide what the next push runs, so wrapped code cannot
     # unwrap or skip it (same set as settings.json's sandbox denyWrite).
