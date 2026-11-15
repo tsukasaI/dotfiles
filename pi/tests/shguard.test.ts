@@ -2,17 +2,10 @@
 // The last test calls the real shguard binary when it is on PATH.
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import shguard, { checkCommand, hookPayload, parseVerdict } from "../extensions/shguard.ts";
+import shguard, { checkCommand, parseVerdict } from "../extensions/shguard.ts";
 
 const answer = (permissionDecision?: string, permissionDecisionReason?: string) =>
 	JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision, permissionDecisionReason } });
-
-describe("hookPayload", () => {
-	test("is a Bash PreToolUse input carrying the command verbatim", () => {
-		const cmd = 'git commit -m "a\nb" \'$x\'';
-		expect(JSON.parse(hookPayload(cmd))).toEqual({ tool_name: "Bash", tool_input: { command: cmd }, hook_event_name: "PreToolUse" });
-	});
-});
 
 describe("parseVerdict", () => {
 	test("allow passes", () => {
@@ -44,8 +37,9 @@ describe("parseVerdict", () => {
 describe("checkCommand", () => {
 	test("sends the hook payload on stdin", async () => {
 		let sent = "";
-		await checkCommand("ls -la", async (stdin) => ((sent = stdin), { stdout: answer("allow") }));
-		expect(JSON.parse(sent).tool_input.command).toBe("ls -la");
+		const cmd = 'git commit -m "a\nb" \'$x\'';
+		await checkCommand(cmd, async (stdin) => ((sent = stdin), { stdout: answer("allow") }));
+		expect(JSON.parse(sent)).toEqual({ tool_name: "Bash", tool_input: { command: cmd }, hook_event_name: "PreToolUse" });
 	});
 	test("a failed run with no output blocks", async () => {
 		const v = await checkCommand("ls", async () => ({ stdout: "", error: new Error("spawn shguard ENOENT") }));

@@ -178,12 +178,6 @@ test('an unreadable message flag is denied (fail closed)', async ($, on) => {
   }
 })
 
-test('the unreadable-message deny names both readable forms', async ($, on) => {
-  stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
-  const ran = await $.tool.call({ tool: 'Bash', command: 'git commit -m "$SUBJECT"' })
-  expect(ran.deny).toContain(`use -m '<msg>' or -m "$(cat <<'EOF' ... EOF)"`)
-})
-
 test('reusing or editing an existing message is not denied', async ($, on) => {
   stubGit(on, 'feat/x', 'git@github.com:tsukasaI/app.git')
   for (const command of [

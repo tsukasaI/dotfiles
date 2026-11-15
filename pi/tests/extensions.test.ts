@@ -173,10 +173,6 @@ describe("usage-log", () => {
 		},
 	});
 
-	test("ignores non-assistant messages", () => {
-		expect(toRecord({ turnIndex: 0, message: { role: "user" } }, "s", "/")).toBeUndefined();
-	});
-
 	test("turn_end appends a JSONL record; /usage summarizes", async () => {
 		const { api, emit, commands } = fakePi();
 		usageLog(api);

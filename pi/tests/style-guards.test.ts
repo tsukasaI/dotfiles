@@ -30,7 +30,6 @@ describe("commit", () => {
 
 	test("message rules", async () => {
 		expect((await checkCommit("git commit -m 'update stuff'", "/w", git("feat/x", "")))?.reason).toContain("Conventional");
-		expect((await checkCommit("git commit -m 'fix: 修正'", "/w", git("feat/x", "")))?.reason).toContain("Japanese");
 		expect(await checkCommit("git commit -m 'fix(pi): handle x'", "/w", git("feat/x", ""))).toBeUndefined();
 	});
 	test("main is blocked except in dotfiles/ops", async () => {

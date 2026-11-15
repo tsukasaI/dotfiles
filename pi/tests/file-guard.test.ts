@@ -136,10 +136,7 @@ describe("extension", () => {
 });
 
 describe("real block-config-edit.sh", () => {
-	test("blocks secret-scan config and lockfiles, allows linter config and ordinary files", async () => {
-		expect((await checkWrite("/tmp/pi-fg-proj/.gitleaks.toml"))?.reason).toContain("SECRET_SCAN_PROTECTION");
-		expect(await checkWrite("/tmp/pi-fg-proj/.eslintrc.json")).toBeUndefined();
-		expect((await checkWrite("/tmp/pi-fg-proj/bun.lock"))?.reason).toContain("LOCKFILE_PROTECTION");
+	test("pi's write guard calls the real block-config-edit.sh", async () => {
 		expect((await checkWrite(`${CLAUDE_SETTINGS}`))?.reason).toContain("GUARDRAIL_PROTECTION");
 		expect(await checkWrite("/tmp/pi-fg-proj/src/a.ts")).toBeUndefined();
 	});

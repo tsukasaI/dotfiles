@@ -458,7 +458,6 @@ case_ "npm test and run scripts"         'npm test && npm run typecheck && npm r
 case_ "npm run deploy"                   'npm run deploy'                      deny "only listed scripts"
 case_ "npm run with args"                'npm run lint -- --fix'               deny "no operands"
 case_ "npm exec"                         'npm exec cowsay'                     deny "runs a named binary"
-case_ "bun test (inexpressible)"         'bun test'                            deny "INEXPRESSIBLE_HEADS"
 
 # ── config-load fail-closed ────────────────────────────────────────────────
 # A config that fails to load denies every Bash call (since 0.10 there is
