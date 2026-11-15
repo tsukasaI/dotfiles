@@ -9,6 +9,11 @@ Patterns that the sandbox or shguard denies by mechanism, not by policy:
   `git worktree add --no-track -b <b> <path> origin/main`): the sandbox
   write-protects `.git/config`, so recording the upstream fails. Set the
   upstream with the unsandboxed `git push -u origin <b>` instead.
+- The sandbox also write-protects `lefthook*`, `.lefthook*`, `.gitleaks.toml`,
+  `.gitleaksignore` and `.git/hooks` in every repo under `~`. A sandboxed
+  `git switch`, `merge`, `rebase` or `cherry-pick` that has to rewrite one of
+  them fails partway; give the user the command, or use the unsandboxed
+  `git pull --rebase origin main` for that case.
 - shguard refuses `git commit -F`, which its row doesn't list. Pass a multi-part
   message with repeated `-m`, one per paragraph.
 - shguard refuses a `gh` body file outside `/private/tmp` and the repository

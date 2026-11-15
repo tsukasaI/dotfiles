@@ -5,6 +5,7 @@
     "EDITOR": "nvim",
     "CLAUDE_CODE_PLUGIN_DIRS": "~/dotfiles/claude-code/mod",
     "HOMEBREW_NO_ANALYTICS": "1",
+    "GITLEAKS_CONFIG": "/Users/inouetsukasa/.config/gitleaks/gitleaks.toml",
     "npm_config_cache": "/Users/inouetsukasa/.cache/claude-sandbox/npm",
     "BUN_INSTALL_CACHE_DIR": "/Users/inouetsukasa/.cache/claude-sandbox/bun",
     "GOCACHE": "/Users/inouetsukasa/.cache/claude-sandbox/go-build",
@@ -278,7 +279,13 @@
         "~/dotfiles/karabiner",
         "~/dotfiles/nix-darwin",
         "~/dotfiles/claude-code",
-        "~/dotfiles/.claude"
+        "~/dotfiles/.claude",
+        "~/**/lefthook.*",
+        "~/**/lefthook-local.*",
+        "~/**/.lefthook*",
+        "~/**/.gitleaks.toml",
+        "~/**/.gitleaksignore",
+        "~/**/.git/hooks"
       ],
       "denyRead": [
         "~/Library/Application Support/turso",
