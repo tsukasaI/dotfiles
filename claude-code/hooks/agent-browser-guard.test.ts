@@ -11,8 +11,11 @@ const call = (tool: string, input: unknown) => ({
   tool_input: input,
 });
 
+// ROOT is the macOS sandbox temp dir; on Linux CI it can't be created.
+const onMac = process.platform === "darwin";
 let tmp: string | null = null;
 beforeAll(() => {
+  if (!onMac) return;
   mkdirSync(ROOT, { recursive: true });
   tmp = mkdtempSync(join(ROOT, "abguard-test-"));
 });
@@ -20,7 +23,7 @@ afterAll(() => {
   if (tmp) rmSync(tmp, { recursive: true, force: true });
 });
 // Not `if (!tmp) return`: that turned these tests into silent passes when the
-// temp dir could not be created.
+// temp dir could not be created. Off macOS they are reported as skipped instead.
 const tmpDir = (): string => {
   if (!tmp) throw new Error("temp dir under ROOT was not created");
   return tmp;
@@ -37,10 +40,10 @@ describe("allows", () => {
     expect(decide(call("scroll", { direction: "down", amount: 300 }))).toBeNull());
   test.each(["work", "my-session_2", "A1"])("session name %s", (session) =>
     expect(decide(call("snapshot", { session }))).toBeNull());
-  test("screenshot path under the allowed root", () => {
+  test.skipIf(!onMac)("screenshot path under the allowed root", () => {
     expect(decide(call("screenshot", { path: join(tmpDir(), "x", "a.png") }))).toBeNull();
   });
-  test("screenshot path via /tmp spelling", () => {
+  test.skipIf(!onMac)("screenshot path via /tmp spelling", () => {
     expect(decide(call("screenshot", { path: join(tmpDir(), "a.png").replace("/private", "") }))).toBeNull();
   });
 });
@@ -69,7 +72,7 @@ describe("denies", () => {
   test("empty path", () => expect(decide(call("screenshot", { path: "" }))).not.toBeNull());
   test("non-string output", () => expect(decide(call("screenshot", { output: 5 }))).not.toBeNull());
   test("baseline outside root", () => expect(decide(call("diff_screenshot", { baseline: "/etc/passwd" }))).not.toBeNull());
-  test("symlink escape", () => {
+  test.skipIf(!onMac)("symlink escape", () => {
     symlinkSync("/Users", join(tmpDir(), "link"));
     expect(decide(call("screenshot", { path: join(tmpDir(), "link", "new", "a.png") }))).toContain("symlink");
   });
