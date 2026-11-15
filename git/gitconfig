@@ -29,3 +29,8 @@
 	colorMoved = plain
 [rerere]
 	enabled = true
+[sendemail]
+	smtpServer = smtp.gmail.com
+	smtpServerPort = 587
+	smtpEncryption = tls
+	smtpUser = inoue.tsukasa.4@gmail.com
