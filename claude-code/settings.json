@@ -238,11 +238,13 @@
     "filesystem": {
       "allowWrite": [
         "~/.cache/claude-sandbox",
-        "~/.cache/nix"
+        "~/.cache/nix",
+        "~/Library/Preferences/.wrangler/logs"
       ],
       "allowRead": [
         "~/engineer/cc-memory/.wrangler/state",
-        "~/engineer/staygreen/.wrangler/state"
+        "~/engineer/staygreen/.wrangler/state",
+        "~/engineer/cc-memory/.wrangler/tmp"
       ],
       "denyWrite": [
         "~/engineer/ops/scripts/check_career_consistency.py",
