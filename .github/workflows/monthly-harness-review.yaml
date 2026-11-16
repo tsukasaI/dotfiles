@@ -24,7 +24,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          month="$(TZ='Asia/Tokyo' date +'%Y-%m')"
+          # The review covers the month that just ended, matching harness-metrics' default --month.
+          month="$(date -d "$(TZ='Asia/Tokyo' date +'%Y-%m-01') -1 day" +'%Y-%m')"
           gh issue create \
             --title "Harness Review - ${month}" \
             --body-file .github/harness-review.md \
