@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { statSync, readFileSync } from "fs";
+import { appendFileSync, mkdirSync, statSync, readFileSync, writeFileSync } from "fs";
 import { dirname, resolve } from "path";
 import { abbreviateHome } from "./lib/home-path";
 
@@ -193,6 +193,35 @@ try {
   if (row1.length > 0) console.log(powerline(row1));
   if (row2.length > 0) console.log(powerline(row2));
   if (row3.length > 0) console.log(powerline(row3));
+
+  // Appends only when the rounded (7d, 5h) pair changed: the state file holds
+  // the last pair, since reading the JSONL's tail on every render is slower.
+  try {
+    const rl = input.rate_limits;
+    const sevenPct = num(rl?.seven_day?.used_percentage);
+    if (sevenPct != null) {
+      const fivePct = num(rl?.five_hour?.used_percentage);
+      const key = `${Math.round(sevenPct)}|${fivePct == null ? "" : Math.round(fivePct)}`;
+      const dir = `${Bun.env.HOME ?? ""}/.local/share/claude-logs`;
+      const statePath = `${dir}/rate-limits.last`;
+      let last = "";
+      try { last = readFileSync(statePath, "utf-8"); } catch {}
+      if (last !== key) {
+        mkdirSync(dir, { recursive: true, mode: 0o700 });
+        const line = JSON.stringify({
+          ts: new Date().toISOString(),
+          seven_day_pct: Math.round(sevenPct),
+          seven_day_resets_at: num(rl?.seven_day?.resets_at),
+          five_hour_pct: fivePct == null ? null : Math.round(fivePct),
+          five_hour_resets_at: num(rl?.five_hour?.resets_at),
+        });
+        appendFileSync(`${dir}/rate-limits.jsonl`, `${line}\n`);
+        writeFileSync(statePath, key);
+      }
+    }
+  } catch (err) {
+    console.error(`[statusline] rate-limits record failed: ${err instanceof Error ? err.message : err}`);
+  }
 } catch (err) {
   console.error(`[statusline] failed: ${err instanceof Error ? err.message : err}`);
 }

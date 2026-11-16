@@ -10,7 +10,9 @@ import {
   inWindow,
   lastDayOfMonth,
   monthWindow,
+  parseRateLimitLines,
   parseReviewDate,
+  quotaClustering,
   renderLocal,
   renderPublic,
   topDenied,
@@ -205,6 +207,77 @@ describe("month window", () => {
     expect(inWindow("2026-10-31T15:00:00Z", r.value)).toBe(true);
     expect(inWindow("2026-10-31T14:59:59Z", r.value)).toBe(false);
     expect(inWindow("2026-11-30T15:00:00Z", r.value)).toBe(false);
+  });
+});
+
+describe("rate limits", () => {
+  const w = monthWindow("2026-11", new Date());
+  if (!w.ok) throw new Error("window");
+  const win = w.value;
+  const at = (hours: number) => win.startMs + hours * 3_600_000;
+  const snap = (hours: number, pct: number) => ({ tsMs: at(hours), sevenDayPct: pct });
+  const spanHours = (win.endMs - win.startMs) / 3_600_000;
+
+  test("parser skips empty, malformed and incomplete lines", () => {
+    const line = (o: unknown) => JSON.stringify(o);
+    const out = parseRateLimitLines([
+      "",
+      "not json",
+      "null",
+      line({ ts: "2026-11-02T00:00:00Z" }),
+      line({ seven_day_pct: 10 }),
+      line({ ts: "bad", seven_day_pct: 10 }),
+      line({ ts: "2026-11-03T00:00:00Z", seven_day_pct: "10" }),
+      line({ ts: "2026-11-03T00:00:00Z", seven_day_pct: 20, five_hour_pct: null }),
+      line({ ts: "2026-11-02T00:00:00Z", seven_day_pct: 10 }),
+    ]);
+    expect(out.map((s) => s.sevenDayPct)).toEqual([10, 20]);
+    expect(parseRateLimitLines([])).toEqual([]);
+  });
+
+  test("a commit before any snapshot is not judged", () => {
+    const r = quotaClustering([at(1)], [snap(2, 10)], 30, win);
+    expect(r.judged).toBe(0);
+    expect(r.highRemaining).toBe(0);
+  });
+
+  test("judges against the snapshot at or before the commit; threshold is inclusive", () => {
+    const snaps = [snap(1, 30), snap(10, 31)];
+    const r = quotaClustering([at(1), at(5), at(10), at(20)], snaps, 30, win);
+    expect(r.judged).toBe(4);
+    expect(r.highRemaining).toBe(2);
+  });
+
+  test("time share runs each snapshot to the next one or the window end", () => {
+    const r = quotaClustering([], [snap(0, 10), snap(10, 90)], 30, win);
+    expect(r.highTimeShare).toBeCloseTo(10 / spanHours, 10);
+  });
+
+  test("snapshots outside the window are ignored and no data gives null", () => {
+    const outside = [{ tsMs: win.startMs - 1, sevenDayPct: 0 }, { tsMs: win.endMs, sevenDayPct: 0 }];
+    const r = quotaClustering([at(1)], outside, 30, win);
+    expect(r).toEqual({ judged: 0, highRemaining: 0, highTimeShare: null });
+  });
+
+  test("public line is numbers only, and falls back when there is no data", () => {
+    const base: ReportInput = {
+      window: win,
+      totals: aggregate([]),
+      repos: [],
+      excludedRepos: [],
+      guard: null,
+      urgentIssues: null,
+      overdueHypotheses: null,
+      warnings: [],
+      topDenied: [],
+      sample: [],
+    };
+    const some = renderPublic({ ...base, quota: { judged: 4, highRemaining: 3, highTimeShare: 0.25 } });
+    expect(some).toContain("目的化の見張り: 残量が多い時期のハーネス系コミット 3/4（基準: 残量が多い時間の割合 25.0%）");
+    expect(renderPublic({ ...base, quota: null })).toContain("未計測（rate_limits 未記録）");
+    expect(renderPublic({ ...base, quota: { judged: 0, highRemaining: 0, highTimeShare: null } })).toContain(
+      "未計測（rate_limits 未記録）",
+    );
   });
 });
 

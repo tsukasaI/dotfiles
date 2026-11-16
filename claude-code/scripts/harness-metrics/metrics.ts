@@ -55,7 +55,19 @@ export interface GuardStats {
   withoutIssueRef: number;
 }
 
+export interface RateSnapshot {
+  tsMs: number;
+  sevenDayPct: number;
+}
+
+export interface QuotaClustering {
+  judged: number;
+  highRemaining: number;
+  highTimeShare: number | null;
+}
+
 export interface ReportInput {
+  quota?: QuotaClustering | null;
   window: MonthWindow;
   totals: Totals;
   repos: RepoRow[];
@@ -371,6 +383,58 @@ export function monthWindow(arg: string | undefined, now: Date): Result<MonthWin
   return { ok: true, value: windowFor(year, month) };
 }
 
+export function parseRateLimitLines(lines: string[]): RateSnapshot[] {
+  const out: RateSnapshot[] = [];
+  for (const line of lines) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!isPlainObject(parsed)) continue;
+    const tsMs = typeof parsed.ts === "string" ? new Date(parsed.ts).getTime() : Number.NaN;
+    const pct = parsed.seven_day_pct;
+    if (!Number.isFinite(tsMs) || typeof pct !== "number" || !Number.isFinite(pct)) continue;
+    out.push({ tsMs, sevenDayPct: pct });
+  }
+  return out.sort((a, b) => a.tsMs - b.tsMs);
+}
+
+export function quotaClustering(
+  commitTimesMs: number[],
+  snapshots: RateSnapshot[],
+  thresholdPct: number,
+  window: MonthWindow,
+): QuotaClustering {
+  const inside = snapshots
+    .filter((s) => s.tsMs >= window.startMs && s.tsMs < window.endMs)
+    .sort((a, b) => a.tsMs - b.tsMs);
+
+  let judged = 0;
+  let highRemaining = 0;
+  for (const c of commitTimesMs) {
+    let prior: RateSnapshot | undefined;
+    for (const s of inside) {
+      if (s.tsMs <= c) prior = s;
+      else break;
+    }
+    if (!prior) continue;
+    judged++;
+    if (prior.sevenDayPct <= thresholdPct) highRemaining++;
+  }
+
+  let covered = 0;
+  let high = 0;
+  inside.forEach((s, i) => {
+    const until = inside[i + 1]?.tsMs ?? window.endMs;
+    covered += until - s.tsMs;
+    if (s.sevenDayPct <= thresholdPct) high += until - s.tsMs;
+  });
+
+  return { judged, highRemaining, highTimeShare: covered > 0 ? high / covered : null };
+}
+
 export function lastDayOfMonth(w: MonthWindow): string {
   return jstDate(new Date(w.endMs - 1));
 }
@@ -419,7 +483,9 @@ export function renderPublic(r: ReportInput): string {
     }）`,
     `- harness-urgent Issue: ${na(r.urgentIssues)}`,
     `- 見直し日を過ぎた harness-hypothesis: ${na(r.overdueHypotheses)}`,
-    "- 目的化の見張り: 未計測（rate_limits 未記録）",
+    r.quota && r.quota.highTimeShare !== null
+      ? `- 目的化の見張り: 残量が多い時期のハーネス系コミット ${r.quota.highRemaining}/${r.quota.judged}（基準: 残量が多い時間の割合 ${pct(r.quota.highTimeShare)}）`
+      : "- 目的化の見張り: 未計測（rate_limits 未記録）",
     "",
   ].join("\n");
 }

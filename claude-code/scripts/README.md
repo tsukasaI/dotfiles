@@ -131,6 +131,7 @@ turso db tokens invalidate cc-logs
 ## 評価フレームワークの集計（harness-metrics.ts）
 
 `docs/harness-evaluation.md` の指標を、`logs.db` と `~/.claude/projects` の transcript から集計します。
+目的化の見張りには、ステータスラインが記録する `~/.local/share/claude-logs/rate-limits.jsonl` も入力に使います（無ければ「未計測」）。
 
 ```bash
 bun claude-code/scripts/harness-metrics/main.ts --month 2026-11

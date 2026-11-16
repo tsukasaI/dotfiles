@@ -14,12 +14,15 @@ import {
   jstDate,
   lastDayOfMonth,
   monthWindow,
+  parseRateLimitLines,
+  quotaClustering,
   renderLocal,
   renderPublic,
   sampleSessions,
   topDenied,
   type GuardStats,
   type MonthWindow,
+  type RateSnapshot,
   type RepoRow,
   type Result,
   type SessionRecord,
@@ -204,6 +207,40 @@ async function ghCount(args: string[], field: "length" | "bodies", dir: string):
   }
 }
 
+function loadRateSnapshots(): RateSnapshot[] | null {
+  const path = join(home, ".local", "share", "claude-logs", "rate-limits.jsonl");
+  try {
+    return parseRateLimitLines(toLines(readFileSync(path, "utf-8")));
+  } catch (e: unknown) {
+    if (isPlainObject(e) && e.code === "ENOENT") return null;
+    warn(`rate-limits.jsonl unreadable: ${e instanceof Error ? e.message : String(e)}`);
+    return null;
+  }
+}
+
+async function harnessCommitTimes(w: MonthWindow): Promise<number[] | null> {
+  const sources: { dir: string; paths: string[] }[] = [
+    { dir: join(home, "dotfiles"), paths: ["--", "claude-code/"] },
+    { dir: join(home, "engineer", "shguard"), paths: [] },
+  ];
+  const times: number[] = [];
+  for (const s of sources) {
+    const r = await run(
+      ["git", "log", `--since=${w.startIso}`, `--until=${w.endIso}`, "--format=%cI", ...s.paths],
+      s.dir,
+    );
+    if (!r.ok) {
+      warn(`harness commit times: ${r.error}`);
+      return null;
+    }
+    for (const l of r.value.split("\n")) {
+      const ms = new Date(l.trim()).getTime();
+      if (l.trim() && Number.isFinite(ms)) times.push(ms);
+    }
+  }
+  return times;
+}
+
 async function main(): Promise<void> {
   const flagIdx = process.argv.indexOf("--month");
   const w = monthWindow(flagIdx === -1 ? undefined : process.argv[flagIdx + 1], new Date());
@@ -263,7 +300,11 @@ async function main(): Promise<void> {
     firstPrompt: r.metrics.firstPrompt,
   }));
 
+  const snapshots = loadRateSnapshots();
+  const commitTimes = snapshots ? await harnessCommitTimes(window) : null;
+
   const input = {
+    quota: snapshots && commitTimes ? quotaClustering(commitTimes, snapshots, 30, window) : null,
     window,
     totals: aggregate(records),
     repos,
