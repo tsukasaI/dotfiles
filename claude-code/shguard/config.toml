@@ -1279,7 +1279,7 @@ opt = [{ long = "redact" }]
 # (P3: the repo is trusted to that extent); the loop can edit package.json, so
 # the boundary is the sandbox, not this row. Keychain items the loop must not
 # read have `security` removed from their ACL (dotfiles#132). Production smoke,
-# `pnpm run release` and `pnpm dev` have no row and stay user-run.
+# `pnpm run release` and `pnpm install` have no row and stay user-run.
 # cwd_sensitive: pnpm and npm read the project's package.json and .npmrc.
 [[row]]
 key = ["pnpm"]
@@ -1319,6 +1319,23 @@ dashdash = "literal"
 # Offline: checks that the smoke refuses SMOKE_REMOTE_* against production.
 [[row]]
 key = ["pnpm", "smoke:guard"]
+source = "https://pnpm.io/cli/run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+# Not a row that takes a URL: cc-memory's and staygreen's oauth-smoke.mjs aim
+# at a remote Worker only when given a target operand, so the bare form can
+# only hit http://localhost:8787.
+[[row]]
+key = ["pnpm", "smoke"]
+source = "https://pnpm.io/cli/run"
+cwd_sensitive = true
+order = "strict"
+dashdash = "literal"
+
+[[row]]
+key = ["pnpm", "dev"]
 source = "https://pnpm.io/cli/run"
 cwd_sensitive = true
 order = "strict"
