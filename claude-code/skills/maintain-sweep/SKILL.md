@@ -3,7 +3,8 @@ name: maintain-sweep
 description: Runs the maintenance investigation agents (sweep-structure, sweep-logic, sweep-dead, sweep-tests, crash-fuzzer) against the current repository in parallel (read-only, opus), has a single fable agent triage their findings, then files the surviving ones as GitHub issues. Use when the user wants to run a maintenance sweep, "メンテナンスルーチンを回して", or asks to run several/all of the maintenance agents at once. Not for running one investigation agent by name; invoke that agent directly instead. Never edits code or opens PRs; fixes go through /triage → /mkgoal.
 disable-model-invocation: true
 argument-hint: [agent ...] (optional; omit to run all 5 investigation agents)
-allowed-tools: Bash, Write, Workflow
+allowed-tools: Write, Workflow, Bash(git rev-parse *), Bash(gh issue list *), Bash(gh issue create *)
+disallowed-tools: Edit
 ---
 
 # /maintain-sweep — investigate in parallel, triage once, file issues

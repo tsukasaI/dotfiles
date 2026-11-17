@@ -2,7 +2,8 @@
 name: mkgoal
 description: Builds a verifiable /goal statement (completion condition and verification command) through a short dialogue, before the user runs /goal. Also turns one or more #<issue> references, typically a /triage group, into one combined goal from their Triage comments; Claude may invoke it after /triage finishes when the user asks for that (e.g. "G1をgoalにして"). Not for running /goal itself, and never invoked from inside /triage or a subagent.
 argument-hint: [達成したいこと | #issue番号 ...]
-allowed-tools: Read, Grep, Glob, AskUserQuestion, Bash, Write
+allowed-tools: Read, Grep, Glob, AskUserQuestion, Write, Bash(gh issue view *), Bash(wc -m *)
+disallowed-tools: Edit, Agent, Skill
 ---
 
 # /mkgoal — draft a verifiable /goal statement

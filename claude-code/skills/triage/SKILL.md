@@ -3,7 +3,8 @@ name: triage
 description: Organizes the open GitHub issues in the current repo and settles their direction. Reads the code each issue touches (fanning out to sonnet Explore agents when the backlog is large) and proposes one board covering stale issues, duplicates to merge, groups of up to about 30 issues sized for one /goal loop each, and work order. The user approves or revises the board in one step, then settles every open technical call (design option, completion condition, verification command, change-specific constraint). Records each "go" issue's decision, completion condition, verification command, scope, and constraints as a structured Triage comment on the issue, so /mkgoal needs no further technical questions. Use when reviewing the backlog or deciding what to build next. Ends with the go issues in work order, one line per group.
 disable-model-invocation: true
 argument-hint: (none, scans the current repo)
-allowed-tools: Bash, Read, Grep, Glob, Write, AskUserQuestion, Agent
+allowed-tools: Read, Grep, Glob, Write, AskUserQuestion, Agent, Bash(gh issue *), Bash(gh pr list *), Bash(gh pr comment *), Bash(date *)
+disallowed-tools: Edit, Skill
 ---
 
 # /triage: make the backlog ready for /goal, once, for the whole picture

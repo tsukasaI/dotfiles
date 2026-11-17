@@ -2,7 +2,8 @@
 name: handover
 description: Produces a copy-pasteable handover document (goal, progress, decisions, next step) so a fresh Claude Code or pi session can resume without re-discovery; output goes to chat as one fenced block, never a file. User-invoked via /handover (/skill:handover in pi); Claude may suggest it in one line when context looks degraded (long session, heavy compaction), and invokes it only after the user agrees.
 argument-hint: [追加で残したいメモ (optional)]
-allowed-tools: Bash, Read, Grep, Glob
+allowed-tools: Read, Grep, Glob, Bash(git status *), Bash(git diff *), Bash(git log *), Bash(git branch *)
+disallowed-tools: Edit, Write, Agent, Skill
 ---
 
 # /handover — copy-pasteable session handover
