@@ -65,7 +65,8 @@ environment's setup script installs the shared config instead. Details are in
   claude-code/<path>` per changed file and Edits that line (paths in the
   manifest are relative to `claude-code/`). A file added or removed changes
   the line set: have the user run `! bash tests/cloud-manifest-sync.sh
-  --write` instead.
+  --write` instead. Stage a new file (`git add`) before that run: the
+  script lists tracked files only.
 
 ## Concepts
 
