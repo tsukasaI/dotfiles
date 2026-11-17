@@ -86,6 +86,14 @@ description: The code-reviewer gate between `gh pr create` and `gh pr merge` in 
   list it for the user.
 - Merge via `gh pr merge --squash --delete-branch` once approved and every
   medium/low finding is settled.
+- Stacked PRs (one PR's base is another PR's branch): the required check
+  must pass on a branch that contains every fixup of every PR below it,
+  not on a branch cut before a lower PR's fixup landed (cc-memory #284
+  merged with its fixup's smoke assertions never run). Before merging a
+  lower PR with `--delete-branch`, retarget the PR above it to `main`
+  (`gh pr edit <n> --base main`): deleting its base branch closes it, and
+  a closed PR whose base is gone cannot be reopened (cc-memory #285,
+  reopened as #292).
 
 ## In pi
 
