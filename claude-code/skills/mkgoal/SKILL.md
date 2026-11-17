@@ -361,10 +361,8 @@ Rules:
   it and instructs showing its output each turn too.
 - The task summary states what to achieve. The statement doubles as Claude's
   first-turn directive.
-- The standard-constraint, sonnet/reviewer/squash-merge, review-gate
-  reference, needs-decision cap, stuck-rule, Unverified, final re-run
-  (issue mode), and Follow-ups clauses from Standing implementation pattern above are always
-  included; their wording may be tightened, their content never dropped. The one
+- Every unbracketed clause of the template is required; its wording may be
+  tightened, its content never dropped. The one
   exception is a `dotfiles` or `ops` target: those repos commit straight
   to main with no review gate, and their config/doc edits stay in the main
   loop (global CLAUDE.md, Workflow and Model behavior), so replace the
@@ -406,4 +404,3 @@ Rules:
 | "follow-up issue をゼロにする条件を足そう" | 足さない。ゼロ要求は issue を閉じて数字を合わせる動機になる。残件は `## Follow-ups` で見せる。 |
 | "文が長いと格好悪いから要素を削ろう" | 4,000字まで許容される。短さより要素の完全性。ただし改行は入れない。 |
 | "コミットの分け方も完了条件に入れよう" | 入れない。マージ後は変えられず、満たせないままターン上限まで回る。既存テストは標準の assertion 数の制約が守る。 |
-| "目分量で4,000字以内だろう" | 必ず `wc -m` で数える。超過した statement は /goal に拒否される。 |

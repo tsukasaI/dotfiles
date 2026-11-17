@@ -16,8 +16,8 @@ scope (the binary comes from `nix-darwin/flake.nix`):
 claude mcp add -s user agent-browser -- agent-browser mcp --tools core,debug,react,network
 ```
 
-Check with `claude mcp list`. If it's missing, tell the user and stop rather
-than running commands that will fail. Don't fall back to the `agent-browser`
+If no `mcp__agent-browser__*` tool is available, tell the user and stop
+rather than running commands that will fail. Don't fall back to the `agent-browser`
 CLI from Bash: Chromium can't launch inside the Bash sandbox.
 
 `hooks/agent-browser-guard.ts` gates every call: tools outside its allowlist,
@@ -25,17 +25,8 @@ launch/state arguments (`extraArgs`, `restore*`, `namespace`, ...), paths
 outside `/private/tmp/claude-501/`, and non-http(s) URLs are denied. A deny
 from it is the boundary working; don't try to route around it.
 
-## When to use
-
-- End-to-end verification of a UI change (golden path + at least one edge case)
-- Reproducing a frontend bug with concrete steps
-- Visual / CSS / accessibility audit
-- Performance profiling (LCP, CLS, INP, long tasks)
-
-When NOT to use:
-- Logic that can be covered by a unit or integration test (write the test instead)
-- Backend-only changes with no visible UI effect
-- Anything requiring authenticated session data not already available in the environment
+Not for anything that needs authenticated session data not already
+available in the environment.
 
 ## agent-browser MCP (all use cases)
 
