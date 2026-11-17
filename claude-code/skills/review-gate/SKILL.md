@@ -6,6 +6,9 @@ description: The code-reviewer gate between `gh pr create` and `gh pr merge` in 
 # Review gate
 
 - When: run `code-reviewer` once, automatically, right after `gh pr create`.
+  Give it the PR URL, the `<base>...<head>` range, and the issue's Scope if
+  any: its default target is the uncommitted diff, which is empty once the
+  PR is pushed.
 - Model: `opus`; `fable` only for a security boundary or an architectural
   decision, since Fable's weekly quota is the scarce one.
 - Approved = no critical/high finding. A classifier refusal or pause, or a
@@ -66,6 +69,9 @@ description: The code-reviewer gate between `gh pr create` and `gh pr merge` in 
   - Not auto-fixed because: <the auto-fix criterion it failed, or "found by implementer">
   - Source: <PR URL>, finding <n>
   ```
+- Batch fixups: send every critical/high fix and every `auto-fix` finding
+  to the implementer in one message, and re-review once after that single
+  fixup, not once per finding.
 - Re-review after critical/high or `auto-fix` fixups (always, even when
   small): resume the original reviewer via `SendMessage` (agent id from its
   first `Agent` call) and ask only whether the findings are resolved and
@@ -101,8 +107,8 @@ The gate is the same, including the outcome table and `## Not filed`;
 only the mechanics differ.
 
 - Reviewer: `subagent` with agent `reviewer` (Opus, read-only; its prompt
-  is `~/.claude/agents/code-reviewer.md`). Put the PR URL or diff range, and
-  the issue's Scope if any, in the task. There is no Fable reviewer: for a
+  is `~/.claude/agents/code-reviewer.md`), given the same target as above.
+  There is no Fable reviewer: for a
   security boundary or an architectural decision, also send the diff to
   `consult_advisor`.
 - Fixes go to a `subagent` worker, not the main loop.
