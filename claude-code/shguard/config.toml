@@ -1272,15 +1272,10 @@ order = "permute"
 dashdash = "ends"
 positionals = ["path"]
 opt = [{ long = "redact" }]
-# ───── Project check scripts for /goal loops (dotfiles#132) ─────
-# Each row names one package.json script, with no options or operands, so the
-# command line cannot add arguments to it (`pnpm smoke -- <url>`) or pick
-# another script. The script body is repo code and runs as cargo test does
-# (P3: the repo is trusted to that extent); the loop can edit package.json, so
-# the boundary is the sandbox, not this row. Keychain items the loop must not
-# read have `security` removed from their ACL (dotfiles#132). Production smoke,
-# `pnpm run release` and `pnpm install` have no row and stay user-run.
-# cwd_sensitive: pnpm and npm read the project's package.json and .npmrc.
+# Each row names one package.json script with no options or operands, so the
+# command line cannot add arguments (`pnpm smoke -- <url>`) or pick another
+# script. Not the boundary: the loop can edit package.json, so the sandbox is.
+# Production smoke, `pnpm run release` and `pnpm install` stay user-run.
 [[row]]
 key = ["pnpm"]
 source = "https://pnpm.io/cli/run"
@@ -1392,7 +1387,6 @@ source = "https://docs.npmjs.com/cli/commands/npm-run"
 cwd_sensitive = true
 order = "strict"
 dashdash = "literal"
-# ───── Secret-scan config and read-only lookups (guard inventory, 2026-11) ─────
 # A second layer behind the sandbox's ~/**/.gitleaks* denyWrite: cp and git mv
 # onto these names were allowed (mv, ln and tee already deny). Not exact: it
 # matches only the whole word, so `cp a sub/.gitleaksignore` passed.
