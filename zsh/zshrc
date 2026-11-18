@@ -1,9 +1,7 @@
-# Nix
 if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
   . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
 fi
 
-# eval cache helper: caches command output, invalidates when binary changes
 _cached_eval() {
   local name=$1 cmd=$2
   local cache_dir="$HOME/.cache/zsh"
@@ -14,16 +12,13 @@ _cached_eval() {
     rm -f "$cache" "$src" # tool gone: drop stale cache, don't source it
     return
   fi
-  # Resolve through symlinks: every Nix-installed binary carries the fixed
-  # epoch mtime (1970-01-01) by design, so the raw `-nt` check below can
-  # never see a Nix-installed tool's upgrade even though the resolved store
-  # path changes on every rebuild. Recording and comparing that path covers
-  # Nix upgrades; `-nt` still covers non-Nix tools with real mtimes.
+  # Not `-nt` alone: Nix binaries all carry the 1970 epoch mtime, so only the
+  # resolved store path changes on a Nix upgrade.
   local resolved=${bin:A}
   if [[ ! -f "$cache" || "$bin" -nt "$cache" || "$(cat "$src" 2>/dev/null)" != "$resolved" ]]; then
     mkdir -p "$cache_dir"
-    # atomic write; record $resolved only on success so a failed regeneration
-    # is retried next shell instead of pinning the stale cache
+    # Record $resolved only on success, so a failed regeneration is retried
+    # next shell instead of pinning the stale cache.
     if eval "$cmd" > "$cache.tmp"; then
       mv -f "$cache.tmp" "$cache"
       print -r -- "$resolved" > "$src"
@@ -34,42 +29,32 @@ _cached_eval() {
   [[ -f "$cache" ]] && source "$cache"
 }
 
-# mise
 _cached_eval mise-activate "mise activate zsh"
 
 [[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
-# Central gitleaks config (claude-code/gitleaks/): lefthook passes --config,
-# this covers gitleaks runs inside repo scripts, which a repo's own
-# .gitleaks.toml would otherwise configure.
+# Not left to each repo: a repo's own .gitleaks.toml would otherwise configure
+# gitleaks runs inside its scripts (lefthook already passes --config).
 export GITLEAKS_CONFIG="$HOME/.config/gitleaks/gitleaks.toml"
 
-# GnuPG: start the daemons up front. Claude Code's Bash sandbox can't write
-# ~/.gnupg, so gpg there can't autostart them and commit signing fails.
 (( $+commands[gpgconf] )) && { gpgconf --launch keyboxd; gpgconf --launch gpg-agent; } >/dev/null 2>&1 &!
 
-# ============================================
-# History
-# ============================================
 HISTFILE=~/.zsh_history
 HISTSIZE=100000
 SAVEHIST=100000
-setopt HIST_IGNORE_DUPS       # skip consecutive duplicates
-setopt HIST_IGNORE_ALL_DUPS   # remove older duplicates, keep latest
-setopt HIST_IGNORE_SPACE      # skip commands starting with space
-setopt SHARE_HISTORY          # share history across terminals
-setopt HIST_REDUCE_BLANKS     # trim extra whitespace
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_IGNORE_SPACE
+setopt SHARE_HISTORY
+setopt HIST_REDUCE_BLANKS
 
-# ============================================
-# Prompt
-# ============================================
 zmodload zsh/datetime
 autoload -Uz vcs_info
 zstyle ':vcs_info:*' check-for-changes true
 zstyle ':vcs_info:*' unstagedstr '*'
 zstyle ':vcs_info:*' stagedstr '+'
-zstyle ':vcs_info:git:*' formats $' %%F{cyan}\ue725%b%u%c%%f'
-zstyle ':vcs_info:git:*' actionformats $' %%F{cyan}\ue725%b%u%c%%f %%F{red}(%a)%%f'
+zstyle ':vcs_info:git:*' formats $' %%F{cyan}%b%u%c%%f'
+zstyle ':vcs_info:git:*' actionformats $' %%F{cyan}%b%u%c%%f %%F{red}(%a)%%f'
 
 _cmd_timer_preexec() { _cmd_start=$EPOCHREALTIME }
 _cmd_timer_precmd() {
@@ -92,13 +77,13 @@ _cmd_timer_precmd() {
 _cloud_info() {
   _cloud_prompt=""
   if [[ -n "$AWS_PROFILE" ]]; then
-    _cloud_prompt+=$' %F{yellow}\uf0ef'"$AWS_PROFILE"
+    _cloud_prompt+=$' %F{yellow}'"$AWS_PROFILE"
     [[ -n "$AWS_REGION" ]] && _cloud_prompt+="($AWS_REGION)"
     _cloud_prompt+="%f"
   fi
   if [[ -n "$CLOUDSDK_ACTIVE_CONFIG_NAME" || -n "$GOOGLE_CLOUD_PROJECT" ]]; then
     local gcp="${GOOGLE_CLOUD_PROJECT:-$CLOUDSDK_ACTIVE_CONFIG_NAME}"
-    _cloud_prompt+=$' %F{blue}\uf7b7'"$gcp%f"
+    _cloud_prompt+=$' %F{blue}'"$gcp%f"
   fi
 }
 precmd() { vcs_info; _cmd_timer_precmd; _cloud_info }
@@ -106,23 +91,17 @@ preexec() { _cmd_timer_preexec "$@" }
 setopt PROMPT_SUBST
 PROMPT='%F{blue}%2~%f${vcs_info_msg_0_}${_cloud_prompt}${_cmd_duration} %(?.%F{green}.%F{yellow})❯%f '
 
-# ============================================
-# Rust CLI Tools Aliases (interactive only)
-# ============================================
 if [[ $- == *i* ]]; then
   alias ls='eza --icons --color=always'
   alias find='fd'
   alias ps='procs'
 
-  # cd → zoxide
   _cached_eval zoxide "zoxide init zsh"
   alias cd='z'
 
-  # fzf (Ctrl+R 履歴, Ctrl+T ファイル, Alt+C ディレクトリ)
   _cached_eval fzf "fzf --zsh"
 fi
 
-# Ghostty
 autoload -Uz add-zsh-hook
 _osc7_cwd() {
   print -Pn "\e]7;file://localhost${PWD}\e\\"

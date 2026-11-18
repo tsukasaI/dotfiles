@@ -1,4 +1,3 @@
-# macOS
 .DS_Store
 .AppleDouble
 .LSOverride
@@ -6,14 +5,11 @@
 .Spotlight-V100
 .Trashes
 
-# Claude
 .claude/
 CLAUDE.local.md
 
-# Node
 node_modules/
 
-# Editor / IDE
 *.swp
 *.swo
 *~
@@ -21,17 +17,14 @@ node_modules/
 .vscode/
 *.code-workspace
 
-# Environment / Secrets
 .env
 .env.*
 !.env.example
 
-# Build artifacts
 *.o
 *.so
 *.dylib
 
-# Misc
 .terraform/
 .cache/
 .parcel-cache/

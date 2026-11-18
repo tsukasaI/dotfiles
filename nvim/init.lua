@@ -1,34 +1,31 @@
--- 起動高速化 (最上部で有効化)
 vim.loader.enable()
 
--- リーダーキー (lazy.nvim より前に設定する必要がある)
+-- Before lazy.nvim: mappings defined while loading plugins read it.
 vim.g.mapleader = " "
 
 require("config.lazy")
 
--- 基本オプション
-vim.opt.number = true           -- 行番号
-vim.opt.tabstop = 2             -- タブ幅
-vim.opt.shiftwidth = 2          -- インデント幅
-vim.opt.expandtab = true        -- スペースに展開
-vim.opt.ignorecase = true       -- 検索時大文字小文字無視
-vim.opt.smartcase = true        -- 大文字含むと区別
-vim.opt.splitright = true       -- 右に分割
-vim.opt.splitbelow = true       -- 下に分割
+vim.opt.number = true
+vim.opt.tabstop = 2
+vim.opt.shiftwidth = 2
+vim.opt.expandtab = true
+vim.opt.ignorecase = true
+vim.opt.smartcase = true
+vim.opt.splitright = true
+vim.opt.splitbelow = true
 vim.schedule(function()
   vim.opt.clipboard = 'unnamedplus'
 end)
 vim.opt.mouse = ''
 vim.opt.signcolumn = 'yes'
-vim.opt.undofile = true         -- 永続undo
-vim.opt.scrolloff = 10          -- スクロール余白
-vim.opt.showmode = false        -- lualineに任せる
-vim.opt.updatetime = 250        -- CursorHold高速化
-vim.opt.inccommand = 'split'    -- 置換リアルタイムプレビュー
-vim.opt.breakindent = true      -- 折り返しインデント維持
+vim.opt.undofile = true
+vim.opt.scrolloff = 10
+vim.opt.showmode = false        -- lualine shows the mode
+vim.opt.updatetime = 250
+vim.opt.inccommand = 'split'
+vim.opt.breakindent = true
 vim.opt.cursorline = true
 
--- Transparent background (let terminal handle opacity)
 local function set_transparent()
   local groups = {
     "Normal", "NormalNC", "NormalFloat",
@@ -47,7 +44,6 @@ vim.api.nvim_create_autocmd("ColorScheme", {
   callback = set_transparent,
 })
 
--- Diagnostics
 vim.diagnostic.config({
   virtual_text = { current_line = true },
   signs = {
@@ -64,7 +60,6 @@ vim.diagnostic.config({
 })
 vim.keymap.set('n', '<leader>e', vim.diagnostic.open_float, { desc = 'Show diagnostic' })
 
--- Keymaps
 vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
 vim.keymap.set('n', '<C-h>', '<C-w><C-h>', { desc = 'Focus left window' })
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Focus lower window' })
@@ -77,7 +72,7 @@ vim.keymap.set('x', '>', '>gv')
 vim.keymap.set('n', '<A-j>', '<cmd>m .+1<cr>==', { desc = 'Move line down' })
 vim.keymap.set('n', '<A-k>', '<cmd>m .-2<cr>==', { desc = 'Move line up' })
 
--- LSP (設定本体は nvim/lsp/<name>.lua — 0.12+ で自動ロード)
+-- Per-server settings live in nvim/lsp/<name>.lua (auto-loaded since 0.12).
 vim.lsp.config('*', {
   capabilities = require('blink.cmp').get_lsp_capabilities(),
 })

@@ -1,15 +1,11 @@
-# Nix
 result
 result-*
 
-# MacOS
 .DS_Store
 
-# Karabiner
 karabiner/automatic_backups/
 
-# Claude Code: override user-global .claude/ ignore so project-scoped config (skills, etc.) is trackable,
-# while keeping session-local state ignored.
+# Overrides the user-global .claude/ ignore, keeping session-local state ignored.
 !.claude/
 .claude/memory/
 .claude/plans/

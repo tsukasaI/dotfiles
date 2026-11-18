@@ -14,10 +14,8 @@ permissions:
 
 jobs:
   flake-check:
-    # aarch64-darwin evaluation needs an arm64 macOS runner. `nix flake check
-    # --no-build` only confirmed the darwinConfigurations output exists without
-    # evaluating the module set; evaluating the system drvPath forces full
-    # module evaluation while still building nothing.
+    # Not `nix flake check --no-build`: it skips module evaluation. The
+    # system drvPath forces it while building nothing.
     runs-on: macos-26
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

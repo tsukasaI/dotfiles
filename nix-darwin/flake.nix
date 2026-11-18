@@ -7,9 +7,7 @@
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
     ewc.url = "github:tsukasaI/ewc";
     ewc.inputs.nixpkgs.follows = "nixpkgs";
-    # ewc's transitive git-hooks input pins its own (older) nixpkgs unless told
-    # to follow root here too (issue #12): without this, flake.lock ends up
-    # with two materialized nixpkgs closures instead of one.
+    # Without this, git-hooks pins a second nixpkgs into flake.lock (issue #12).
     ewc.inputs.git-hooks.inputs.nixpkgs.follows = "nixpkgs";
     fini.url = "github:tsukasaI/fini";
     fini.inputs.nixpkgs.follows = "nixpkgs";
@@ -26,18 +24,12 @@
     shguardFor = pkgs: pkgs.callPackage ./shguard.nix { src = shguard; };
     diagramRenderFor = pkgs: pkgs.callPackage ./diagram-render.nix { };
     jaLintFor = pkgs: pkgs.callPackage ./ja-lint.nix { };
-    # One function per host (#14): adding a second machine is one more mkHost
-    # call under darwinConfigurations, not a copy of the configuration block.
     mkHost = { primaryUser, system }:
     let
     configuration = { pkgs, lib, ... }:
     let
-      # NOTE (issue #27): this does NOT actually give nvim precompiled parsers at
-      # runtime. In practice nvim-treesitter (the lazy.nvim plugin) self-compiles
-      # go/rust/toml/etc. into ~/.local/share/nvim/site/parser/*.so on first use,
-      # using the Xcode CLT C toolchain — this derivation's rtp prepend has no
-      # observed effect. `proto` dropped below since it never shows up in the
-      # resulting parser list either way.
+      # No observed effect: nvim-treesitter compiles its own parsers on first
+      # use with the Xcode CLT toolchain (issue #27).
       treesitterParsers = pkgs.vimPlugins.nvim-treesitter.withPlugins (p: with p; [
         rust toml go gomod gowork gosum
       ]);
@@ -98,7 +90,6 @@
         (pkgs.callPackage ./dream-extract.nix { inherit primaryUser; opsDir = "/Users/${primaryUser}/engineer/ops"; })
         (pkgs.callPackage ./prepush-sandbox.nix { })
       ] ++ (with pkgs; [
-        # Modern CLI replacements
         bat
         eza
         fd
@@ -109,10 +100,8 @@
         jq
         tokei
 
-        # Required for git commit signing (gpgsign = true)
         gnupg
 
-        # Editor / Git
         neovimWithParsers
         git
         lazygit
@@ -120,32 +109,25 @@
         lefthook
         shellcheck
 
-        # Cloud / DevOps
         awscli2
         gh
         terraform
 
-        # Node / TypeScript
         bun
         nodejs
         pnpm
         pi-coding-agent # run via ~/.local/bin/pi-factory, not bare `pi`
         agent-browser # run as a user-scope MCP server, not from Bash: Chromium can't launch in the Bash sandbox
 
-        # Go (LSP, formatters, debugger for nvim-dap-go)
-        # go_latest tracks nixpkgs' newest go_1_XX; plain `go` lags behind on
-        # a slower-moving "stable" alias (confirmed: go=1.26.7, go_latest=1.27.0
-        # on the same nixpkgs pin).
+        # Not `go`: it lags a minor release behind on a slower-moving alias.
         go_latest
         gopls
         gofumpt
-        gotools # goimports
+        gotools
         delve
 
-        # Python
         uv
 
-        # Rust (LSP, formatter, linter for nvim)
         cargo
         rustc
         clippy
@@ -154,13 +136,11 @@
         lldb
       ]);
 
-      # Touch ID for sudo (works inside tmux/screen via pam_reattach)
       security.pam.services.sudo_local = {
         touchIdAuth = true;
         reattach = true;
       };
 
-      # Homebrew（Nixで管理できないもの用）
       homebrew = {
         enable = true;
         onActivation = {
@@ -171,24 +151,23 @@
 
         taps = [
           # trusted: Homebrew 5.1+ blocks formulae from untrusted third-party taps.
-          { name = "bendews/tap"; trusted = true; }  # apw (Apple Passwords CLI)
-          { name = "tursodatabase/tap"; trusted = true; }  # turso (libSQL cloud CLI)
+          { name = "bendews/tap"; trusted = true; }
+          { name = "tursodatabase/tap"; trusted = true; }
           { name = "libsql/sqld"; trusted = true; }  # sqld (turso CLI dependency)
-          { name = "ariga/tap"; trusted = true; }  # atlas (DB schema migration tool)
-          { name = "charmbracelet/tap"; trusted = true; }  # freeze (code screenshot tool)
-          { name = "abue-ammar/tinycast"; trusted = true; }  # tinycast (app launcher)
+          { name = "ariga/tap"; trusted = true; }
+          { name = "charmbracelet/tap"; trusted = true; }
+          { name = "abue-ammar/tinycast"; trusted = true; }
         ];
 
-        # Nixに移行しないformulae
         brews = [
           "deck"
           "mise"
           "yt-dlp"
-          "apw"  # Apple Passwords CLI
-          "container"  # apple/container: per-container VMs, used by pi-factory --container
-          "tursodatabase/tap/turso"  # libSQL/Turso cloud CLI (core "turso" is a different DB engine)
-          "ariga/tap/atlas"  # Atlas DB schema migration tool
-          "charmbracelet/tap/freeze"  # generate code screenshots as images
+          "apw"
+          "container"  # used by pi-factory --container
+          "tursodatabase/tap/turso"  # not core "turso": that is a different DB engine
+          "ariga/tap/atlas"
+          "charmbracelet/tap/freeze"
         ];
 
         casks = [
@@ -199,7 +178,7 @@
           "session-manager-plugin"
           "font-plemol-jp-nf"
           "font-blex-mono-nerd-font"
-          "abue-ammar/tinycast/tinycast"  # app launcher
+          "abue-ammar/tinycast/tinycast"
           "raycast"  # not redundant with tinycast: fallback launcher; removing it zaps its settings
         ];
       };
@@ -256,8 +235,6 @@
       # Not darwin's default `false`: the Claude Code sandbox may reach the
       # nix daemon socket, and an unsandboxed builder would be its way out.
       nix.settings.sandbox = true;
-      # Store hygiene (issue #12): without these the Nix store grows
-      # unbounded — nothing here ever reclaims old generations/derivations.
       nix.optimise.automatic = true;
       nix.gc = {
         automatic = true;

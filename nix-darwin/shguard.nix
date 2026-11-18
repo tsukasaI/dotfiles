@@ -1,4 +1,3 @@
-# The shguard hook binary, built from the `shguard` flake input's source.
 # shguard's own flake has no `packages.default` yet (tsukasaI/shguard#1114);
 # once it does, use that instead and delete this file. Built like shguard's
 # release job (`cargo build --locked --release -p shguard`), with nixpkgs'
