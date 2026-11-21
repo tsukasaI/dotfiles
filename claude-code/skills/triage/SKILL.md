@@ -48,7 +48,9 @@ Also collect the review notes left on merged PRs (the `review-gate` skill's
 Keep only PRs whose body carries `<!-- not-filed:v1 -->` and that have no
 comment starting with `<!-- triage-notes:v1 -->` from an OWNER, MEMBER, or
 COLLABORATOR (an earlier triage already settled those). Each line under the
-heading is one note: severity, summary, `file:line`, options A/B.
+heading is one note: severity, summary, `file:line`, options A/B. A line
+ending in the token `outside-bar` is outside the repo's `## Quality bar`
+(CLAUDE.md) and is always `drop`, whatever its severity.
 
 ## Analyze (read-only)
 
@@ -123,7 +125,8 @@ Proposed action is exactly one of:
   to leave the code unchanged; closed with that decision recorded, no PR
 - `merge → #M`: duplicate; #M is the canonical issue that stays open
 
-Notes from merged PRs: a note of severity medium or above gets its own row,
+Notes from merged PRs: `outside-bar` notes show only as a per-PR count in
+the PR's `drop` row and cannot be promoted. Any other note of severity medium or above gets its own row,
 named `PR#<n> note <k>`, with action `file` (it becomes a new issue, which
 this board then treats like any other `go`/`schedule` row) or `drop`. Low
 notes default to `drop` and show as one row per PR with their count; the

@@ -37,6 +37,13 @@ description: The code-reviewer gate between `gh pr create` and `gh pr merge` in 
   is behavior, security, or data-loss. Those are still filed, with the
   earlier decision quoted, since a re-ask can be the real fix (cc-memory
   #222 re-asked part of #189 and shipped).
+  A repo whose CLAUDE.md has a `## Quality bar` section settles medium/low
+  findings, the implementer's own included, by that section's table
+  instead of the provenance rows above and the `needs-decision` rule
+  below; critical/high handling is unchanged. The reviewer marks each
+  finding inside or outside the bar. An outside finding is a `note`
+  whatever its provenance or kind, and its `## Not filed` line ends with
+  the token `outside-bar`.
   - Auto-fix criteria, all must hold: stays within Scope (the issue's
     triage `Scope`, plus the files the PR touches, plus any doc or comment
     the PR made false); touches no public API/CLI flag, config schema,
