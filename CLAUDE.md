@@ -71,7 +71,9 @@ environment's setup script installs the shared config instead. Details are in
 ## Concepts
 
 - **ewc / fini / herdr**: personal tools installed as flake inputs. `fini` is
-  the formatter the PostToolUse hook runs on every Edit/Write. `herdr`
+  the formatter; lefthook's pre-commit runs `fini --check` on staged
+  non-code text files, check-only because sandboxed commits can't
+  rewrite the live config. `herdr`
   supplies the SessionStart hook (`~/.claude/hooks/`, outside this repo).
 - **claude-logs**: the SessionEnd hook (`hooks/save-transcript.ts`) writes
   transcripts to `~/.local/share/claude-logs/logs.db`.

@@ -10,6 +10,8 @@ pre-commit:
     shellcheck:
       glob: "*.sh"
       run: shellcheck -x --severity=warning {staged_files}
+    fini-check:
+      run: fini --check {staged_files}
     rules-paths-sync:
       run: bash tests/rules-paths-sync.sh
     symlinked-sync:

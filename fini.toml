@@ -1,0 +1,13 @@
+# Code files are left to their own formatters; fini covers everything else.
+exclude = [
+  "*.ts",
+  "*.tsx",
+  "*.js",
+  "*.lua",
+  "*.sh",
+  "*.nix",
+  "*.py",
+  "*.jq",
+  "zsh/zshrc",
+  "*.lock",
+]

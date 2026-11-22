@@ -80,8 +80,8 @@ Pi coding agent on API-key billing, kept off Claude Code's subscription.
   `copy-code.ts` adds `/copy-code [n]`: walks the branch back to the newest
   assistant reply with a fenced block (CommonMark fences, so a ```` block
   quoting ``` stays whole) and `pbcopy`s block n, else the longest.
-  `format.ts` runs `fini` after write/edit (as Claude Code's PostToolUse)
-  and tells the model when the file changed. `style-guards.ts` runs
+  `format.ts` runs `fini` after write/edit (Claude Code no longer does;
+  it relies on lefthook's `fini --check`) and tells the model when the file changed. `style-guards.ts` runs
   `claude-code/hooks/slop-guard.ts` on prose writes and imports
   `claude-code/mod/hooks/rule-guards.ts`' commit-message and main-branch
   checks; both fail open, like their Claude Code originals.

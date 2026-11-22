@@ -13,12 +13,6 @@ Hook scripts for Claude Code, configured in `~/.claude/settings.json`.
 | `slop-guard.ts` | `Edit\|Write` | Deny prose edits (`.md`/`.mdx`/`.txt`) that newly introduce an em dash or a cliché phrase from `slop-phrases.conf`; only the net-new count vs. the pre-edit text is checked, never the whole file. `SLOP_GUARD_DISABLE=1` disables it. |
 | `agent-browser-guard.ts` | `mcp__agent-browser__.*` | Fail-closed argument guard for the unsandboxed agent-browser MCP: tool allowlist, forbidden launch/state keys, `path`/`output`/`baseline` confined to `/private/tmp/claude-501/`, http(s)/about:blank URLs only. |
 
-### PostToolUse
-
-| Script | Matcher | Description |
-|---|---|---|
-| (inline) `fini` | `Edit\|Write` | Auto-format edited files with fini |
-
 ### SessionEnd
 
 | Script | Matcher | Description |
