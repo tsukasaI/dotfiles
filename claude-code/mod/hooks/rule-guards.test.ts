@@ -32,6 +32,17 @@ test('commitMessage reads -m, --message= and heredoc forms, and gives up on the 
   expect(commitMessage('git commit -m "$(git log -1 --format=%s)"')).toBeUndefined()
 })
 
+test('a heredoc ends only on its own tag line', async () => {
+  expect(commitMessage(`git commit -m "$(cat <<'EOF'\nfeat: a\n  EOF trailing\nbody\nEOF\n)"`)).toBe(
+    'feat: a\n  EOF trailing\nbody',
+  )
+})
+
+test('a heredoc with a long blank body finishes', async () => {
+  expect(commitMessage('cat <<EOF\n' + '\n'.repeat(50000) + 'x')).toBeUndefined()
+  expect(commitMessage('cat <<EOF\n' + '\n \n'.repeat(20000) + 'x')).toBeUndefined()
+})
+
 test('messageProblem enforces Conventional Commits and English', async () => {
   expect(messageProblem('feat(mod): add pane\n\nintent(mod): x')).toBeUndefined()
   expect(messageProblem('fix!: drop flag')).toBeUndefined()

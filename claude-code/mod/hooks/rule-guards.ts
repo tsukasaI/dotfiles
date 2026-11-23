@@ -10,16 +10,21 @@ const VALUE = String.raw`(?:"[^"]*"|'[^']*'|[^\s"']\S*)`
 const NV = String.raw`(?:"[^"]*"|'[^']*'|(?![-"'])\S+)`
 const VALUE_LONG_OPTIONS = 'git-dir|work-tree|namespace|exec-path|config-env|attr-source'
 const GIT_GLOBAL_OPTIONS = String.raw`(?:\s+(?:-[cC]\s+${NV}|--(?:${VALUE_LONG_OPTIONS})\s+${NV}|--[\w-]+(?:=${VALUE})?|-\w+))*`
-const GIT_COMMIT = new RegExp(String.raw`(^|[;&|(\n]\s*)git(${GIT_GLOBAL_OPTIONS})\s+commit(?![\w-])`)
+// Not `\s*` after the separator: it spans newlines, so every line of a long blank run rescans the rest
+// (quadratic). A run containing a newline still matches from its last `\n`, ending at the same `git`.
+const GIT_COMMIT = new RegExp(String.raw`(^|[;&|(\n][^\S\n]*)git(${GIT_GLOBAL_OPTIONS})\s+commit(?![\w-])`)
 const SUBJECT = /^(feat|fix|refactor|chore|docs|test|perf|build|ci|style|revert)(\([^)]+\))?!?: \S/
 const JAPANESE = /[぀-ヿ㐀-鿿ｦ-ﾟ]/
-const HEREDOC_BODY = /(<<-?\s*['"]?(\w+)['"]?\n)([\s\S]*?)(\n\s*\2\b)/g
+// Not `\n\s*` before the tag: `\s` spans newlines, so a long blank run backtracks quadratically
+// inside the Claude Code process, and an indented `  EOF note` line would end the heredoc early.
+// bash ends it only on the tag's own line (leading tabs for `<<-`); `)` closes `$(cat <<EOF ... EOF)`.
+const HEREDOC_BODY = /(<<-?\s*['"]?(\w+)['"]?\n)([\s\S]*?)(\n\t*\2(?=[\n)]|$))/g
 // A heredoc only counts as the message when its consumer is `-m "$(cat <<EOF`, or `-F - <<EOF`
 // (`-` or `/dev/stdin`, optionally followed by other flags such as `--signoff`).
 const HEREDOC_M =
-  /(?:^|\s)(?:-[a-zA-Z]*m\s*|--m[a-z]*(?:=|\s+))"?\$\(\s*cat\s+<<-?\s*['"]?(?<tag>\w+)['"]?\n(?<body>[\s\S]*?)\n\s*\k<tag>\b(?:\s*\)"?)?/g
+  /(?:^|\s)(?:-[a-zA-Z]*m\s*|--m[a-z]*(?:=|\s+))"?\$\(\s*cat\s+<<-?\s*['"]?(?<tag>\w+)['"]?\n(?<body>[\s\S]*?)\n\t*\k<tag>(?=[\n)]|$)(?:\s*\)"?)?/g
 const HEREDOC_F =
-  /(?:^|\s)(?:-F\s*(?:-|\/dev\/stdin)|--file(?:=|\s+)(?:-|\/dev\/stdin))(?:\s+-[\w=-]+)*\s*<<-?\s*['"]?(?<tag>\w+)['"]?\n(?<body>[\s\S]*?)\n\s*\k<tag>\b/g
+  /(?:^|\s)(?:-F\s*(?:-|\/dev\/stdin)|--file(?:=|\s+)(?:-|\/dev\/stdin))(?:\s+-[\w=-]+)*\s*<<-?\s*['"]?(?<tag>\w+)['"]?\n(?<body>[\s\S]*?)\n\t*\k<tag>(?=[\n)]|$)/g
 // `-m`, a combined short flag ending in `m` (`-am`), or `--message` / an abbreviation of it.
 const MESSAGE_FLAG = /(?:^|\s)(?:-[a-zA-Z]*m|--m(?:e(?:s(?:s(?:a(?:g(?:e)?)?)?)?)?)?(?=[=\s]|$))/g
 const FILE_STDIN = /(?:^|\s)(?:-F\s*(?:-|\/dev\/stdin)|--file(?:=|\s+)(?:-|\/dev\/stdin))(?=\s|$)/g

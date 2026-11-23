@@ -48,6 +48,11 @@ test('hasCriticalOrHigh table of severity notations', async () => {
   for (const [line, want] of CASES) expect([line, hasCriticalOrHigh(line)]).toEqual([line, want])
 })
 
+test('hasCriticalOrHigh finishes on a long run of asterisks', async () => {
+  expect(hasCriticalOrHigh('confidence ' + '*'.repeat(20000) + 'high')).toBe(false)
+  expect(hasCriticalOrHigh('**High** ' + '*'.repeat(20000))).toBe(true)
+})
+
 test('mergedNumber reads a number or URL argument', async () => {
   expect(mergedNumber('gh pr merge 12 --squash --delete-branch')).toBe(12)
   expect(mergedNumber(`gh pr merge ${PR} --squash`)).toBe(12)

@@ -17,11 +17,12 @@ const AGENT_ID = /agentId:\s*([A-Za-z0-9_-]+)/
 // "critical path", or a zero count ("Critical: 0") is not a severity.
 const SEVERITY_NOTATION = new RegExp(
   '(?:^\\s*(?:[-*>]\\s+|\\d+[.)]\\s+)*|[[(]|\\*\\*|#+\\s+|\\s[—–]\\s*|\\s-\\s+|severity[\\s*_:=|/—–-]*)' +
-    '(?<!confidence[\\s*_:=—–-]*\\**)' +
+    '(?<!confidence[\\s*_:=—–-]*)' +
     '(?:critical(?!\\s+path\\b)|high)\\b' +
     '(?!-level\\b)(?!\\s+confidence\\b)(?!\\s*:?\\s*(?:0|none)\\b)',
   'i',
 )
+const MAX_SEVERITY_LINE = 2000
 const TABLE_ROW = /^\s*\|.*\|\s*$/
 const TABLE_RATING = /^[\s*_`]*(critical|high|medium|low)[\s*_`]*$/i
 
@@ -31,7 +32,9 @@ function lineHasCriticalOrHigh(line: string): boolean {
     const rating = line.split('|').map(c => TABLE_RATING.exec(c)?.[1]).find(r => r !== undefined)
     return rating !== undefined && /^(critical|high)$/i.test(rating)
   }
-  return SEVERITY_NOTATION.test(line)
+  // Not the whole line: the variable-length lookbehind makes a long run of `*` quadratic, and this
+  // runs inside the Claude Code process, so an unbounded line can stall the session (issue #115).
+  return SEVERITY_NOTATION.test(line.slice(0, MAX_SEVERITY_LINE))
 }
 
 /**
