@@ -166,7 +166,7 @@ async function repoRow(repo: string, w: MonthWindow): Promise<RepoRow> {
 }
 
 async function guardStats(w: MonthWindow): Promise<GuardStats | null> {
-  const messages: string[] = [];
+  const commits: { repo: string; message: string }[] = [];
   const sources: { dir: string; paths: string[] }[] = [
     {
       dir: join(home, "dotfiles"),
@@ -185,9 +185,16 @@ async function guardStats(w: MonthWindow): Promise<GuardStats | null> {
       failed = true;
       continue;
     }
-    messages.push(...r.value.split("\0").filter((m) => m.trim()));
+    const repo = basename(s.dir);
+    commits.push(
+      ...r.value
+        .split("\0")
+        .map((m) => m.trim())
+        .filter((m) => m !== "")
+        .map((message) => ({ repo, message })),
+    );
   }
-  return failed ? null : countGuardCommits(messages);
+  return failed ? null : countGuardCommits(commits);
 }
 
 async function ghCount(args: string[], field: "length" | "bodies", dir: string): Promise<number | string[] | null> {

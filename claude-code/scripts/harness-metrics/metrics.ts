@@ -13,6 +13,7 @@ export interface SessionMetrics {
   abnormalStops: number;
   askUserQuestions: number;
   exitPlanModes: number;
+  planAccepted: boolean;
   autonomous: boolean;
 }
 
@@ -31,6 +32,7 @@ export interface Totals {
   abnormalStops: number;
   askUserQuestions: number;
   exitPlanModes: number;
+  planSessions: number;
   autonomousSessions: number;
 }
 
@@ -53,6 +55,7 @@ export interface RepoRow {
 export interface GuardStats {
   total: number;
   withoutIssueRef: number;
+  unreferenced: { repo: string; subject: string }[];
 }
 
 export interface RateSnapshot {
@@ -152,6 +155,9 @@ interface ToolUse {
   command: string;
 }
 
+// dotfiles and ops commit straight to main, so a push there stands in for `gh pr merge`.
+const MAIN_COMMIT_REPO = /(^|\/)(dotfiles|ops)(\/|$)/;
+
 export function analyzeSession(lines: string[]): SessionMetrics {
   const m: SessionMetrics = {
     startedAt: "",
@@ -164,11 +170,12 @@ export function analyzeSession(lines: string[]): SessionMetrics {
     abnormalStops: 0,
     askUserQuestions: 0,
     exitPlanModes: 0,
+    planAccepted: false,
     autonomous: false,
   };
   const toolUses = new Map<string, ToolUse>();
   let assistantText = "";
-  let planAccepted = false;
+  let planLive = false;
 
   for (const line of lines) {
     let parsed: unknown;
@@ -217,14 +224,14 @@ export function analyzeSession(lines: string[]): SessionMetrics {
         const denied = isHookDenial(text);
         if (denied) m.deniedCommands.push(use?.command || `[${use?.name ?? "unknown"}]`);
         const failed = b.is_error === true || denied;
-        if (use?.name === "ExitPlanMode" && !failed) planAccepted = true;
-        if (
-          use?.name === "Bash" &&
-          !failed &&
-          planAccepted &&
-          /\bgh\s+pr\s+merge\b/.test(use.command)
-        ) {
-          m.autonomous = true;
+        if (use?.name === "ExitPlanMode" && !failed) {
+          planLive = true;
+          m.planAccepted = true;
+        }
+        if (use?.name === "Bash" && !failed && planLive) {
+          const merged = /\bgh\s+pr\s+merge\b/.test(use.command);
+          const pushedToMain = /\bgit\s+push\b/.test(use.command) && MAIN_COMMIT_REPO.test(m.cwd);
+          if (merged || pushedToMain) m.autonomous = true;
         }
       }
       continue;
@@ -234,8 +241,10 @@ export function analyzeSession(lines: string[]): SessionMetrics {
     const text = textOf(content);
     const command = bashInputCommand(text);
     if (command !== undefined) {
-      if (isHandoff(command, assistantText)) m.handoffs++;
-      else m.selfRuns++;
+      if (isHandoff(command, assistantText)) {
+        m.handoffs++;
+        planLive = false;
+      } else m.selfRuns++;
       continue;
     }
     const head = text.trimStart();
@@ -243,7 +252,7 @@ export function analyzeSession(lines: string[]): SessionMetrics {
 
     m.humanPrompts++;
     if (!m.firstPrompt) m.firstPrompt = text;
-    planAccepted = false;
+    planLive = false;
     assistantText = "";
   }
 
@@ -261,6 +270,7 @@ export function aggregate(records: SessionRecord[]): Totals {
     abnormalStops: 0,
     askUserQuestions: 0,
     exitPlanModes: 0,
+    planSessions: 0,
     autonomousSessions: 0,
   };
   for (const { metrics: s } of records) {
@@ -272,6 +282,7 @@ export function aggregate(records: SessionRecord[]): Totals {
     t.abnormalStops += s.abnormalStops;
     t.askUserQuestions += s.askUserQuestions;
     t.exitPlanModes += s.exitPlanModes;
+    if (s.planAccepted) t.planSessions++;
     if (s.autonomous) t.autonomousSessions++;
   }
   return t;
@@ -324,19 +335,23 @@ export function countFeatFix(subjects: string[]): { feat: number; fix: number } 
   return { feat, fix };
 }
 
-export function reworkRate(feat: number, fix: number): number | null {
-  return feat + fix === 0 ? null : fix / (feat + fix);
-}
-
-export function hasIssueRef(message: string): boolean {
+export function hasIssueRef(message: string, opts: { stripPrSuffix: boolean }): boolean {
   const [first = "", ...rest] = message.split("\n");
-  return /#\d+/.test([first.replace(/\s*\(#\d+\)\s*$/, ""), ...rest].join("\n"));
+  const subject = opts.stripPrSuffix ? first.replace(/\s*\(#\d+\)\s*$/, "") : first;
+  return /#\d+/.test([subject, ...rest].join("\n"));
 }
 
-export function countGuardCommits(messages: string[]): GuardStats {
+// dotfiles commits straight to main, so its trailing (#N) is an issue; shguard squash-merges PRs, so it is the PR number.
+const PR_SUFFIX_REPOS = new Set(["shguard"]);
+
+export function countGuardCommits(commits: { repo: string; message: string }[]): GuardStats {
+  const unreferenced = commits
+    .filter((c) => !hasIssueRef(c.message, { stripPrSuffix: PR_SUFFIX_REPOS.has(c.repo) }))
+    .map((c) => ({ repo: c.repo, subject: (c.message.split("\n")[0] ?? "").trim() }));
   return {
-    total: messages.length,
-    withoutIssueRef: messages.filter((msg) => !hasIssueRef(msg)).length,
+    total: commits.length,
+    withoutIssueRef: unreferenced.length,
+    unreferenced,
   };
 }
 
@@ -459,7 +474,6 @@ export function renderPublic(r: ReportInput): string {
   const feat = sumNullable(product.map((x) => x.feat));
   const fix = sumNullable(product.map((x) => x.fix));
   const merged = sumNullable(product.map((x) => x.mergedPrs));
-  const rate = feat === null || fix === null ? null : reworkRate(feat, fix);
   return [
     `## 公開用 (${r.window.month})`,
     "",
@@ -471,9 +485,8 @@ export function renderPublic(r: ReportInput): string {
     `- 必要な介入（AskUserQuestion ${t.askUserQuestions} / ExitPlanMode ${t.exitPlanModes}）${
       t.askUserQuestions + t.exitPlanModes === 0 ? " 警告: 0 件" : ""
     }`,
-    `- 自律稼働セッション: ${t.autonomousSessions}`,
+    `- 自律稼働セッション: ${t.autonomousSessions}（計画承認 ${t.planSessions} セッション中）`,
     `- 出荷（プロダクト系）: feat ${na(feat)} / fix ${na(fix)} / マージ PR ${na(merged)}`,
-    `- 手戻り率（プロダクト系）: ${pct(rate)}`,
     `- ハーネス系: feat ${na(sumNullable(harness.map((x) => x.feat)))} / fix ${na(
       sumNullable(harness.map((x) => x.fix)),
     )} / マージ PR ${na(sumNullable(harness.map((x) => x.mergedPrs)))}`,
@@ -506,6 +519,10 @@ export function renderLocal(r: ReportInput): string {
   if (r.excludedRepos.length > 0) {
     out.push("", "### 対象外 (gate なし)", ...r.excludedRepos.map((x) => `- ${x}`));
   }
+  out.push("", "### Issue 参照のないガードファイルのコミット");
+  if (r.guard === null) out.push("- N/A");
+  else if (r.guard.unreferenced.length === 0) out.push("- なし");
+  else for (const c of r.guard.unreferenced) out.push(`- ${c.repo}: ${truncate(normalizeWs(c.subject), 120)}`);
   out.push("", "### 拒否されたコマンド上位");
   if (r.topDenied.length === 0) out.push("- なし");
   for (const d of r.topDenied) out.push(`- ${d.count}x ${d.command}`);

@@ -136,6 +136,71 @@ describe("autonomous completion", () => {
     expect(analyzeSession([user("go"), ...rejected, ...merge]).autonomous).toBe(false);
   });
 
+  describe("direct push to main", () => {
+    const push = [
+      toolUse("g", "Bash", { command: "git push origin main" }),
+      toolResult("g", "pushed"),
+    ];
+
+    test("accepted plan then push in dotfiles counts", () => {
+      const m = analyzeSession([user("go", { cwd: "/Users/me/dotfiles" }), ...plan, ...push]);
+      expect(m.autonomous).toBe(true);
+      expect(m.planAccepted).toBe(true);
+    });
+
+    test("the same push in a branch+PR repo does not", () => {
+      const m = analyzeSession([user("go", { cwd: "/Users/me/app" }), ...plan, ...push]);
+      expect(m.autonomous).toBe(false);
+      expect(m.planAccepted).toBe(true);
+    });
+
+    test("a handoff between acceptance and push disqualifies without counting as a prompt", () => {
+      const m = analyzeSession([
+        user("go", { cwd: "/Users/me/dotfiles" }),
+        ...plan,
+        assistantText("Run this:\n```bash\ngit status\n```"),
+        user("<bash-input>git status</bash-input>"),
+        ...push,
+      ]);
+      expect(m.handoffs).toBe(1);
+      expect(m.humanPrompts).toBe(1);
+      expect(m.autonomous).toBe(false);
+      expect(m.planAccepted).toBe(true);
+    });
+
+    test("a self-run ! command that is not a handoff keeps autonomous", () => {
+      const m = analyzeSession([
+        user("go", { cwd: "/Users/me/dotfiles" }),
+        ...plan,
+        user("<bash-input>ls</bash-input>"),
+        ...push,
+      ]);
+      expect(m.selfRuns).toBe(1);
+      expect(m.autonomous).toBe(true);
+    });
+
+    test("a human prompt between acceptance and push disqualifies but keeps planAccepted", () => {
+      const m = analyzeSession([
+        user("go", { cwd: "/Users/me/dotfiles" }),
+        ...plan,
+        user("wait, also X"),
+        ...push,
+      ]);
+      expect(m.autonomous).toBe(false);
+      expect(m.planAccepted).toBe(true);
+    });
+  });
+
+  test("planSessions counts sessions with an accepted plan", () => {
+    const withPlan = analyzeSession([user("go"), ...plan]);
+    const without = analyzeSession([user("go")]);
+    const t = aggregate([
+      { sessionId: "a", metrics: withPlan },
+      { sessionId: "b", metrics: without },
+    ]);
+    expect(t.planSessions).toBe(1);
+  });
+
   test("counts canary tool uses and abnormal stops", () => {
     const m = analyzeSession([
       toolUse("a", "AskUserQuestion"),
@@ -165,11 +230,39 @@ describe("git helpers", () => {
   });
 
   test("detects issue refs and guard commits without one", () => {
-    expect(hasIssueRef("fix: a #12")).toBe(true);
-    expect(hasIssueRef("fix: a")).toBe(false);
-    expect(hasIssueRef("fix(x): y (#12)")).toBe(false);
-    expect(hasIssueRef("fix(x): y\n\nrefs #5 (#12)")).toBe(true);
-    expect(countGuardCommits(["a #1", "b"])).toEqual({ total: 2, withoutIssueRef: 1 });
+    const strip = { stripPrSuffix: true };
+    expect(hasIssueRef("fix: a #12", strip)).toBe(true);
+    expect(hasIssueRef("fix: a", strip)).toBe(false);
+    expect(hasIssueRef("fix(x): y (#12)", strip)).toBe(false);
+    expect(hasIssueRef("fix(x): y (#12)", { stripPrSuffix: false })).toBe(true);
+    expect(hasIssueRef("fix(x): y\n\nrefs #5 (#12)", strip)).toBe(true);
+    expect(
+      countGuardCommits([
+        { repo: "dotfiles", message: "a #1" },
+        { repo: "shguard", message: "b" },
+      ]),
+    ).toEqual({ total: 2, withoutIssueRef: 1, unreferenced: [{ repo: "shguard", subject: "b" }] });
+  });
+
+  test("a trailing (#N) is an issue ref in dotfiles but a PR suffix in shguard", () => {
+    const stats = countGuardCommits([
+      { repo: "dotfiles", message: "fix(x): y (#133)" },
+      { repo: "shguard", message: "fix(x): y (#133)" },
+    ]);
+    expect(stats.unreferenced).toEqual([{ repo: "shguard", subject: "fix(x): y (#133)" }]);
+  });
+
+  test("lists unreferenced guard commits by repo and subject", () => {
+    const stats = countGuardCommits([
+      { repo: "dotfiles", message: "fix(hooks): tighten rule\n\nbody without ref\n" },
+      { repo: "dotfiles", message: "feat(shguard): add row\n\nrefs #12" },
+      { repo: "shguard", message: "  chore: bump (#34)  \n" },
+    ]);
+    expect(stats.total).toBe(3);
+    expect(stats.unreferenced).toEqual([
+      { repo: "dotfiles", subject: "fix(hooks): tighten rule" },
+      { repo: "shguard", subject: "chore: bump (#34)" },
+    ]);
   });
 
   test("parses review dates and counts overdue", () => {
@@ -291,7 +384,7 @@ describe("rendering", () => {
     totals: aggregate(records),
     repos: [{ repo: "secret-repo", kind: "product", feat: 3, fix: 1, mergedPrs: null }],
     excludedRepos: ["private-playground"],
-    guard: { total: 2, withoutIssueRef: 1 },
+    guard: { total: 2, withoutIssueRef: 1, unreferenced: [{ repo: "shguard", subject: "fix: secret-subject" }] },
     urgentIssues: null,
     overdueHypotheses: 0,
     warnings: ["gh failed in secret-repo"],
@@ -301,20 +394,20 @@ describe("rendering", () => {
 
   test("public section holds aggregates only", () => {
     const pub = renderPublic(input);
-    for (const s of ["secret-repo", "secret-prompt-text", "secret-cmd", "private-playground"]) {
+    for (const s of ["secret-repo", "secret-prompt-text", "secret-cmd", "private-playground", "secret-subject"]) {
       expect(pub).not.toContain(s);
     }
-    expect(pub).toContain("手戻り率（プロダクト系）: 25.0%");
+    expect(pub).not.toContain("手戻り率");
     expect(pub).toContain("harness-urgent Issue: N/A");
   });
 
-  test("harness commits do not affect the product rework rate", () => {
+  test("harness commits do not affect the product shipping line", () => {
     const withHarness: ReportInput = {
       ...input,
       repos: [...input.repos, { repo: "dotfiles", kind: "harness", feat: 10, fix: 30, mergedPrs: null }],
     };
     const pub = renderPublic(withHarness);
-    expect(pub).toContain("手戻り率（プロダクト系）: 25.0%");
+    expect(pub).toContain("出荷（プロダクト系）: feat 3 / fix 1");
     expect(pub).toContain("ハーネス系: feat 10 / fix 30");
     expect(pub).not.toContain("dotfiles");
   });
@@ -324,5 +417,18 @@ describe("rendering", () => {
     for (const s of ["secret-repo", "secret-prompt-text", "secret-cmd"]) {
       expect(local).toContain(s);
     }
+    expect(local).toContain("### Issue 参照のないガードファイルのコミット\n- shguard: fix: secret-subject");
+  });
+
+  test("local guard section handles empty and unavailable data", () => {
+    const empty = renderLocal({ ...input, guard: { total: 1, withoutIssueRef: 0, unreferenced: [] } });
+    expect(empty).toContain("### Issue 参照のないガードファイルのコミット\n- なし");
+    expect(renderLocal({ ...input, guard: null })).toContain(
+      "### Issue 参照のないガードファイルのコミット\n- N/A",
+    );
+  });
+
+  test("public autonomous line shows the plan-accepted denominator", () => {
+    expect(renderPublic(input)).toContain("自律稼働セッション: 0（計画承認 0 セッション中）");
   });
 });
