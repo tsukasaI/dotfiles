@@ -72,7 +72,9 @@ describe("guardrail files", () => {
   test.each([
     "/anyprefix/claude-code/hooks/x.ts",
     "/x/claude-code/lib/a.ts",
+    "/x/claude-code/statusline.ts",
     "/x/claude-code/settings.json",
+    "/x/proj/.claude/settings.local.json",
     "/x/claude-code/shguard/config.toml",
     "/x/proj/lefthook.yml",
     "/x/proj/.lefthook-local.yml",

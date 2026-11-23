@@ -79,8 +79,10 @@ check_path() {
     */claude-code/mod/hooks/hooks.json | \
     */claude-code/mod/.claude-plugin/* | \
     */claude-code/lib/* | \
+    */claude-code/statusline.ts | \
     */claude-code/settings.json | \
     */.claude/settings.json | \
+    */.claude/settings.local.json | \
     */claude-code/shguard/config.toml | \
     */claude-code/skills/ja-lint/scripts/* | \
     */.claude/skills/ja-lint/scripts/* | \
