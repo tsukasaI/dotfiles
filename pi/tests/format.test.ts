@@ -60,7 +60,8 @@ try {
 	hasFini = false;
 }
 test.skipIf(!hasFini)("real fini strips trailing whitespace", async () => {
-	const f = join(dir, "real.ts");
+	// Not .ts: the repo's fini.toml excludes code files, and fini reads it from the cwd.
+	const f = join(dir, "real.txt");
 	writeFileSync(f, "a  \nb\n");
 	expect(await formatFile(f)).toContain("normalized");
 	expect(readFileSync(f, "utf8")).toBe("a\nb\n");
