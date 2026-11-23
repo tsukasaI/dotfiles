@@ -1,8 +1,14 @@
-# Renewal mechanism for the SHA-pinned actions in workflows (security rule:
-# every content-hash pin needs a way to not silently rot).
+# Renewal mechanism for the SHA-pinned actions in workflows and the digest-pinned
+# base image of pi/Dockerfile.pi (security rule: every content-hash pin needs a
+# way to not silently rot). The tool pins in claude-code/cloud/setup.sh are not
+# covered; their renewal is in claude-code/cloud/CLAUDE.md.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /pi
     schedule:
       interval: weekly

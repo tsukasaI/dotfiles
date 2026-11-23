@@ -26,6 +26,15 @@ Verification log: `docs/cloud-sessions.md`.
   (the same list `setup.sh` links on the Mac). Re-pin with
   `bash tests/coding-guidelines-pin.sh --write <coding-guidelines main commit>`,
   then regenerate the manifest.
+- The tool pins at the top of `cloud/setup.sh` (gitleaks, atlas, cargo-deny,
+  cargo-audit) have no Dependabot coverage, so renew them by hand at least
+  quarterly and whenever an upstream security release lands: compare each
+  against `gh api repos/<owner>/<repo>/releases/latest` (gitleaks/gitleaks,
+  EmbarkStudios/cargo-deny, ariga/atlas; for cargo-audit, the newest
+  `cargo-audit/v*` tag in rustsec/rustsec, whose latest release may be
+  another crate), bump the
+  version, recompute the SHA256 from the downloaded artifact, then renew the
+  pin below.
 - `cloud/exclude.txt` lists the Mac-only skills left out, with reasons.
 - Renew the pin: `bash claude-code/cloud/pin.sh <main commit>` and paste the
   output into the environment's setup-script box. Until then cloud sessions
