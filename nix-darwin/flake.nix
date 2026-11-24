@@ -15,7 +15,7 @@
     herdr.inputs.nixpkgs.follows = "nixpkgs";
     # Source only, pinned to the release tag: ./shguard.nix builds it, since
     # shguard's flake has no package output yet (tsukasaI/shguard#1114).
-    shguard.url = "github:tsukasaI/shguard/v0.13.0";
+    shguard.url = "github:tsukasaI/shguard/v0.14.0";
     shguard.flake = false;
   };
 
