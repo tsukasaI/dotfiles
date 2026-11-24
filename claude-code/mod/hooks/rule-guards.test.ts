@@ -129,6 +129,9 @@ const COMMIT_FORMS: Array<[string, string, string | undefined, boolean]> = [
   ['--message=msg', "git commit --message='wip stuff'", 'wip stuff', true],
   ['--mess abbreviation', "git commit --mess 'wip stuff'", 'wip stuff', true],
   ['&& chain', "git add x && git commit -m 'wip'", 'wip', true],
+  ['&& then a newline', "git add x &&\n  git commit -m 'wip'", 'wip', true],
+  ['one-line -m heredoc closed by )', 'git commit -m "$(cat <<EOF\nwip stuff\nEOF)"', 'wip stuff', true],
+  ['<<- heredoc with tab-indented tag', 'git commit -F - <<-EOF\n\twip stuff\n\tEOF', '\twip stuff', true],
   ['-F - heredoc', "git commit -F - <<'EOF'\nwip stuff\nEOF", 'wip stuff', true],
   ['--file=- heredoc', "git commit --file=- <<EOF\nwip stuff\nEOF", 'wip stuff', true],
   ['-F /dev/stdin heredoc', "git commit -F /dev/stdin <<'EOF'\nwip stuff\nEOF", 'wip stuff', true],
@@ -185,6 +188,7 @@ test('an unreadable message flag is denied (fail closed)', async ($, on) => {
     'git commit -F -',
     'git commit -F /dev/stdin',
     'cat m | git commit -F -',
+    'git commit -F - <<EOF\nwip\nEOF ',
   ]) {
     const ran = await $.tool.call({ tool: 'Bash', command })
     expect(ran.deny, command).toMatch(/not readable; use -m/)
@@ -229,6 +233,12 @@ test('a cd before a newline-separated commit skips the branch check; plain and -
   expect(newline.deny).toMatch(/branch \+ PR/)
   const dashC = await $.tool.call({ tool: 'Bash', command: 'git -c a=b commit -m "feat: x"' })
   expect(dashC.deny).toMatch(/branch \+ PR/)
+})
+
+test('a long blank run before a commit on main finishes and is still checked', async ($, on) => {
+  stubGit(on, 'main', 'git@github.com:tsukasaI/app.git')
+  const command = '\n'.repeat(50000) + 'git commit -m "feat: x"'
+  expect((await $.tool.call({ tool: 'Bash', command })).deny).toMatch(/branch \+ PR/)
 })
 
 test('cd/-C commits skip the branch check', async ($, on) => {

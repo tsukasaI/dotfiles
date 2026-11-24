@@ -166,7 +166,7 @@ export function registerRuleGuards(on: On): void {
     // Not resolving the `cd`/`-C` target instead: this guard catches slips, not evasion
     // (`cd . && git commit` skips it), and parsing chained or non-literal paths here would
     // run on every Bash call. Hard enforcement belongs in GitHub branch protection.
-    const redirected = /(^|[;&|(\n]\s*)cd\s/.test(commit.prefix) || /(^|\s)-C(\s|$)/.test(commit.globalOptions)
+    const redirected = /(^|[;&|(\n][^\S\n]*)cd\s/.test(commit.prefix) || /(^|\s)-C(\s|$)/.test(commit.globalOptions)
     if (e.agentId === undefined && !redirected) {
       const badBranch = await mainCommitProblem($)
       if (badBranch !== undefined) return { deny: `dotfiles-mod: ${badBranch}.` }
