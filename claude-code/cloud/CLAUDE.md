@@ -32,9 +32,9 @@ Verification log: `docs/cloud-sessions.md`.
   against `gh api repos/<owner>/<repo>/releases/latest` (gitleaks/gitleaks,
   EmbarkStudios/cargo-deny, ariga/atlas; for cargo-audit, the newest
   `cargo-audit/v*` tag in rustsec/rustsec, whose latest release may be
-  another crate), bump the
-  version, recompute the SHA256 from the downloaded artifact, then renew the
-  pin below.
+  another crate), bump the version, then renew the pin below. atlas,
+  cargo-deny and cargo-audit also carry a SHA256: recompute it from the
+  downloaded artifact. gitleaks is pinned by version only (`go install`).
 - `cloud/exclude.txt` lists the Mac-only skills left out, with reasons.
 - Renew the pin: `bash claude-code/cloud/pin.sh <main commit>` and paste the
   output into the environment's setup-script box. Until then cloud sessions
