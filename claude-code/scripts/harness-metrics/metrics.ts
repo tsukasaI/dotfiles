@@ -158,6 +158,13 @@ interface ToolUse {
 // dotfiles and ops commit straight to main, so a push there stands in for `gh pr merge`.
 const MAIN_COMMIT_REPO = /(^|\/)(dotfiles|ops)(\/|$)/;
 
+// Command position only, with quoted text blanked first: `git commit -m "x; git push"`
+// and `echo git push` are not pushes. `[^\S\n]*`, not `\s*`: that is quadratic on long blank runs.
+const QUOTED = /"[^"]*"|'[^']*'/g;
+const GIT_PUSH = /(^[^\S\n]*|[;&|(\n][^\S\n]*)git\s+push\b/;
+const GH_PR_MERGE = /(^[^\S\n]*|[;&|(\n][^\S\n]*)gh\s+pr\s+merge\b/;
+const DRY_RUN = /(^|\s)(--dry-run|-n)(\s|$)/;
+
 export function analyzeSession(lines: string[]): SessionMetrics {
   const m: SessionMetrics = {
     startedAt: "",
@@ -229,8 +236,10 @@ export function analyzeSession(lines: string[]): SessionMetrics {
           m.planAccepted = true;
         }
         if (use?.name === "Bash" && !failed && planLive) {
-          const merged = /\bgh\s+pr\s+merge\b/.test(use.command);
-          const pushedToMain = /\bgit\s+push\b/.test(use.command) && MAIN_COMMIT_REPO.test(m.cwd);
+          const cmd = use.command.replace(QUOTED, '""');
+          const merged = GH_PR_MERGE.test(cmd);
+          const pushedToMain =
+            GIT_PUSH.test(cmd) && !DRY_RUN.test(cmd) && MAIN_COMMIT_REPO.test(m.cwd);
           if (merged || pushedToMain) m.autonomous = true;
         }
       }

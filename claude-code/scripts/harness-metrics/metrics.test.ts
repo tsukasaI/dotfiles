@@ -154,6 +154,42 @@ describe("autonomous completion", () => {
       expect(m.planAccepted).toBe(true);
     });
 
+    const bash = (id: string, command: string): string[] => [
+      toolUse(id, "Bash", { command }),
+      toolResult(id, "ok"),
+    ];
+    const inDotfiles = user("go", { cwd: "/Users/me/dotfiles" });
+
+    test("push text inside a commit message is not a push", () => {
+      const m = analyzeSession([
+        inDotfiles,
+        ...plan,
+        ...bash("c", 'git commit -m "feat: x; git push later"'),
+        user("also Y"),
+        ...push,
+      ]);
+      expect(m.autonomous).toBe(false);
+    });
+
+    test("a dry-run push does not count", () => {
+      expect(
+        analyzeSession([inDotfiles, ...plan, ...bash("d", "git push --dry-run origin main")]).autonomous,
+      ).toBe(false);
+      expect(analyzeSession([inDotfiles, ...plan, ...bash("d", "git push -n origin main")]).autonomous).toBe(
+        false,
+      );
+    });
+
+    test("a push chained after another command counts", () => {
+      expect(
+        analyzeSession([inDotfiles, ...plan, ...bash("e", "git add . && git push origin main")]).autonomous,
+      ).toBe(true);
+    });
+
+    test("echoing a merge command is not a merge", () => {
+      expect(analyzeSession([user("go"), ...plan, ...bash("f", "echo gh pr merge 1")]).autonomous).toBe(false);
+    });
+
     test("a handoff between acceptance and push disqualifies without counting as a prompt", () => {
       const m = analyzeSession([
         user("go", { cwd: "/Users/me/dotfiles" }),
